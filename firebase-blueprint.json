@@ -1,0 +1,308 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "full_name": { "type": "string" },
+        "phone": { "type": "string" },
+        "document": { "type": "string" },
+        "role": { "type": "string", "enum": ["master", "admin", "user"] },
+        "company_id": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" } },
+        "active": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Company information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "pix_key": { "type": "string" },
+        "fiscal_token": { "type": "string" },
+        "fiscal_environment": { "type": "string", "enum": ["sandbox", "production"] },
+        "fiscal_provider": { "type": "string", "enum": ["FocusNFe", "WebmaniaBR"] },
+        "role_permissions": { "type": "object" },
+        "active": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Product inventory item",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "category_id": { "type": "string" },
+        "cost_price": { "type": "number" },
+        "sale_price": { "type": "number" },
+        "stock_quantity": { "type": "number" },
+        "min_stock": { "type": "number" },
+        "ncm": { "type": "string" },
+        "cest": { "type": "string" },
+        "icms_rate": { "type": "number" },
+        "ipi_rate": { "type": "number" },
+        "pis_rate": { "type": "number" },
+        "cofins_rate": { "type": "number" },
+        "mva_rate": { "type": "number" },
+        "csosn": { "type": "string" },
+        "cst": { "type": "string" },
+        "cfop": { "type": "string" },
+        "company_id": { "type": "string" },
+        "bom_items": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "product_id": { "type": "string" },
+              "product_name": { "type": "string" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "company_id"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Sales transaction",
+      "type": "object",
+      "properties": {
+        "sale_number": { "type": "string" },
+        "client_id": { "type": "string" },
+        "client_name": { "type": "string" },
+        "client_document": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "total": { "type": "number" },
+        "payment_method": { "type": "string" },
+        "cashier_id": { "type": "string" },
+        "seller_id": { "type": "string" },
+        "seller_name": { "type": "string" },
+        "commission_amount": { "type": "number" },
+        "commission_status": { "type": "string", "enum": ["pending", "paid"] },
+        "company_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["total", "company_id"]
+    },
+    "Invite": {
+      "title": "Invite",
+      "description": "User invitation to a company",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "company_id": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "EXPIRED"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "company_id", "role", "status"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Financial account (payable or receivable)",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "due_date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Pendente", "Pago", "Atrasado"] },
+        "company_id": { "type": "string" },
+        "is_recurring": { "type": "boolean" },
+        "frequency": { "type": "string", "enum": ["WEEKLY", "MONTHLY", "YEARLY"] },
+        "payment_date": { "type": "string", "format": "date-time" },
+        "receipt_date": { "type": "string", "format": "date-time" },
+        "bank_account_id": { "type": "string" },
+        "cashier_id": { "type": "string" },
+        "supplier": { "type": "string" },
+        "client_name": { "type": "string" }
+      },
+      "required": ["description", "amount", "due_date", "status", "company_id"]
+    },
+    "TaxRule": {
+      "title": "Tax Rule",
+      "description": "Tax configuration by NCM",
+      "type": "object",
+      "properties": {
+        "ncm": { "type": "string" },
+        "description": { "type": "string" },
+        "icms_rate": { "type": "number" },
+        "ipi_rate": { "type": "number" },
+        "pis_rate": { "type": "number" },
+        "cofins_rate": { "type": "number" },
+        "mva_rate": { "type": "number" },
+        "aliquota_interna": { "type": "number" },
+        "aliquota_interestadual": { "type": "number" },
+        "cfop_internal": { "type": "string" },
+        "cfop_interstate": { "type": "string" },
+        "company_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ncm", "company_id"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "System audit logs for tracking actions",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "entity": { "type": "string" },
+        "entity_id": { "type": "string" },
+        "description": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "company_id": { "type": "string" }
+      },
+      "required": ["action", "user_id", "timestamp"]
+    },
+    "Seller": {
+      "title": "Seller",
+      "description": "Sales person information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "commission_rate": { "type": "number" },
+        "monthly_goal": { "type": "number" },
+        "active": { "type": "boolean" },
+        "company_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "company_id"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Service information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "iss_rate": { "type": "number" },
+        "pis_rate": { "type": "number" },
+        "cofins_rate": { "type": "number" },
+        "service_code": { "type": "string" },
+        "active": { "type": "boolean" },
+        "company_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "company_id"]
+    },
+    "InventoryMovement": {
+      "title": "Inventory Movement",
+      "description": "Record of stock changes",
+      "type": "object",
+      "properties": {
+        "product_id": { "type": "string" },
+        "product_name": { "type": "string" },
+        "type": { "type": "string", "enum": ["IN", "OUT", "ADJUSTMENT"] },
+        "reason": { "type": "string" },
+        "quantity": { "type": "number" },
+        "previous_stock": { "type": "number" },
+        "current_stock": { "type": "number" },
+        "observation": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "company_id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["product_id", "type", "quantity", "company_id"]
+    },
+    "Certificate": {
+      "title": "Digital Certificate",
+      "description": "Company digital certificate A1 metadata",
+      "type": "object",
+      "properties": {
+        "company_id": { "type": "string" },
+        "filename": { "type": "string" },
+        "storage_path": { "type": "string" },
+        "expiration_date": { "type": "string", "format": "date-time" },
+        "issuer": { "type": "string" },
+        "subject": { "type": "string" },
+        "serial_number": { "type": "string" },
+        "active": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["company_id", "storage_path"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System notification for alerts",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "error", "success"] },
+        "status": { "type": "string", "enum": ["unread", "read"] },
+        "company_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "link": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "message", "type", "status", "company_id"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Fiscal invoice (NF-e/NFC-e)",
+      "type": "object",
+      "properties": {
+        "number": { "type": "number" },
+        "series": { "type": "string" },
+        "type": { "type": "string", "enum": ["NFe", "NFCe"] },
+        "sale_id": { "type": "string" },
+        "client_name": { "type": "string" },
+        "client_document": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pendente", "Emitida", "Cancelada", "Erro"] },
+        "emission_date": { "type": "string", "format": "date-time" },
+        "protocol": { "type": "string" },
+        "access_key": { "type": "string" },
+        "xml_url": { "type": "string" },
+        "xml_storage_url": { "type": "string" },
+        "pdf_url": { "type": "string" },
+        "error_message": { "type": "string" },
+        "company_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["number", "status", "company_id"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "User profiles" },
+    "companies": { "schema": "Company", "description": "Companies" },
+    "products": { "schema": "Product", "description": "Products" },
+    "sales": { "schema": "Sale", "description": "Sales" },
+    "purchases": { "schema": "object", "description": "Purchases" },
+    "accountsReceivable": { "schema": "Account", "description": "Accounts Receivable" },
+    "accountsPayable": { "schema": "Account", "description": "Accounts Payable" },
+    "cashiers": { "schema": "object", "description": "Cashiers" },
+    "clients": { "schema": "object", "description": "Clients" },
+    "suppliers": { "schema": "object", "description": "Suppliers" },
+    "categories": { "schema": "object", "description": "Categories" },
+    "services": { "schema": "Service", "description": "Services" },
+    "invites": { "schema": "Invite", "description": "User invitations" },
+    "tax_rules": { "schema": "TaxRule", "description": "Tax rules by NCM" },
+    "audit_logs": { "schema": "AuditLog", "description": "System audit logs" },
+    "sellers": { "schema": "Seller", "description": "Sales team" },
+    "inventory_movements": { "schema": "InventoryMovement", "description": "Inventory movement logs" },
+    "certificates": { "schema": "Certificate", "description": "Digital certificates A1" },
+    "notifications": { "schema": "Notification", "description": "System notifications" },
+    "invoices": { "schema": "Invoice", "description": "Fiscal invoices" }
+  }
+}

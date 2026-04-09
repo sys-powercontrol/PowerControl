@@ -1,0 +1,5 @@
+{
+  "name": "PowerControl",
+  "description": "Sistema de Gestão Empresarial completo com controle de vendas, financeiro, estoque e multi-tenant.",
+  "requestFramePermissions": []
+}
