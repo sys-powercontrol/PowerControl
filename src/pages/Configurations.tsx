@@ -16,7 +16,8 @@ import {
   Globe,
   Info,
   ShieldCheck,
-  Check
+  Check,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
@@ -26,6 +27,7 @@ export default function Configurations() {
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState("general");
+  const [isSaving, setIsSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -74,6 +76,7 @@ export default function Configurations() {
 
   const saveData = (data: any) => {
     if (!user?.company_id) return;
+    setIsSaving(true);
     api.put("companies", user.company_id, data).then(() => {
       api.log({
         action: 'UPDATE',
@@ -86,6 +89,12 @@ export default function Configurations() {
       queryClient.invalidateQueries({ queryKey: ["company", user.company_id] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
       toast.success("Configurações salvas com sucesso!");
+    }).catch((error) => {
+      console.error("Error saving company settings:", error);
+      toast.error("Erro ao salvar configurações. Tente novamente.");
+    }).finally(() => {
+      setIsSaving(false);
+      setConfirmModal(prev => ({ ...prev, isOpen: false }));
     });
   };
 
@@ -130,7 +139,6 @@ export default function Configurations() {
               : "Tem certeza que deseja habilitar as fotos de produtos? A área de upload voltará a ficar disponível.",
             onConfirm: () => {
               saveData(data);
-              setConfirmModal(prev => ({ ...prev, isOpen: false }));
             }
           });
           return;
@@ -454,9 +462,9 @@ export default function Configurations() {
               )}
 
               <div className="flex justify-end pt-8 border-t border-gray-50">
-                <button type="submit" className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
-                  <Save size={20} />
-                  Salvar Alterações
+                <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50">
+                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  {isSaving ? "Salvando..." : "Salvar Alterações"}
                 </button>
               </div>
             </form>
@@ -470,6 +478,7 @@ export default function Configurations() {
         onConfirm={confirmModal.onConfirm}
         title={confirmModal.title}
         message={confirmModal.message}
+        isLoading={isSaving}
       />
     </div>
   );
