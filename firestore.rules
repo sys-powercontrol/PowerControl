@@ -66,57 +66,64 @@ service cloud.firestore {
     }
 
     match /purchases/{id} {
-      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('inventory.manage');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
     }
 
     match /inventory_movements/{id} {
-      allow read, create: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('inventory.manage');
+      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
       allow update, delete: if false;
     }
 
     match /accountsPayable/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /accountsReceivable/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /bankAccounts/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /cashiers/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /suppliers/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /sellers/{id} {
-      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('sellers.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('sellers.manage');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('sellers.manage');
     }
 
     match /employees/{id} {
-      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('employees.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('employees.manage');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('employees.manage');
     }
 
     match /invoices/{id} {
-      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('fiscal.manage');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
     }
 
     match /tax_rules/{id} {
-      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('fiscal.manage');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
     }
 
     match /certificates/{id} {
-      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('fiscal.manage');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
     }
 
     match /invites/{inviteId} {
