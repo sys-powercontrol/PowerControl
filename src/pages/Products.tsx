@@ -70,6 +70,14 @@ export default function Products() {
     enabled: !!user
   });
 
+  const { data: companyData } = useQuery({ 
+    queryKey: ["company", currentCompanyId], 
+    queryFn: () => api.get("companies", currentCompanyId),
+    enabled: !!currentCompanyId
+  });
+
+  const disableProductImages = companyData?.disable_product_images === "true" || companyData?.disable_product_images === true;
+
   const products = useMemo(() => {
     if (!currentCompanyId) return productsData;
     return productsData.filter((item: any) => item.company_id === currentCompanyId);
@@ -257,7 +265,7 @@ export default function Products() {
       cofins_rate: parseFloat(data.cofins_rate as string) || 0,
       mva_rate: parseFloat(data.mva_rate as string) || 0,
       aliquota_interna_destino: parseFloat(data.aliquota_interna_destino as string) || 0,
-      image_url: imageBase64 || editingProduct?.image_url || null,
+      image_url: disableProductImages ? null : (imageBase64 || editingProduct?.image_url || null),
       bom_items: bomItems
     };
 
@@ -408,45 +416,47 @@ export default function Products() {
                 Nenhum produto encontrado.
               </div>
             ) : filteredProducts.map((p: any) => (
-              <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group">
-                <div className="aspect-square bg-gray-50 flex items-center justify-center relative">
-                  {p.image_url ? (
-                    <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <ImageIcon size={48} className="text-gray-200" />
-                  )}
-                  {canManage && (
-                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => { 
-                          setEditingProduct(p); 
-                          setImageBase64(p.image_url || null); 
-                          setBomItems(p.bom_items || []);
-                          setIsModalOpen(true); 
-                        }}
-                        className="p-2 bg-white rounded-lg shadow-md text-blue-600 hover:bg-blue-50"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setConfirmModal({
-                            isOpen: true,
-                            title: "Excluir Produto",
-                            message: "Deseja realmente excluir este produto? Esta ação não pode ser desfeita.",
-                            onConfirm: () => {
-                              deleteMutation.mutate({ entity: "products", id: p.id });
-                              setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                            }
-                          });
-                        }}
-                        className="p-2 bg-white rounded-lg shadow-md text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+              <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group relative">
+                {!disableProductImages && (
+                  <div className="aspect-square bg-gray-50 flex items-center justify-center relative">
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={48} className="text-gray-200" />
+                    )}
+                  </div>
+                )}
+                {canManage && (
+                  <div className={`absolute ${disableProductImages ? 'top-2 right-2' : 'top-2 right-2'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                    <button 
+                      onClick={() => { 
+                        setEditingProduct(p); 
+                        setImageBase64(p.image_url || null); 
+                        setBomItems(p.bom_items || []);
+                        setIsModalOpen(true); 
+                      }}
+                      className="p-2 bg-white rounded-lg shadow-md text-blue-600 hover:bg-blue-50"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setConfirmModal({
+                          isOpen: true,
+                          title: "Excluir Produto",
+                          message: "Deseja realmente excluir este produto? Esta ação não pode ser desfeita.",
+                          onConfirm: () => {
+                            deleteMutation.mutate({ entity: "products", id: p.id });
+                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                          }
+                        });
+                      }}
+                      className="p-2 bg-white rounded-lg shadow-md text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-bold text-gray-900 truncate flex-1">{p.name}</h3>
@@ -608,32 +618,34 @@ export default function Products() {
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative group">
-                  <div className="w-32 h-32 bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-50 flex items-center justify-center">
-                    {imageBase64 || editingProduct?.image_url ? (
-                      <img src={imageBase64 || editingProduct?.image_url} alt="Produto" className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon size={48} className="text-gray-300" />
-                    )}
+              {!disableProductImages && (
+                <div className="flex flex-col items-center mb-6">
+                  <div className="relative group">
+                    <div className="w-32 h-32 bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-50 flex items-center justify-center">
+                      {imageBase64 || editingProduct?.image_url ? (
+                        <img src={imageBase64 || editingProduct?.image_url} alt="Produto" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon size={48} className="text-gray-300" />
+                      )}
+                    </div>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={handleFileChange} 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute -bottom-2 -right-2 p-2 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus size={16} />
+                    </button>
                   </div>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleFileChange} 
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute -bottom-2 -right-2 p-2 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus size={16} />
-                  </button>
+                  <p className="text-xs text-gray-400 mt-3">Tamanho máximo: 500KB</p>
                 </div>
-                <p className="text-xs text-gray-400 mt-3">Tamanho máximo: 500KB</p>
-              </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-bold text-gray-700">Nome do Produto *</label>

@@ -171,22 +171,43 @@ export default function Configurations() {
                   </div>
 
                   <div className="pt-6 border-t border-gray-50">
-                    <h3 className="text-sm font-bold text-gray-900 mb-4">Configurações de Estoque</h3>
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div>
-                        <p className="font-bold text-gray-900">Permitir estoque negativo</p>
-                        <p className="text-xs text-gray-500">Permitir a finalização de vendas mesmo sem estoque disponível.</p>
+                    <h3 className="text-sm font-bold text-gray-900 mb-4">Configurações de Produtos e Estoque</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div>
+                          <p className="font-bold text-gray-900">Permitir estoque negativo</p>
+                          <p className="text-xs text-gray-500">Permitir a finalização de vendas mesmo sem estoque disponível.</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            name="allow_negative_stock" 
+                            defaultChecked={company.allow_negative_stock === "true" || company.allow_negative_stock === true}
+                            className="sr-only peer" 
+                            value="true"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          name="allow_negative_stock" 
-                          defaultChecked={company.allow_negative_stock === "true" || company.allow_negative_stock === true}
-                          className="sr-only peer" 
-                          value="true"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
+
+                      {user?.role === 'master' && (
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                          <div>
+                            <p className="font-bold text-gray-900">Desabilitar fotos de produtos</p>
+                            <p className="text-xs text-gray-500">Ocultar a opção de upload de imagens no cadastro de produtos.</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              name="disable_product_images" 
+                              defaultChecked={company.disable_product_images === "true" || company.disable_product_images === true}
+                              className="sr-only peer" 
+                              value="true"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
