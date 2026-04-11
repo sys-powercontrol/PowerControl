@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -45,6 +46,7 @@ import Employees from "./pages/Employees";
 import { AuthProvider, useAuth } from "./lib/auth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ScrollToTop from "./components/ScrollToTop";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -71,6 +73,7 @@ export default function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <ScrollToTop />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
