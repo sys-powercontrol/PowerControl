@@ -20,11 +20,23 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 export default function Configurations() {
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState("general");
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   const canManage = hasPermission('settings.manage');
 
@@ -48,6 +60,23 @@ export default function Configurations() {
     queryFn: () => api.get("companies", user?.company_id) 
   });
   const company = companyData || {};
+
+  const saveData = (data: any) => {
+    if (!user?.company_id) return;
+    api.put("companies", user.company_id, data).then(() => {
+      api.log({
+        action: 'UPDATE',
+        entity: 'companies',
+        entity_id: user.company_id,
+        description: `Atualizou configurações da empresa`,
+        metadata: data,
+        changes: calculateDiff(company, data)
+      });
+      queryClient.invalidateQueries({ queryKey: ["company", user.company_id] });
+      queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
+      toast.success("Configurações salvas com sucesso!");
+    });
+  };
 
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -75,19 +104,30 @@ export default function Configurations() {
       return;
     }
     
-    api.put("companies", user.company_id, data).then(() => {
-      api.log({
-        action: 'UPDATE',
-        entity: 'companies',
-        entity_id: user.company_id,
-        description: `Atualizou configurações da empresa`,
-        metadata: data,
-        changes: calculateDiff(company, data)
-      });
-      queryClient.invalidateQueries({ queryKey: ["company", user.company_id] });
-      queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      toast.success("Configurações salvas com sucesso!");
-    });
+    if (activeTab === "general") {
+      data.allow_negative_stock = formData.get("allow_negative_stock") === "true";
+      if (user?.role === 'master') {
+        data.disable_product_images = formData.get("disable_product_images") === "true";
+        
+        const currentDisableImages = company.disable_product_images === "true" || company.disable_product_images === true;
+        if (currentDisableImages !== data.disable_product_images) {
+          setConfirmModal({
+            isOpen: true,
+            title: "Confirmar Alteração",
+            message: data.disable_product_images 
+              ? "Tem certeza que deseja desabilitar as fotos de produtos? A área de upload será ocultada para todos os usuários."
+              : "Tem certeza que deseja habilitar as fotos de produtos? A área de upload voltará a ficar disponível.",
+            onConfirm: () => {
+              saveData(data);
+              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            }
+          });
+          return;
+        }
+      }
+    }
+
+    saveData(data);
   };
 
   const tabs = [
@@ -410,6 +450,14 @@ export default function Configurations() {
           )}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+      />
     </div>
   );
 }
