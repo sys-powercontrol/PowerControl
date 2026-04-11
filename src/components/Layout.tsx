@@ -141,6 +141,7 @@ export default function Layout() {
       submenu: [
         { name: "Contas a Pagar", path: "/ContasPagar", icon: TrendingDown, permission: 'finance.view' },
         { name: "Contas a Receber", path: "/ContasReceber", icon: TrendingUp, permission: 'finance.view' },
+        { name: "Lucratividade", path: "/RelatorioLucratividade", icon: TrendingUp, permission: 'reports.view' },
         { name: "Relatório DRE", path: "/RelatorioDRE", icon: BarChart3, permission: 'reports.view' },
         { name: "Contas Bancárias", path: "/ContasBancarias", icon: Building2, permission: 'finance.manage' },
         { name: "Conciliação Bancária", path: "/ConciliacaoBancaria", icon: ArrowRightLeft, permission: 'finance.manage' },

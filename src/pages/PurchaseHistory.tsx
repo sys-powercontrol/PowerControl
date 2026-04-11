@@ -16,6 +16,7 @@ import React, { useState, useMemo } from "react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { printPurchaseReceipt } from "../lib/utils/print";
+import ExportButton from "../components/ExportButton";
 
 export default function PurchaseHistory() {
   const { user, hasPermission } = useAuth();
@@ -66,6 +67,15 @@ export default function PurchaseHistory() {
     );
   }, [purchasesData, searchTerm]);
 
+  const purchaseExportHeaders = {
+    purchase_number: "Nº Compra",
+    supplier_name: "Fornecedor",
+    total: "Total",
+    payment_method: "Pagamento",
+    status: "Status",
+    purchase_date: "Data"
+  };
+
   const cancelPurchaseMutation = useMutation({
     mutationFn: (id: string) => api.put("purchases", id, { status: "Cancelada" }),
     onSuccess: () => {
@@ -92,6 +102,21 @@ export default function PurchaseHistory() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Histórico de Compras</h1>
           <p className="text-gray-500">Acompanhe todas as entradas de estoque.</p>
+        </div>
+        <div className="flex gap-2">
+          <ExportButton 
+            data={filteredPurchases} 
+            filename="historico-compras" 
+            format="xlsx" 
+            headers={purchaseExportHeaders} 
+          />
+          <ExportButton 
+            data={filteredPurchases} 
+            filename="historico-compras" 
+            format="pdf" 
+            title="Histórico de Compras"
+            headers={purchaseExportHeaders} 
+          />
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy, limit, OrderByDirection } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy, limit, OrderByDirection, onSnapshot } from "firebase/firestore";
 
 let currentCompanyId: string | null = null;
 let isSystemAdminStatus = false;
@@ -167,6 +167,43 @@ export const api = {
     const docRef = doc(db, entity, id);
     await deleteDoc(docRef);
     return true;
+  },
+  subscribe: (entityPath: string, params: any, callback: (data: any[]) => void) => {
+    let q = collection(db, entityPath) as any;
+    const conditions: any[] = [];
+
+    if (params && typeof params === "object") {
+      Object.keys(params).forEach(key => {
+        if (params[key] !== undefined && key !== "_orderBy" && key !== "_orderDir" && key !== "_limit") {
+          conditions.push(where(key, "==", params[key]));
+        }
+      });
+    }
+
+    const pathSegments = entityPath.split("/");
+    const baseEntity = pathSegments[0];
+    const isCompanyEntity = baseEntity === "companies";
+
+    if (!isSystemAdminStatus && currentCompanyId && !isCompanyEntity) {
+      conditions.push(where("company_id", "==", currentCompanyId));
+    }
+
+    const queryConstraints: any[] = [...conditions];
+    if (params?._orderBy) {
+      queryConstraints.push(orderBy(params._orderBy, (params._orderDir as OrderByDirection) || "asc"));
+    }
+    if (params?._limit) {
+      queryConstraints.push(limit(params._limit));
+    }
+
+    if (queryConstraints.length > 0) {
+      q = query(q, ...queryConstraints);
+    }
+
+    return onSnapshot(q, (snapshot: any) => {
+      const data = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      callback(data);
+    });
   },
   log: async (data: any) => {
     const user = auth.currentUser;

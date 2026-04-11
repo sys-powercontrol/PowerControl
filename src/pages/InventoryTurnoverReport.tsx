@@ -114,6 +114,7 @@ export default function InventoryTurnoverReport() {
       const suggestedPurchase = Math.max(0, targetStock - (product.stock_quantity || 0));
 
       const daysOfStock = dailyAvg30 > 0 ? (product.stock_quantity / dailyAvg30) : Infinity;
+      const turnoverRate = dailyAvg30 > 0 ? (sales30 / (product.stock_quantity || 1)) : 0;
 
       return {
         ...product,
@@ -124,6 +125,7 @@ export default function InventoryTurnoverReport() {
         dailyAvg90,
         suggestedPurchase,
         daysOfStock,
+        turnoverRate,
         isCritical: (product.stock_quantity || 0) <= (product.min_stock || 0)
       };
     }).filter((p: any) => {
@@ -149,8 +151,9 @@ export default function InventoryTurnoverReport() {
     const criticalCount = reportData.filter(p => p.isCritical).length;
     const totalSuggestedValue = reportData.reduce((acc, p) => acc + (p.suggestedPurchase * (p.cost_price || 0)), 0);
     const avgTurnover = reportData.reduce((acc, p) => acc + p.sales30, 0) / (reportData.length || 1);
+    const globalTurnoverRate = reportData.reduce((acc, p) => acc + p.turnoverRate, 0) / (reportData.length || 1);
 
-    return { criticalCount, totalSuggestedValue, avgTurnover };
+    return { criticalCount, totalSuggestedValue, avgTurnover, globalTurnoverRate };
   }, [reportData]);
 
   if (isLoadingProducts || isLoadingMovements) {
@@ -211,14 +214,12 @@ export default function InventoryTurnoverReport() {
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
-            <ShoppingCart size={24} />
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+            <BarChart3 size={24} />
           </div>
           <div>
-            <p className="text-sm text-gray-500 font-medium">Investimento Sugerido</p>
-            <h3 className="text-2xl font-bold text-gray-900">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalSuggestedValue)}
-            </h3>
+            <p className="text-sm text-gray-500 font-medium">Taxa de Giro (30d)</p>
+            <h3 className="text-2xl font-bold text-gray-900">{(stats.globalTurnoverRate * 100).toFixed(1)}%</h3>
           </div>
         </div>
       </div>
@@ -313,6 +314,7 @@ export default function InventoryTurnoverReport() {
                 <th className="px-6 py-4 font-bold text-center">Mínimo</th>
                 <th className="px-6 py-4 font-bold text-center">Vendas (30d)</th>
                 <th className="px-6 py-4 font-bold text-center">Média Diária</th>
+                <th className="px-6 py-4 font-bold text-center">Taxa Giro</th>
                 <th className="px-6 py-4 font-bold text-center">Dias Restantes</th>
                 <th className="px-6 py-4 font-bold text-center">Sugestão Compra</th>
                 <th className="px-6 py-4 font-bold">Status</th>
@@ -340,6 +342,9 @@ export default function InventoryTurnoverReport() {
                   <td className="px-6 py-4 text-center text-gray-500">{p.min_stock || 0}</td>
                   <td className="px-6 py-4 text-center font-bold text-blue-600">{p.sales30}</td>
                   <td className="px-6 py-4 text-center text-gray-500">{p.dailyAvg30.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-purple-600 font-medium">{(p.turnoverRate * 100).toFixed(1)}%</span>
+                  </td>
                   <td className="px-6 py-4 text-center">
                     {p.daysOfStock === Infinity ? (
                       <span className="text-gray-400">---</span>

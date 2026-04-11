@@ -14,6 +14,7 @@ import {
   DollarSign
 } from "lucide-react";
 import { toast } from "sonner";
+import ExportButton from "../components/ExportButton";
 
 export default function Services() {
   const { user } = useAuth();
@@ -30,6 +31,15 @@ export default function Services() {
   const filteredServices = services.filter((s: any) => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const serviceExportHeaders = {
+    name: "Serviço",
+    description: "Descrição",
+    price: "Preço",
+    cost: "Custo",
+    duration: "Duração (min)",
+    iss_rate: "ISS (%)"
+  };
 
   const serviceMutation = useMutation({
     mutationFn: (data: any) => editingService 
@@ -91,16 +101,33 @@ export default function Services() {
           <h1 className="text-2xl font-bold text-gray-900">Serviços</h1>
           <p className="text-gray-500">Gerencie o catálogo de serviços da sua empresa.</p>
         </div>
-        <button 
-          onClick={() => {
-            setEditingService(null);
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
-        >
-          <Plus size={20} />
-          Novo Serviço
-        </button>
+        <div className="flex gap-2">
+          <div className="flex gap-2 mr-2">
+            <ExportButton 
+              data={filteredServices} 
+              filename="servicos" 
+              format="xlsx" 
+              headers={serviceExportHeaders} 
+            />
+            <ExportButton 
+              data={filteredServices} 
+              filename="servicos" 
+              format="pdf" 
+              title="Relatório de Serviços"
+              headers={serviceExportHeaders} 
+            />
+          </div>
+          <button 
+            onClick={() => {
+              setEditingService(null);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+          >
+            <Plus size={20} />
+            Novo Serviço
+          </button>
+        </div>
       </div>
 
       {/* Search and Filters */}

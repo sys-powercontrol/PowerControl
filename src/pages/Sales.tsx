@@ -18,14 +18,15 @@ import {
   AlertCircle,
   Tag,
   Package,
-  Lock
+  Lock,
+  CreditCard
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "../lib/auth";
 import { printReceipt } from "../lib/utils/print";
 import { format, subDays } from "date-fns";
-import { PixDynamicGenerator } from "../components/Sales/PixDynamicGenerator";
+import { PaymentGateway } from "../components/Sales/PaymentGateway";
 import { offlineStore } from "../lib/offlineStore";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
 
@@ -44,7 +45,7 @@ export default function Sales() {
   const [dueDate, setDueDate] = useState(format(subDays(new Date(), -30), 'yyyy-MM-dd'));
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<any>(null);
-  const [showPix, setShowPix] = useState(false);
+  const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [activeTab, setActiveTab] = useState<"items" | "cart">("items");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hasPending, setHasPending] = useState(false);
@@ -266,7 +267,12 @@ export default function Sales() {
       });
 
       const totalTaxes = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_taxes, 0);
-      const commissionAmount = (total * (selectedSeller.commission_rate || 0)) / 100;
+      
+      // The total commercial value is 'total' (subtotal - discount)
+      // But for fiscal purposes, the total value of the sale might include IPI and ICMS-ST
+      const totalFiscalValue = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_value, 0) - discount;
+      
+      const commissionAmount = (totalFiscalValue * (selectedSeller.commission_rate || 0)) / 100;
 
       const saleData = {
         company_id: user?.company_id,
@@ -279,7 +285,7 @@ export default function Sales() {
         commission_amount: commissionAmount,
         commission_status: "pending",
         items: itemsWithTaxes,
-        total,
+        total: totalFiscalValue,
         subtotal,
         discount,
         total_taxes: totalTaxes,
@@ -643,16 +649,25 @@ export default function Sales() {
           <div className="space-y-3">
             {paymentMethod === "PIX" && (
               <button 
-                onClick={() => setShowPix(true)}
+                onClick={() => setShowPaymentGateway(true)}
                 className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors"
               >
                 <QrCode size={20} />
                 Gerar QR Code PIX
               </button>
             )}
+            {paymentMethod === "Cartão de Crédito" && (
+              <button 
+                onClick={() => setShowPaymentGateway(true)}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+              >
+                <CreditCard size={20} />
+                Pagar com Cartão
+              </button>
+            )}
             <button 
               onClick={() => finalizeSale.mutate()}
-              disabled={finalizeSale.isPending}
+              disabled={finalizeSale.isPending || (paymentMethod === "PIX" && !showPaymentGateway) || (paymentMethod === "Cartão de Crédito" && !showPaymentGateway)}
               className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-lg shadow-green-100 disabled:opacity-50"
             >
               <CheckCircle2 size={24} />
@@ -689,17 +704,16 @@ export default function Sales() {
         )}
       </div>
 
-      {/* PIX Modal */}
-      {showPix && (
-        <PixDynamicGenerator 
+      {/* Payment Gateway Modal */}
+      {showPaymentGateway && (
+        <PaymentGateway 
           amount={total}
-          pixKey={company?.pix_key || ""}
-          companyName={company?.name || ""}
+          method={paymentMethod === "PIX" ? "PIX" : "CARD"}
           onSuccess={() => {
-            setShowPix(false);
+            setShowPaymentGateway(false);
             finalizeSale.mutate();
           }}
-          onClose={() => setShowPix(false)}
+          onClose={() => setShowPaymentGateway(false)}
         />
       )}
 

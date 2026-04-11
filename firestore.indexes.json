@@ -4,84 +4,84 @@
       "collectionGroup": "sales",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "sale_date", "order": "DESCENDING" }
+        {
+          "fieldPath": "company_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sale_date",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "collectionGroup": "sales",
+      "collectionGroup": "inventory_movements",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "sale_date", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "accountsReceivable",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "accountsReceivable",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "accountsPayable",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "accountsPayable",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "due_date", "order": "ASCENDING" }
+        {
+          "fieldPath": "company_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "audit_logs",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "company_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "collectionGroup": "inventory_movements",
+      "collectionGroup": "accountsPayable",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "company_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "due_date",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "collectionGroup": "inventory_movements",
+      "collectionGroup": "accountsReceivable",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "product_id", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "company_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "due_date",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "purchases",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "company_id", "order": "ASCENDING" },
-        { "fieldPath": "purchase_date", "order": "DESCENDING" }
+        {
+          "fieldPath": "company_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "purchase_date",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],

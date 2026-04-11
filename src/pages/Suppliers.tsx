@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { InputMask } from "../components/ui/InputMask";
 import { externalApi } from "../services/externalApi";
+import ExportButton from "../components/ExportButton";
 
 export default function Suppliers() {
   const { user, hasPermission } = useAuth();
@@ -73,6 +74,16 @@ export default function Suppliers() {
     s.document?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const supplierExportHeaders = {
+    name: "Razão Social",
+    document: "CNPJ",
+    email: "E-mail",
+    phone: "Telefone",
+    city: "Cidade",
+    state: "UF",
+    contact_name: "Contato"
+  };
 
   const searchCEP = async () => {
     const cleanCEP = zipCode.replace(/\D/g, "");
@@ -172,17 +183,34 @@ export default function Suppliers() {
           <h1 className="text-2xl font-bold text-gray-900">Fornecedores</h1>
           <p className="text-gray-500">Gerencie seus parceiros de suprimentos.</p>
         </div>
-        <button 
-          onClick={() => {
-            setEditingSupplier(null);
-            setFetchedData({});
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
-        >
-          <Plus size={20} />
-          Novo Fornecedor
-        </button>
+        <div className="flex gap-2">
+          <div className="flex gap-2 mr-2">
+            <ExportButton 
+              data={filteredSuppliers} 
+              filename="fornecedores" 
+              format="xlsx" 
+              headers={supplierExportHeaders} 
+            />
+            <ExportButton 
+              data={filteredSuppliers} 
+              filename="fornecedores" 
+              format="pdf" 
+              title="Relatório de Fornecedores"
+              headers={supplierExportHeaders} 
+            />
+          </div>
+          <button 
+            onClick={() => {
+              setEditingSupplier(null);
+              setFetchedData({});
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+          >
+            <Plus size={20} />
+            Novo Fornecedor
+          </button>
+        </div>
       </div>
 
       {/* Search */}

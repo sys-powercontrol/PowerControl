@@ -1,113 +1,126 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: users
-    // Fields:
-    //   - email: string (required, email format)
-    //   - full_name: string (optional)
-    //   - role: string (required, ['master', 'admin', 'user'])
-    //   - company_id: string (optional)
-    //   - active: bool (optional)
-    //   - created_at: timestamp (required)
-    //
-    // Collection: companies
-    // Fields:
-    //   - name: string (required)
-    //   - cnpj: string (optional)
-    //   - address: string (optional)
-    //   - phone: string (optional)
-    //   - email: string (optional, email format)
-    //   - active: bool (optional)
-    //   - created_at: timestamp (required)
-    //
-    // Collection: products, sales, purchases, accountsReceivable, accountsPayable, cashiers, clients, suppliers, categories, services
-    // Fields:
-    //   - company_id: string (required)
-    //   - [other fields specific to entity]
-    //
-    // ===============================================================
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'master' ||
-         request.auth.token.email == "sys.powercontrol@gmail.com");
-    }
-
-    function isMaster() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'master' ||
-         request.auth.token.email == "sys.powercontrol@gmail.com");
     }
 
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function isMaster() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "sys.powercontrol@gmail.com" ||
+         getUserData().role == 'master');
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (isMaster() || getUserData().role == 'admin');
+    }
+
     function hasPermission(permissionId) {
-      let userData = getUserData();
       return isMaster() || 
-             (userData.role == 'admin') || 
-             (permissionId in userData.permissions);
+             (getUserData().role == 'admin') || 
+             (getUserData().get('permissions', []).hasAny([permissionId]));
     }
 
     function belongsToCompany(companyId) {
       return isAuthenticated() && (isMaster() || getUserData().company_id == companyId);
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    // ===============================================================
-    // Collection Rules
-    // ===============================================================
-
-    // Users Collection
     match /users/{userId} {
-      allow read: if isOwner(userId) || isMaster() || 
-        (isAdmin() && (resource.data.company_id == getUserData().company_id || !('company_id' in resource.data) || resource.data.company_id == null));
-      allow create: if isAuthenticated() && 
-        (isOwner(userId) || isMaster() || (isAdmin() && (request.resource.data.company_id == getUserData().company_id || !('company_id' in request.resource.data) || request.resource.data.company_id == null))) &&
-        request.resource.data.role in ['master', 'admin', 'user'] &&
-        (request.resource.data.role != 'master' || request.auth.token.email == "sys.powercontrol@gmail.com");
+      allow read: if isAuthenticated() && (isOwner(userId) || isMaster() || (isAdmin() && resource.data.company_id == getUserData().company_id));
+      allow create: if isAuthenticated() && (isMaster() || (isAdmin() && request.resource.data.get('company_id', null) == getUserData().get('company_id', null)) || !('company_id' in request.resource.data));
       allow update: if isAuthenticated() && 
-        (isOwner(userId) || isMaster() || (isAdmin() && (resource.data.company_id == getUserData().company_id || !('company_id' in resource.data) || resource.data.company_id == null))) &&
-        (request.resource.data.role == resource.data.role || isMaster());
+        (isOwner(userId) || isAdmin()) && 
+        (request.resource.data.get('role', resource.data.role) == resource.data.role || isAdmin()) &&
+        (request.resource.data.get('permissions', resource.data.get('permissions', [])) == resource.data.get('permissions', []) || isAdmin()) &&
+        (request.resource.data.get('company_id', resource.data.get('company_id', null)) == resource.data.get('company_id', null) || isMaster());
       allow delete: if isMaster();
     }
 
-    // Companies Collection
-    match /companies/{companyId} {
-      allow read: if isAuthenticated() && (isMaster() || getUserData().company_id == companyId);
-      allow create: if isMaster();
-      allow update: if isMaster() || (isAdmin() && getUserData().company_id == companyId);
-      allow delete: if isMaster();
+    match /products/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
+      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
+      allow update: if belongsToCompany(resource.data.company_id) && belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
+      allow delete: if belongsToCompany(resource.data.company_id) && hasPermission('products.manage');
     }
 
-    // Invites Collection
+    match /sales/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('sales.view');
+      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create');
+      allow update: if belongsToCompany(resource.data.company_id) && belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create');
+      allow delete: if belongsToCompany(resource.data.company_id) && hasPermission('sales.delete');
+    }
+
+    match /services/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
+    }
+
+    match /clients/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('sales.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create');
+    }
+
+    match /purchases/{id} {
+      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
+    }
+
+    match /inventory_movements/{id} {
+      allow read, create: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
+      allow update, delete: if false;
+    }
+
+    match /accountsPayable/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+    }
+
+    match /accountsReceivable/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+    }
+
+    match /bankAccounts/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+    }
+
+    match /cashiers/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+    }
+
+    match /suppliers/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+    }
+
+    match /sellers/{id} {
+      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('sellers.manage');
+    }
+
+    match /employees/{id} {
+      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('employees.manage');
+    }
+
+    match /invoices/{id} {
+      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+    }
+
+    match /tax_rules/{id} {
+      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+    }
+
+    match /certificates/{id} {
+      allow read, create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+    }
+
     match /invites/{inviteId} {
-      allow get: if true; // Public read by ID for registration
+      allow get: if true;
       allow list: if isAuthenticated() && (isMaster() || (isAdmin() && belongsToCompany(resource.data.company_id)));
       allow create: if isAuthenticated() && (isMaster() || (isAdmin() && getUserData().company_id == request.resource.data.company_id));
       allow update: if isAuthenticated() && (
@@ -118,77 +131,26 @@ service cloud.firestore {
       allow delete: if isMaster();
     }
 
-    // Audit Logs Collection
     match /audit_logs/{logId} {
-      allow read: if isAuthenticated() && (isMaster() || (isAdmin() && belongsToCompany(resource.data.company_id)));
+      allow read: if isAuthenticated() && (isMaster() || hasPermission('audit.view'));
       allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
       allow update, delete: if false;
     }
 
-    // Generic rule for company-scoped data
-    match /{collectionName}/{docId} {
-      // Exclude users, companies and audit_logs as they have specific rules
-      allow read: if isAuthenticated() && 
-        !(collectionName in ['users', 'companies', 'audit_logs', 'invites']) &&
-        belongsToCompany(resource.data.company_id) &&
-        (
-          (collectionName == 'products' && hasPermission('products.view')) ||
-          (collectionName == 'sales' && hasPermission('sales.view')) ||
-          (collectionName == 'purchases' && hasPermission('inventory.manage')) ||
-          (collectionName == 'accountsReceivable' && hasPermission('finance.view')) ||
-          (collectionName == 'accountsPayable' && hasPermission('finance.view')) ||
-          (collectionName == 'bankAccounts' && hasPermission('finance.view')) ||
-          (collectionName == 'movements' && hasPermission('finance.view')) ||
-          (collectionName == 'sellers' && hasPermission('sellers.manage')) ||
-          (collectionName == 'tax_rules' && hasPermission('fiscal.manage')) ||
-          (collectionName == 'certificates' && hasPermission('fiscal.manage')) ||
-          (collectionName == 'invoices' && hasPermission('fiscal.manage')) ||
-          !(collectionName in ['products', 'sales', 'purchases', 'accountsReceivable', 'accountsPayable', 'bankAccounts', 'movements', 'sellers', 'tax_rules', 'certificates', 'invoices'])
-        );
-      
-      allow create: if isAuthenticated() && 
-        !(collectionName in ['users', 'companies', 'audit_logs', 'invites']) &&
-        belongsToCompany(request.resource.data.company_id) &&
-        (
-          (collectionName == 'products' && hasPermission('products.manage')) ||
-          (collectionName == 'sales' && hasPermission('sales.create')) ||
-          (collectionName == 'purchases' && hasPermission('inventory.manage')) ||
-          (collectionName == 'accountsReceivable' && hasPermission('finance.manage')) ||
-          (collectionName == 'accountsPayable' && hasPermission('finance.manage')) ||
-          (collectionName == 'bankAccounts' && hasPermission('finance.manage')) ||
-          (collectionName == 'movements' && hasPermission('finance.manage')) ||
-          (collectionName == 'sellers' && hasPermission('sellers.manage')) ||
-          (collectionName == 'tax_rules' && hasPermission('fiscal.manage')) ||
-          (collectionName == 'certificates' && hasPermission('fiscal.manage')) ||
-          (collectionName == 'invoices' && hasPermission('fiscal.manage')) ||
-          !(collectionName in ['products', 'sales', 'purchases', 'accountsReceivable', 'accountsPayable', 'bankAccounts', 'movements', 'sellers', 'tax_rules', 'certificates', 'invoices'])
-        );
-      
-      allow update: if isAuthenticated() && 
-        !(collectionName in ['users', 'companies', 'audit_logs', 'invites']) &&
-        belongsToCompany(resource.data.company_id) &&
-        belongsToCompany(request.resource.data.company_id) &&
-        (
-          (collectionName == 'products' && hasPermission('products.manage')) ||
-          (collectionName == 'sales' && hasPermission('sales.create')) ||
-          (collectionName == 'purchases' && hasPermission('inventory.manage')) ||
-          (collectionName == 'accountsReceivable' && hasPermission('finance.manage')) ||
-          (collectionName == 'accountsPayable' && hasPermission('finance.manage')) ||
-          (collectionName == 'bankAccounts' && hasPermission('finance.manage')) ||
-          (collectionName == 'movements' && hasPermission('finance.manage')) ||
-          (collectionName == 'sellers' && hasPermission('sellers.manage')) ||
-          (collectionName == 'tax_rules' && hasPermission('fiscal.manage')) ||
-          (collectionName == 'certificates' && hasPermission('fiscal.manage')) ||
-          (collectionName == 'invoices' && hasPermission('fiscal.manage')) ||
-          !(collectionName in ['products', 'sales', 'purchases', 'accountsReceivable', 'accountsPayable', 'bankAccounts', 'movements', 'sellers', 'tax_rules', 'certificates', 'invoices'])
-        );
-      
-      allow delete: if isAuthenticated() && 
-        !(collectionName in ['users', 'companies', 'audit_logs', 'invites']) &&
-        (isMaster() || 
-          (collectionName == 'sales' && hasPermission('sales.delete') && belongsToCompany(resource.data.company_id)) ||
-          (isAdmin() && belongsToCompany(resource.data.company_id))
-        );
+    match /categories/{id} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /companies/{companyId} {
+      allow read: if isAuthenticated() && (isMaster() || getUserData().company_id == companyId);
+      allow create: if isMaster();
+      allow update: if isMaster() || (isAdmin() && getUserData().company_id == companyId);
+      allow delete: if isMaster();
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
     }
   }
 }

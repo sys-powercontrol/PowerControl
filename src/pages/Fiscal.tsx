@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import NfeStatusBadge, { NfeStatus } from "../components/NfeStatusBadge";
 import DanfeViewer from "../components/DanfeViewer";
 import { fiscalApi } from "../services/fiscalApi";
+import ExportButton from "../components/ExportButton";
 
 import { Link } from "react-router-dom";
 
@@ -50,13 +51,19 @@ export default function Fiscal() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDanfeOpen, setIsDanfeOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
 
   const currentCompanyId = user?.company_id || api.getCompanyId();
 
-  const { data: invoices = [], isLoading } = useQuery({ 
-    queryKey: ["invoices", currentCompanyId], 
-    queryFn: () => api.get("invoices", { company_id: currentCompanyId }) 
-  });
+  React.useEffect(() => {
+    if (!currentCompanyId) return;
+    const unsubscribe = api.subscribe("invoices", { company_id: currentCompanyId }, (data) => {
+      setInvoices(data);
+      setIsLoadingInvoices(false);
+    });
+    return () => unsubscribe();
+  }, [currentCompanyId]);
 
   const { data: sales = [] } = useQuery({
     queryKey: ["sales", currentCompanyId],
@@ -68,6 +75,16 @@ export default function Fiscal() {
     (i.number?.toString() || "").includes(searchTerm) ||
     (i.client_name?.toLowerCase() || "").includes(searchTerm.toLowerCase())
   );
+
+  const invoiceExportHeaders = {
+    number: "Número",
+    series: "Série",
+    client_name: "Cliente",
+    total_value: "Valor Total",
+    status: "Status",
+    created_at: "Data Emissão",
+    access_key: "Chave de Acesso"
+  };
 
   const cancelMutation = useMutation({
     mutationFn: async (invoice: any) => {
@@ -232,7 +249,22 @@ export default function Fiscal() {
           <h1 className="text-2xl font-bold text-gray-900">Fiscal (NF-e / NFC-e)</h1>
           <p className="text-gray-500">Emissão e controle de Notas Fiscais Eletrônicas.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
+            <ExportButton 
+              data={filteredInvoices} 
+              filename="notas-fiscais" 
+              format="xlsx" 
+              headers={invoiceExportHeaders} 
+            />
+            <ExportButton 
+              data={filteredInvoices} 
+              filename="notas-fiscais" 
+              format="pdf" 
+              title="Relatório de Notas Fiscais"
+              headers={invoiceExportHeaders} 
+            />
+          </div>
           <Link 
             to="/Certificado"
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all"
@@ -298,7 +330,7 @@ export default function Fiscal() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {isLoading ? (
+              {isLoadingInvoices ? (
                 <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">Carregando notas...</td></tr>
               ) : filteredInvoices.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">Nenhuma nota fiscal encontrada.</td></tr>

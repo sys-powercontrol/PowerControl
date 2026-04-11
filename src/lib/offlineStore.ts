@@ -5,10 +5,13 @@ import { openDB, IDBPDatabase } from "idb";
 const DB_NAME = "powercontrol_offline_db";
 const STORE_NAME = "sales";
 
+import { api } from "./api";
+
 export interface OfflineSale {
   id: string;
   saleData: any;
   items: any[];
+  userContext?: any;
   timestamp: number;
 }
 
@@ -35,10 +38,12 @@ export const offlineStore = {
 
   async saveSale(saleData: any, items: any[]) {
     const db = await getDB();
+    const user = api.getCurrentUser();
     const newSale: OfflineSale = {
       id: crypto.randomUUID(),
       saleData,
       items,
+      userContext: user,
       timestamp: Date.now(),
     };
     await db.add(STORE_NAME, newSale);
@@ -69,7 +74,7 @@ export const offlineStore = {
 
     for (const sale of pending) {
       try {
-        await inventory.processSale(sale.saleData, sale.items);
+        await inventory.processSale(sale.saleData, sale.items, sale.userContext);
         await db.delete(STORE_NAME, sale.id);
         successCount++;
       } catch (error) {

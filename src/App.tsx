@@ -39,6 +39,7 @@ import PurchaseHistory from "./pages/PurchaseHistory";
 import InventoryHistory from "./pages/InventoryHistory";
 import InventoryAdjustments from "./pages/InventoryAdjustments";
 import InventoryTurnoverReport from "./pages/InventoryTurnoverReport";
+import ProfitabilityReport from "./pages/ProfitabilityReport";
 import CashFlowReport from "./pages/CashFlowReport";
 import Employees from "./pages/Employees";
 import { AuthProvider, useAuth } from "./lib/auth";
@@ -81,6 +82,7 @@ export default function App() {
               <Route path="AjustesEstoque" element={<InventoryAdjustments />} />
               <Route path="HistoricoEstoque" element={<InventoryHistory />} />
               <Route path="RelatorioGiro" element={<InventoryTurnoverReport />} />
+              <Route path="RelatorioLucratividade" element={<ProfitabilityReport />} />
               <Route path="Compras" element={<Purchases />} />
               <Route path="HistoricoCompras" element={<PurchaseHistory />} />
               <Route path="Vender" element={<Sales />} />

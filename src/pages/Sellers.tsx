@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
+import ExportButton from "../components/ExportButton";
 
 export default function Sellers() {
   const { user, hasPermission } = useAuth();
@@ -57,6 +58,15 @@ export default function Sellers() {
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const sellerExportHeaders = {
+    name: "Vendedor",
+    email: "E-mail",
+    phone: "Telefone",
+    commission_rate: "Comissão (%)",
+    monthly_goal: "Meta Mensal",
+    active: "Ativo"
+  };
 
   const sellerMutation = useMutation({
     mutationFn: (data: any) => editingSeller 
@@ -129,16 +139,33 @@ export default function Sellers() {
           <h1 className="text-2xl font-bold text-gray-900">Vendedores</h1>
           <p className="text-gray-500">Gerencie sua equipe de vendas e comissões.</p>
         </div>
-        <button 
-          onClick={() => {
-            setEditingSeller(null);
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
-        >
-          <UserPlus size={20} />
-          Novo Vendedor
-        </button>
+        <div className="flex gap-2">
+          <div className="flex gap-2 mr-2">
+            <ExportButton 
+              data={filteredSellers} 
+              filename="vendedores" 
+              format="xlsx" 
+              headers={sellerExportHeaders} 
+            />
+            <ExportButton 
+              data={filteredSellers} 
+              filename="vendedores" 
+              format="pdf" 
+              title="Relatório de Vendedores"
+              headers={sellerExportHeaders} 
+            />
+          </div>
+          <button 
+            onClick={() => {
+              setEditingSeller(null);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+          >
+            <UserPlus size={20} />
+            Novo Vendedor
+          </button>
+        </div>
       </div>
 
       {/* Search */}

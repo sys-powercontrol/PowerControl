@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import BOMBuilder from "../components/BOMBuilder";
 import LabelPrinter from "../components/LabelPrinter";
+import ExportButton from "../components/ExportButton";
 
 export default function Products() {
   const { user, hasPermission } = useAuth();
@@ -296,6 +297,18 @@ export default function Products() {
     brandMutation.mutate({ ...data, company_id: user?.company_id, is_active: true });
   };
 
+  const productExportHeaders = {
+    sku: "SKU",
+    name: "Produto",
+    category_name: "Categoria",
+    brand_name: "Marca",
+    price: "Preço Venda",
+    cost_price: "Preço Custo",
+    stock_quantity: "Estoque",
+    min_stock: "Estoque Mínimo",
+    unit: "Unidade"
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -307,35 +320,54 @@ export default function Products() {
             {activeTab === "Marcas" && "Gerencie as marcas dos seus produtos."}
           </p>
         </div>
-        {canManage && (
-          <button 
-            onClick={() => { 
-              if (activeTab === "Produtos") { 
-                setEditingProduct(null); 
-                setImageBase64(null); 
-                setBomItems([]);
-                setIsModalOpen(true); 
-              }
-              if (activeTab === "Categorias") { setEditingCategory(null); setIsCategoryModalOpen(true); }
-              if (activeTab === "Marcas") { setEditingBrand(null); setIsBrandModalOpen(true); }
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
-          >
-            <Plus size={20} />
-            {activeTab === "Produtos" && "Novo Produto"}
-            {activeTab === "Categorias" && "Nova Categoria"}
-            {activeTab === "Marcas" && "Nova Marca"}
-          </button>
-        )}
-        {activeTab === "Produtos" && (
-          <button 
-            onClick={() => setIsLabelModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-shadow shadow-sm"
-          >
-            <Tag size={20} className="text-blue-600" />
-            Etiquetas
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {activeTab === "Produtos" && (
+            <div className="flex gap-2">
+              <ExportButton 
+                data={filteredProducts} 
+                filename="produtos" 
+                format="xlsx" 
+                headers={productExportHeaders} 
+              />
+              <ExportButton 
+                data={filteredProducts} 
+                filename="produtos" 
+                format="pdf" 
+                title="Relatório de Produtos"
+                headers={productExportHeaders} 
+              />
+            </div>
+          )}
+          {activeTab === "Produtos" && (
+            <button 
+              onClick={() => setIsLabelModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-shadow shadow-sm"
+            >
+              <Tag size={20} className="text-blue-600" />
+              Etiquetas
+            </button>
+          )}
+          {canManage && (
+            <button 
+              onClick={() => { 
+                if (activeTab === "Produtos") { 
+                  setEditingProduct(null); 
+                  setImageBase64(null); 
+                  setBomItems([]);
+                  setIsModalOpen(true); 
+                }
+                if (activeTab === "Categorias") { setEditingCategory(null); setIsCategoryModalOpen(true); }
+                if (activeTab === "Marcas") { setEditingBrand(null); setIsBrandModalOpen(true); }
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+            >
+              <Plus size={20} />
+              {activeTab === "Produtos" && "Novo Produto"}
+              {activeTab === "Categorias" && "Nova Categoria"}
+              {activeTab === "Marcas" && "Nova Marca"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

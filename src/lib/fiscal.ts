@@ -70,30 +70,46 @@ export const fiscal = {
     const isInsideState = operation.origin_state === operation.dest_state;
     
     // 1. IPI (Calculated first as it can compose ICMS base)
-    const ipi = value * (config.ipi_rate / 100);
+    // IPI base usually includes freight and other expenses, but for simplicity we use 'value'
+    const ipiBase = value;
+    const ipi = ipiBase * (config.ipi_rate / 100);
     
     // 2. ICMS Próprio
-    const icms = value * (config.icms_rate / 100);
+    // For Simples Nacional, ICMS is often 0 in the invoice (calculated in DAS), 
+    // but for Normal regime it's calculated on (Value + IPI if finality is consumption)
+    const icmsBase = (operation.finality === 'consumo' || operation.finality === 'industrializacao') ? (value + ipi) : value;
+    const icms = icmsBase * (config.icms_rate / 100);
     
     // 3. ICMS-ST (Substituição Tributária)
     let icmsST = 0;
     let baseST = 0;
     if (config.mva_rate && config.mva_rate > 0) {
-      // Base ST = (Valor + IPI + Outras) * (1 + MVA)
+      // Base ST = (Valor + IPI + Outras Despesas - Descontos) * (1 + MVA)
+      // Note: IPI is included in Base ST even if it's not included in ICMS Próprio base
       baseST = (value + ipi) * (1 + config.mva_rate / 100);
-      const internalRate = config.aliquota_interna_destino || config.icms_rate;
+      const internalRate = config.aliquota_interna_destino || 18;
       const icmsSTBruto = baseST * (internalRate / 100);
+      
+      // ICMS ST = (Base ST * Alíquota Interna) - ICMS Próprio
       icmsST = Math.max(0, icmsSTBruto - icms);
     }
     
-    // 4. DIFAL (Diferencial de Alíquota)
+    // 4. DIFAL (Diferencial de Alíquota) - EC 87/2015
     // Only for interstate sales to non-contributor consumers
     let difal = 0;
+    let difal_dest = 0;
+    let difal_orig = 0;
+    
     if (!isInsideState && operation.is_consumer && !operation.is_contributor) {
-      const internalRate = config.aliquota_interna_destino || 18; // Default 18% if not provided
-      const diffRate = internalRate - config.icms_rate;
+      const internalRate = config.aliquota_interna_destino || 18;
+      const interstateRate = config.icms_rate; // Usually 4%, 7% or 12%
+      const diffRate = internalRate - interstateRate;
+      
       if (diffRate > 0) {
         difal = value * (diffRate / 100);
+        // Since 2019, 100% of DIFAL goes to the destination state
+        difal_dest = difal;
+        difal_orig = 0;
       }
     }
 
@@ -103,15 +119,19 @@ export const fiscal = {
 
     return {
       icms,
+      icms_base: icmsBase,
       icms_st: icmsST,
       base_st: baseST,
       difal,
+      difal_dest,
+      difal_orig,
       ipi,
+      ipi_base: ipiBase,
       pis,
       cofins,
       iss,
       total_taxes: icms + icmsST + difal + ipi + pis + cofins + iss,
-      total_value: value + ipi + icmsST // Total to be paid by client
+      total_value: value + ipi + icmsST // Total to be paid by client (Commercial value + IPI + ST)
     };
   },
 
