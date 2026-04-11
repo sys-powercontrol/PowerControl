@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { calculateDiff } from "../lib/utils/diff";
@@ -40,6 +40,19 @@ export default function Configurations() {
 
   const canManage = hasPermission('settings.manage');
 
+  const { data: companyData, isLoading } = useQuery({ 
+    queryKey: ["company", user?.company_id], 
+    enabled: !!user?.company_id,
+    queryFn: () => api.get("companies", user?.company_id) 
+  });
+  const company = companyData || {};
+
+  const [disableImages, setDisableImages] = useState(company.disable_product_images === "true" || company.disable_product_images === true);
+
+  useEffect(() => {
+    setDisableImages(company.disable_product_images === "true" || company.disable_product_images === true);
+  }, [company.disable_product_images]);
+
   if (!canManage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
@@ -53,13 +66,6 @@ export default function Configurations() {
       </div>
     );
   }
-
-  const { data: companyData, isLoading } = useQuery({ 
-    queryKey: ["company", user?.company_id], 
-    enabled: !!user?.company_id,
-    queryFn: () => api.get("companies", user?.company_id) 
-  });
-  const company = companyData || {};
 
   const saveData = (data: any) => {
     if (!user?.company_id) return;
@@ -107,14 +113,14 @@ export default function Configurations() {
     if (activeTab === "general") {
       data.allow_negative_stock = formData.get("allow_negative_stock") === "true";
       if (user?.role === 'master') {
-        data.disable_product_images = formData.get("disable_product_images") === "true";
+        data.disable_product_images = disableImages;
         
         const currentDisableImages = company.disable_product_images === "true" || company.disable_product_images === true;
-        if (currentDisableImages !== data.disable_product_images) {
+        if (currentDisableImages !== disableImages) {
           setConfirmModal({
             isOpen: true,
             title: "Confirmar Alteração",
-            message: data.disable_product_images 
+            message: disableImages 
               ? "Tem certeza que deseja desabilitar as fotos de produtos? A área de upload será ocultada para todos os usuários."
               : "Tem certeza que deseja habilitar as fotos de produtos? A área de upload voltará a ficar disponível.",
             onConfirm: () => {
@@ -240,7 +246,8 @@ export default function Configurations() {
                             <input 
                               type="checkbox" 
                               name="disable_product_images" 
-                              defaultChecked={company.disable_product_images === "true" || company.disable_product_images === true}
+                              checked={disableImages}
+                              onChange={(e) => setDisableImages(e.target.checked)}
                               className="sr-only peer" 
                               value="true"
                             />
