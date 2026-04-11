@@ -48,10 +48,15 @@ export default function Configurations() {
   const company = companyData || {};
 
   const [disableImages, setDisableImages] = useState(company.disable_product_images === "true" || company.disable_product_images === true);
+  const [allowNegativeStock, setAllowNegativeStock] = useState(company.allow_negative_stock === "true" || company.allow_negative_stock === true);
 
   useEffect(() => {
     setDisableImages(company.disable_product_images === "true" || company.disable_product_images === true);
   }, [company.disable_product_images]);
+
+  useEffect(() => {
+    setAllowNegativeStock(company.allow_negative_stock === "true" || company.allow_negative_stock === true);
+  }, [company.allow_negative_stock]);
 
   if (!canManage) {
     return (
@@ -111,7 +116,7 @@ export default function Configurations() {
     }
     
     if (activeTab === "general") {
-      data.allow_negative_stock = formData.get("allow_negative_stock") === "true";
+      data.allow_negative_stock = allowNegativeStock;
       if (user?.role === 'master') {
         data.disable_product_images = disableImages;
         
@@ -228,7 +233,8 @@ export default function Configurations() {
                           <input 
                             type="checkbox" 
                             name="allow_negative_stock" 
-                            defaultChecked={company.allow_negative_stock === "true" || company.allow_negative_stock === true}
+                            checked={allowNegativeStock}
+                            onChange={(e) => setAllowNegativeStock(e.target.checked)}
                             className="sr-only peer" 
                             value="true"
                           />
