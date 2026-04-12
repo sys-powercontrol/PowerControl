@@ -124,26 +124,43 @@ export default function Configurations() {
       return;
     }
     
+    // Settings that should be persisted across tabs if changed
+    const currentAllowNegative = company.allow_negative_stock === "true" || company.allow_negative_stock === true;
+    const currentDisableImages = company.disable_product_images === "true" || company.disable_product_images === true;
+
+    const allowNegativeChanged = currentAllowNegative !== allowNegativeStock;
+    const disableImagesChanged = user?.role === 'master' && currentDisableImages !== disableImages;
+
     if (activeTab === "general") {
       data.allow_negative_stock = allowNegativeStock;
       if (user?.role === 'master') {
         data.disable_product_images = disableImages;
-        
-        const currentDisableImages = company.disable_product_images === "true" || company.disable_product_images === true;
-        if (currentDisableImages !== disableImages) {
-          setConfirmModal({
-            isOpen: true,
-            title: "Confirmar Alteração",
-            message: disableImages 
-              ? "Tem certeza que deseja desabilitar as fotos de produtos? A área de upload será ocultada para todos os usuários."
-              : "Tem certeza que deseja habilitar as fotos de produtos? A área de upload voltará a ficar disponível.",
-            onConfirm: () => {
-              saveData(data);
-            }
-          });
-          return;
-        }
       }
+    }
+    
+    if (allowNegativeChanged || disableImagesChanged) {
+      const changesMsg = [];
+      if (allowNegativeChanged) {
+        changesMsg.push(`• Estoque Negativo: ${allowNegativeStock ? "Habilitado" : "Desabilitado"}`);
+      }
+      if (disableImagesChanged) {
+        changesMsg.push(`• Fotos de Produtos: ${disableImages ? "Desabilitadas" : "Habilitadas"}`);
+      }
+
+      setConfirmModal({
+        isOpen: true,
+        title: "Confirmar Alterações de Sistema",
+        message: `Deseja salvar as seguintes alterações?\n\n${changesMsg.join('\n')}`,
+        onConfirm: () => {
+          const finalData = { ...data };
+          finalData.allow_negative_stock = allowNegativeStock;
+          if (user?.role === 'master') {
+            finalData.disable_product_images = disableImages;
+          }
+          saveData(finalData);
+        }
+      });
+      return;
     }
 
     saveData(data);

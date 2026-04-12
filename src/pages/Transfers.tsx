@@ -16,6 +16,7 @@ import {
   Shield
 } from "lucide-react";
 import { toast } from "sonner";
+import { processMovement } from "../lib/finance";
 
 export default function Transfers() {
   const { user, hasPermission } = useAuth();
@@ -66,20 +67,30 @@ export default function Transfers() {
   ], [bankAccounts, cashiers]);
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => api.post("movements", {
+    mutationFn: (data: any) => processMovement({
       ...data,
       company_id: user?.company_id,
       user_id: user?.id,
       user_name: user?.name,
-      amount: parseFloat(data.amount as string),
-      movement_date: new Date().toISOString()
+      amount: parseFloat(data.amount as string)
     }),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      api.log({
+        action: 'CREATE',
+        entity: 'movements',
+        entity_id: data.id,
+        description: `Registrou nova movimentação: ${data.type} de R$ ${data.amount}`,
+        metadata: data
+      });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       toast.success("Movimentação realizada!");
       setIsModalOpen(false);
+    },
+    onError: (error: any) => {
+      console.error("Error creating movement:", error);
+      toast.error("Erro ao salvar movimentação. Verifique as permissões.");
     }
   });
 
@@ -109,7 +120,10 @@ export default function Transfers() {
       }
     }
 
+    const fromAccountType = data.from_account_id?.toString().split(':')[0];
     const fromAccountId = data.from_account_id?.toString().split(':')[1];
+    
+    const toAccountType = data.to_account_id?.toString().split(':')[0];
     const toAccountId = data.to_account_id?.toString().split(':')[1];
 
     const fromAccount = [...bankAccounts, ...cashiers].find(a => a.id === fromAccountId);
@@ -117,7 +131,11 @@ export default function Transfers() {
 
     createMutation.mutate({
       ...data,
+      from_account_id: fromAccountId || null,
+      from_account_type: fromAccountType || null,
       from_account_name: fromAccount?.name || null,
+      to_account_id: toAccountId || null,
+      to_account_type: toAccountType || null,
       to_account_name: toAccount?.name || null
     });
   };
@@ -234,7 +252,7 @@ export default function Transfers() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">Valor (R$) *</label>
-                <input name="amount" type="number" step="0.01" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                <input name="amount" type="number" step="0.01" min="0.01" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className={`space-y-2 ${movementType === "Entrada" ? "opacity-50 pointer-events-none" : ""}`}>

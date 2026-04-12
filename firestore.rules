@@ -149,6 +149,11 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /movements/{id} {
+      allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
+      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+    }
+
     match /companies/{companyId} {
       allow read: if isAuthenticated() && (isMaster() || getUserData().company_id == companyId);
       allow create: if isMaster();
