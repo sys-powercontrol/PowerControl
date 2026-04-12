@@ -25,8 +25,6 @@ export default function ConfirmationModal({
   variant = 'danger',
   isLoading = false
 }: ConfirmationModalProps) {
-  if (!isOpen) return null;
-
   const variantStyles = {
     danger: {
       icon: <AlertTriangle className="text-red-600" size={24} />,
@@ -75,7 +73,7 @@ export default function ConfirmationModal({
                     <X size={20} />
                   </button>
                 </div>
-                <p className="text-gray-500 mt-2 leading-relaxed">
+                <p className="text-gray-500 mt-2 leading-relaxed whitespace-pre-wrap">
                   {message}
                 </p>
               </div>

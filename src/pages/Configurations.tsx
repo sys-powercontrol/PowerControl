@@ -33,11 +33,13 @@ export default function Configurations() {
     title: string;
     message: string;
     onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
   }>({
     isOpen: false,
     title: "",
     message: "",
     onConfirm: () => {},
+    variant: 'warning'
   });
 
   const canManage = hasPermission('settings.manage');
@@ -151,6 +153,7 @@ export default function Configurations() {
         isOpen: true,
         title: "Confirmar Alterações de Sistema",
         message: `Deseja salvar as seguintes alterações?\n\n${changesMsg.join('\n')}`,
+        variant: 'warning',
         onConfirm: () => {
           const finalData = { ...data };
           finalData.allow_negative_stock = allowNegativeStock;
@@ -496,6 +499,7 @@ export default function Configurations() {
         title={confirmModal.title}
         message={confirmModal.message}
         isLoading={isSaving}
+        variant={confirmModal.variant || 'warning'}
       />
     </div>
   );
