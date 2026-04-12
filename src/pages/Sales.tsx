@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
 import { printReceipt } from "../lib/utils/print";
 import { format, subDays } from "date-fns";
 import { PaymentGateway } from "../components/Sales/PaymentGateway";
@@ -42,7 +43,7 @@ export default function Sales() {
   const [cashReceived, setCashReceived] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("Dinheiro");
-  const [dueDate, setDueDate] = useState(format(subDays(new Date(), -30), 'yyyy-MM-dd'));
+  const [dueDate, setDueDate] = useState(formatBR(subDays(getNowBR(), -30), 'yyyy-MM-dd'));
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<any>(null);
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
@@ -149,7 +150,7 @@ export default function Sales() {
   }, [sellersData, currentCompanyId]);
 
   const hasOpenCashier = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayBR();
     return cashiers.some((c: any) => 
       c.status === "Aberto" && 
       c.opened_by_id === user?.id &&
@@ -743,7 +744,7 @@ export default function Sales() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Data</span>
-                  <span className="font-bold">{new Date(lastSale?.sale_date).toLocaleString()}</span>
+                  <span className="font-bold">{formatBR(lastSale?.sale_date, "dd/MM/yyyy HH:mm")}</span>
                 </div>
               </div>
 

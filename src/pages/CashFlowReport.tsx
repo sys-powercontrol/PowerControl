@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR } from "../lib/dateUtils";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -67,8 +68,8 @@ export default function CashFlowReport() {
   }
 
   const [dateRange, setDateRange] = useState({
-    start: startOfMonth(new Date()),
-    end: endOfMonth(new Date())
+    start: startOfMonth(getNowBR()),
+    end: endOfMonth(getNowBR())
   });
   const [filterType, setFilterType] = useState("current_month");
 
@@ -92,7 +93,7 @@ export default function CashFlowReport() {
 
   const handleFilterChange = (type: string) => {
     setFilterType(type);
-    const now = new Date();
+    const now = getNowBR();
     if (type === "current_month") {
       setDateRange({ start: startOfMonth(now), end: endOfMonth(now) });
     } else if (type === "last_month") {
@@ -201,8 +202,8 @@ export default function CashFlowReport() {
             <input 
               type="date" 
               className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
-              value={format(dateRange.start, 'yyyy-MM-dd')}
-              onChange={(e) => setDateRange(prev => ({ ...prev, start: new Date(e.target.value) }))}
+              value={formatBR(dateRange.start, 'yyyy-MM-dd')}
+              onChange={(e) => setDateRange(prev => ({ ...prev, start: new Date(`${e.target.value}T12:00:00`) }))}
             />
           </div>
           <div className="space-y-2 flex-1">
@@ -212,8 +213,8 @@ export default function CashFlowReport() {
             <input 
               type="date" 
               className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
-              value={format(dateRange.end, 'yyyy-MM-dd')}
-              onChange={(e) => setDateRange(prev => ({ ...prev, end: new Date(e.target.value) }))}
+              value={formatBR(dateRange.end, 'yyyy-MM-dd')}
+              onChange={(e) => setDateRange(prev => ({ ...prev, end: new Date(`${e.target.value}T12:00:00`) }))}
             />
           </div>
         </div>

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR } from "../lib/dateUtils";
 import { storage } from "../lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { 
@@ -165,7 +166,7 @@ export default function CertificateManager() {
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Expiração</p>
                       <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
                         <Calendar size={14} className="text-blue-500" />
-                        {format(new Date(activeCertificate.expiration_date), "dd/MM/yyyy")}
+                        {formatBR(activeCertificate.expiration_date, "dd/MM/yyyy")}
                       </div>
                     </div>
                     <div className="space-y-1">

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { parse } from "ofx-js";
+import { formatBR } from "../../lib/dateUtils";
 
 interface OFXTransaction {
   id: string;
@@ -463,7 +464,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                           )}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                          <span>{new Date(t.date).toLocaleDateString()}</span>
+                          <span>{formatBR(t.date)}</span>
                           <span>•</span>
                           <span>ID: {t.fitid}</span>
                           {matchResult && !manualMatch && (
@@ -572,7 +573,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                       >
                         <div>
                           <p className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{e.description}</p>
-                          <p className="text-xs text-gray-500">Vencimento: {new Date(e.due_date).toLocaleDateString()}</p>
+                          <p className="text-xs text-gray-500">Vencimento: {formatBR(e.due_date)}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-gray-900">R$ {e.amount?.toLocaleString()}</p>

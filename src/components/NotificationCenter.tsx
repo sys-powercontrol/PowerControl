@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { getTodayBR } from "../lib/dateUtils";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -90,7 +91,7 @@ export default function NotificationCenter() {
 
   const alerts = useMemo(() => {
     const list: Alert[] = [];
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayBR();
 
     // 1. Low Stock Alerts
     products.filter((p: any) => p.stock_quantity <= p.min_stock).forEach((p: any) => {

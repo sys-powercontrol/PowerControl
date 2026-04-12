@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR } from "../lib/dateUtils";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -86,7 +87,7 @@ export default function ProfitabilityReport() {
   });
 
   const reportData = useMemo(() => {
-    const now = new Date();
+    const now = getNowBR();
     const startDate = subDays(now, parseInt(dateRange));
     
     const filteredSales = sales.filter((s: any) => {
@@ -147,12 +148,12 @@ export default function ProfitabilityReport() {
     
     // Initialize timeline with all days in range
     for (let i = parseInt(dateRange); i >= 0; i--) {
-      const d = format(subDays(now, i), 'dd/MM');
+      const d = formatBR(subDays(now, i), 'dd/MM');
       timeline[d] = { date: d, revenue: 0, profit: 0, expenses: 0 };
     }
 
     filteredSales.forEach((s: any) => {
-      const d = format(parseISO(s.sale_date), 'dd/MM');
+      const d = formatBR(s.sale_date, 'dd/MM');
       if (timeline[d]) {
         timeline[d].revenue += s.total || 0;
         const saleCOGS = (s.items || []).reduce((acc: number, item: any) => acc + ((item.cost_price || 0) * item.quantity), 0);
@@ -161,7 +162,7 @@ export default function ProfitabilityReport() {
     });
 
     filteredExpenses.forEach((e: any) => {
-      const d = format(parseISO(e.payment_date), 'dd/MM');
+      const d = formatBR(e.payment_date, 'dd/MM');
       if (timeline[d]) {
         timeline[d].expenses += e.amount || 0;
       }

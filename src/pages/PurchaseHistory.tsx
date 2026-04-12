@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR } from "../lib/dateUtils";
 import { 
   Truck, 
   Search, 
@@ -167,7 +168,7 @@ export default function PurchaseHistory() {
                   </td>
                   <td className="py-4 text-gray-500 flex items-center gap-2">
                     <Calendar size={14} />
-                    {new Date(p.purchase_date).toLocaleDateString()}
+                    {formatBR(p.purchase_date)}
                   </td>
                   <td className="py-4 text-right flex justify-end gap-2">
                     <button 

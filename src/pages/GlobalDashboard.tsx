@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR } from "../lib/dateUtils";
 import { 
   TrendingUp, 
   Building2, 
@@ -65,7 +66,7 @@ export default function GlobalDashboard() {
   });
 
   const metrics = useMemo(() => {
-    const now = new Date();
+    const now = getNowBR();
     const monthStart = startOfMonth(now);
     
     const activeCompanies = companies.filter((c: any) => c.is_active).length;
@@ -97,13 +98,13 @@ export default function GlobalDashboard() {
     // Revenue by day (last 30 days)
     const last30Days = Array.from({ length: 30 }, (_, i) => {
       const d = subDays(now, 29 - i);
-      return format(d, 'yyyy-MM-dd');
+      return formatBR(d, 'yyyy-MM-dd');
     });
 
     const dailyRevenue = last30Days.map(date => {
-      const daySales = sales.filter((s: any) => s.sale_date?.startsWith(date));
+      const daySales = sales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === date);
       return {
-        date: format(new Date(date), 'dd/MM', { locale: ptBR }),
+        date: formatBR(date, 'dd/MM'),
         total: daySales.reduce((acc: number, s: any) => acc + (s.total || 0), 0)
       };
     });

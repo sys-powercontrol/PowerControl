@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { getNowBR } from "../lib/dateUtils";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -79,7 +80,7 @@ export default function InventoryTurnoverReport() {
   });
 
   const reportData = useMemo(() => {
-    const now = new Date();
+    const now = getNowBR();
     const date30 = subDays(now, 30);
     const date60 = subDays(now, 60);
     const date90 = subDays(now, 90);

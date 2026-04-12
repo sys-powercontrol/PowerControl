@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR } from "../lib/dateUtils";
 import { 
   TrendingDown, 
   Plus, 
@@ -127,7 +128,7 @@ export default function AccountsPayable() {
           created_at: new Date().toISOString()
         });
         
-        toast.info(`Próximo lançamento gerado para ${new Date(nextDueDate).toLocaleDateString()}`);
+        toast.info(`Próximo lançamento gerado para ${formatBR(nextDueDate)}`);
       }
 
       return result;
@@ -283,7 +284,7 @@ export default function AccountsPayable() {
                 </h3>
                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                   <span className="flex items-center gap-1"><Building2 size={12} /> {acc.supplier || "Fornecedor não inf."}</span>
-                  <span className="flex items-center gap-1"><Calendar size={12} /> Vence em: {new Date(acc.due_date).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1"><Calendar size={12} /> Vence em: {formatBR(acc.due_date)}</span>
                 </div>
               </div>
             </div>

@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { formatBR, getNowBR } from "../lib/dateUtils";
 
 interface ExportButtonProps {
   data: any[];
@@ -68,7 +69,7 @@ export default function ExportButton({
         doc.text(title, 14, 22);
         doc.setFontSize(11);
         doc.setTextColor(100);
-        doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 30);
+        doc.text(`Gerado em: ${formatBR(getNowBR(), "dd/MM/yyyy HH:mm")}`, 14, 30);
       }
 
       const tableHeaders = Object.keys(preparedData[0]);

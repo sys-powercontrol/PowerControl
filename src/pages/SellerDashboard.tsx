@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
 import { 
   TrendingUp, 
   ShoppingCart, 
@@ -46,11 +47,11 @@ export default function SellerDashboard() {
   }, [salesData, currentSeller]);
 
   const metrics = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const thisMonth = new Date().toISOString().slice(0, 7);
+    const today = getTodayBR();
+    const thisMonth = today.slice(0, 7);
 
-    const salesToday = sellerSales.filter((s: any) => s.sale_date?.startsWith(today));
-    const salesMonth = sellerSales.filter((s: any) => s.sale_date?.startsWith(thisMonth));
+    const salesToday = sellerSales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === today);
+    const salesMonth = sellerSales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM') === thisMonth);
 
     const totalToday = salesToday.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
     const totalMonth = salesMonth.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
@@ -75,15 +76,15 @@ export default function SellerDashboard() {
   // Generate chart data from last 7 days
   const chartData = useMemo(() => {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
+      const d = getNowBR();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
+      return formatBR(d, 'yyyy-MM-dd');
     });
 
     return last7Days.map(date => {
-      const daySales = sellerSales.filter((s: any) => s.sale_date?.startsWith(date));
+      const daySales = sellerSales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === date);
       return {
-        name: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        name: formatBR(date, 'dd/MM'),
         value: daySales.reduce((acc: number, s: any) => acc + (s.total || 0), 0)
       };
     });
@@ -244,7 +245,7 @@ export default function SellerDashboard() {
                   <td className="py-4 font-medium text-gray-900">#{sale.sale_number || "001"}</td>
                   <td className="py-4 text-gray-600">{sale.client_name || "Consumidor Final"}</td>
                   <td className="py-4 font-bold text-green-600">R$ {sale.total?.toLocaleString()}</td>
-                  <td className="py-4 text-gray-500">{new Date(sale.sale_date).toLocaleDateString()}</td>
+                  <td className="py-4 text-gray-500">{formatBR(sale.sale_date)}</td>
                 </tr>
               ))}
               {sellerSales.length === 0 && (

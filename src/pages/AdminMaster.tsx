@@ -47,6 +47,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR } from "../lib/dateUtils";
 import { AuditLog } from "../types";
 import { format, subDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -180,17 +181,17 @@ export default function AdminMaster() {
 
   const revenueByDay = React.useMemo(() => {
     const last30Days = Array.from({ length: 30 }, (_, i) => {
-      const d = subDays(new Date(), i);
-      return format(d, 'yyyy-MM-dd');
+      const d = subDays(getNowBR(), i);
+      return formatBR(d, 'yyyy-MM-dd');
     }).reverse();
 
     const data = last30Days.map(date => ({
-      date: format(new Date(date), 'dd/MM', { locale: ptBR }),
+      date: formatBR(date, 'dd/MM'),
       total: 0
     }));
 
     sales.forEach((s: any) => {
-      const saleDate = s.sale_date?.split('T')[0];
+      const saleDate = s.sale_date ? formatBR(s.sale_date, 'yyyy-MM-dd') : null;
       const index = last30Days.indexOf(saleDate);
       if (index !== -1) {
         data[index].total += s.total || 0;

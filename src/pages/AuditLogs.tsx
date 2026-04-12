@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
 import { 
   History, 
   Search, 
@@ -36,8 +37,8 @@ export default function AuditLogs() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedAction, setSelectedAction] = useState("");
   const [dateRange, setDateRange] = useState({
-    start: format(subDays(new Date(), 7), 'yyyy-MM-dd'),
-    end: format(new Date(), 'yyyy-MM-dd')
+    start: formatBR(subDays(getNowBR(), 7), 'yyyy-MM-dd'),
+    end: getTodayBR()
   });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
@@ -107,8 +108,8 @@ export default function AuditLogs() {
         : new Date();
         
       const matchesDate = isWithinInterval(logDate, {
-        start: startOfDay(new Date(dateRange.start)),
-        end: endOfDay(new Date(dateRange.end))
+        start: startOfDay(new Date(`${dateRange.start}T12:00:00`)),
+        end: endOfDay(new Date(`${dateRange.end}T12:00:00`))
       });
 
       return matchesSearch && matchesCompany && matchesUser && matchesAction && matchesDate;
@@ -306,7 +307,7 @@ export default function AuditLogs() {
                 <tr key={log.id} className="text-sm hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                     {log.timestamp?.seconds 
-                      ? format(new Date(log.timestamp.seconds * 1000), 'dd/MM/yy HH:mm', { locale: ptBR }) 
+                      ? formatBR(log.timestamp.seconds * 1000, 'dd/MM/yy HH:mm') 
                       : 'Agora'}
                   </td>
                   <td className="px-6 py-4">
@@ -382,7 +383,7 @@ export default function AuditLogs() {
                   <p className="text-xs font-bold text-gray-400 uppercase">Data/Hora</p>
                   <p className="font-medium text-gray-900">
                     {selectedLog.timestamp?.seconds 
-                      ? format(new Date(selectedLog.timestamp.seconds * 1000), 'dd/MM/yyyy HH:mm:ss', { locale: ptBR }) 
+                      ? formatBR(selectedLog.timestamp.seconds * 1000, 'dd/MM/yyyy HH:mm:ss') 
                       : 'Agora'}
                   </p>
                 </div>

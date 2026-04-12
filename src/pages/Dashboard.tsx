@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR } from "../lib/dateUtils";
 import SellerDashboard from "./SellerDashboard";
 import { 
   TrendingUp, 
@@ -123,15 +124,15 @@ export default function Dashboard() {
 
   // Generate chart data from last 7 days
   const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
+    const d = getNowBR();
     d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
+    return formatBR(d, 'yyyy-MM-dd');
   });
 
   const chartData = last7Days.map(date => {
-    const daySales = sales.filter((s: any) => s.sale_date?.startsWith(date));
+    const daySales = sales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === date);
     return {
-      name: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      name: formatBR(date, 'dd/MM'),
       value: daySales.reduce((acc: number, s: any) => acc + (s.total || 0), 0)
     };
   });
@@ -323,7 +324,7 @@ export default function Dashboard() {
                       {sale.status || "Concluída"}
                     </span>
                   </td>
-                  <td className="py-4 text-gray-500">{new Date(sale.sale_date).toLocaleDateString()}</td>
+                  <td className="py-4 text-gray-500">{formatBR(sale.sale_date)}</td>
                 </tr>
               ))}
               {sales.length === 0 && (

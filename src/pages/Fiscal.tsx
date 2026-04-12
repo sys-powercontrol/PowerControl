@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR } from "../lib/dateUtils";
 import { 
   FileText, 
   Plus, 
@@ -345,7 +346,7 @@ export default function Fiscal() {
                     <p className="text-xs text-gray-500">{invoice.client_document || "---"}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-sm text-gray-600">{new Date(invoice.emission_date).toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-600">{formatBR(invoice.emission_date)}</p>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm font-bold text-gray-900">R$ {invoice.total?.toLocaleString()}</p>

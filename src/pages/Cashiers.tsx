@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR } from "../lib/dateUtils";
 import { 
   CreditCard, 
   Plus, 
@@ -204,7 +205,7 @@ export default function Cashiers() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500">Abertura</span>
-                    <span className="font-bold text-gray-700">{new Date(c.opened_at).toLocaleString()}</span>
+                    <span className="font-bold text-gray-700">{formatBR(c.opened_at, "dd/MM/yyyy HH:mm")}</span>
                   </div>
                 </div>
               )}

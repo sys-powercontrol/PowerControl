@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR } from "../lib/dateUtils";
 import { format, subDays } from "date-fns";
 
 export default function Purchases() {
@@ -22,7 +23,7 @@ export default function Purchases() {
   const [cart, setCart] = useState<any[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState("Pendente");
-  const [dueDate, setDueDate] = useState(format(subDays(new Date(), -30), 'yyyy-MM-dd'));
+  const [dueDate, setDueDate] = useState(formatBR(subDays(getNowBR(), -30), 'yyyy-MM-dd'));
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
 

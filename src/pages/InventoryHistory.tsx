@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR } from "../lib/dateUtils";
 import { 
   History, 
   Search, 
@@ -61,7 +62,7 @@ export default function InventoryHistory() {
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "---";
     const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
-    return format(date, "dd/MM/yyyy HH:mm", { locale: ptBR });
+    return formatBR(date, "dd/MM/yyyy HH:mm");
   };
 
   return (

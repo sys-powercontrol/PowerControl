@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR } from "../lib/dateUtils";
 import { 
   Mail, 
   Plus, 
@@ -204,7 +205,7 @@ export default function Invite() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
-                    {format(new Date(invite.expires_at), "dd/MM/yyyy", { locale: ptBR })}
+                    {formatBR(invite.expires_at, "dd/MM/yyyy")}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">

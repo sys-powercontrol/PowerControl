@@ -1,4 +1,5 @@
-import { addWeeks, addMonths, addYears, parseISO, format } from "date-fns";
+import { addWeeks, addMonths, addYears, parseISO } from "date-fns";
+import { formatBR } from "./dateUtils";
 import { db } from "./firebase";
 import { doc, runTransaction, collection } from "firebase/firestore";
 
@@ -22,7 +23,7 @@ export function calculateNextDueDate(currentDueDate: string, frequency: Frequenc
       nextDate = addMonths(date, 1);
   }
 
-  return format(nextDate, "yyyy-MM-dd");
+  return formatBR(nextDate, "yyyy-MM-dd");
 }
 
 export async function processMovement(data: any) {

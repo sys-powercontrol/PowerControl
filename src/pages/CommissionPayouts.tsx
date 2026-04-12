@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
 import { 
   TrendingUp, 
   Search, 
@@ -14,7 +15,7 @@ import {
   DollarSign
 } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ExportButton from "../components/ExportButton";
 
@@ -60,8 +61,8 @@ export default function CommissionPayouts() {
   }
 
   const [selectedSellerId, setSelectedSellerId] = useState<string>("all");
-  const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(formatBR(startOfMonth(getNowBR()), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(formatBR(endOfMonth(getNowBR()), 'yyyy-MM-dd'));
 
   const { data: sellers = [] } = useQuery({ 
     queryKey: ["sellers", currentCompanyId], 
@@ -81,8 +82,8 @@ export default function CommissionPayouts() {
       const isPending = sale.commission_status === "pending";
       const matchesSeller = selectedSellerId === "all" || sale.seller_id === selectedSellerId;
       const matchesDate = isWithinInterval(saleDate, {
-        start: new Date(startDate),
-        end: new Date(endDate + 'T23:59:59')
+        start: new Date(`${startDate}T00:00:00-03:00`),
+        end: new Date(`${endDate}T23:59:59-03:00`)
       });
 
       return isPending && matchesSeller && matchesDate;
@@ -106,7 +107,7 @@ export default function CommissionPayouts() {
         company_id: currentCompanyId,
         description: `Comissão: Venda #${sale.id.substr(0, 8).toUpperCase()} - ${sale.seller_name}`,
         amount: sale.commission_amount,
-        due_date: format(new Date(), 'yyyy-MM-dd'),
+        due_date: getTodayBR(),
         status: "Pago",
         payment_date: new Date().toISOString(),
         supplier: sale.seller_name, // Using seller as supplier for tracking
@@ -228,8 +229,8 @@ export default function CommissionPayouts() {
             <button 
               onClick={() => {
                 setSelectedSellerId("all");
-                setStartDate(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-                setEndDate(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+                setStartDate(formatBR(startOfMonth(getNowBR()), 'yyyy-MM-dd'));
+                setEndDate(formatBR(endOfMonth(getNowBR()), 'yyyy-MM-dd'));
               }}
               className="w-full py-2 text-sm font-bold text-gray-500 hover:text-blue-600 transition-colors"
             >
@@ -267,7 +268,7 @@ export default function CommissionPayouts() {
                   {filteredSales.map((sale: any) => (
                     <tr key={sale.id} className="group hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(sale.sale_date || sale.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        {formatBR(sale.sale_date || sale.created_at, "dd/MM/yyyy HH:mm")}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
