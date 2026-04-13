@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 import { 
   Search, 
   Filter, 
@@ -9,7 +10,8 @@ import {
   FileText, 
   XCircle,
   ChevronDown,
-  Shield
+  Shield,
+  Calendar
 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
@@ -17,10 +19,15 @@ import ConfirmationModal from "../components/ConfirmationModal";
 import ExportButton from "../components/ExportButton";
 import { printReceipt } from "../lib/utils/print";
 
+type DateFilterType = "day" | "week" | "month" | "custom" | "all";
+
 export default function SalesHistory() {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState<DateFilterType>("day");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
 
   const canView = hasPermission('sales.view');
   const canDelete = hasPermission('sales.delete');
@@ -64,10 +71,37 @@ export default function SalesHistory() {
     enabled: !!user?.company_id
   });
 
-  const filteredSales = sales.filter((s: any) => 
-    (s.client_name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-    (s.id?.toLowerCase() || "").includes(searchTerm.toLowerCase())
-  );
+  const filteredSales = sales.filter((s: any) => {
+    const matchesSearch = (s.client_name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+                          (s.id?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    if (!s.sale_date) return true;
+
+    const saleDate = new Date(s.sale_date);
+    const now = new Date();
+
+    if (dateFilter === "day") {
+      return isWithinInterval(saleDate, { start: startOfDay(now), end: endOfDay(now) });
+    } else if (dateFilter === "week") {
+      return isWithinInterval(saleDate, { start: startOfWeek(now, { weekStartsOn: 0 }), end: endOfWeek(now, { weekStartsOn: 0 }) });
+    } else if (dateFilter === "month") {
+      return isWithinInterval(saleDate, { start: startOfMonth(now), end: endOfMonth(now) });
+    } else if (dateFilter === "custom") {
+      if (customStartDate && customEndDate) {
+        const start = startOfDay(parseISO(customStartDate));
+        const end = endOfDay(parseISO(customEndDate));
+        return isWithinInterval(saleDate, { start, end });
+      } else if (customStartDate) {
+        return saleDate >= startOfDay(parseISO(customStartDate));
+      } else if (customEndDate) {
+        return saleDate <= endOfDay(parseISO(customEndDate));
+      }
+    }
+    
+    return true;
+  });
 
   const cancelSaleMutation = useMutation({
     mutationFn: (id: string) => api.put("sales", id, { status: "Cancelada" }),
@@ -104,10 +138,40 @@ export default function SalesHistory() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <select 
+            value={dateFilter} 
+            onChange={(e) => setDateFilter(e.target.value as DateFilterType)}
+            className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-600 font-medium"
+          >
+            <option value="day">Hoje</option>
+            <option value="week">Esta Semana</option>
+            <option value="month">Este Mês</option>
+            <option value="custom">Personalizado</option>
+            <option value="all">Todo o Período</option>
+          </select>
+
+          {dateFilter === "custom" && (
+            <div className="flex gap-2 items-center">
+              <input 
+                type="date" 
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-600"
+              />
+              <span className="text-gray-400">até</span>
+              <input 
+                type="date" 
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-600"
+              />
+            </div>
+          )}
+        </div>
+
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-gray-600 font-bold flex items-center gap-2 hover:bg-gray-100">
-            <Filter size={18} /> Filtros
-          </button>
           <ExportButton 
             data={filteredSales} 
             filename="historico-vendas" 

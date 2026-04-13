@@ -26,6 +26,7 @@ import ConfirmationModal from "../components/ConfirmationModal";
 export default function Configurations() {
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
+  const companyId = api.getCompanyId() || user?.company_id;
   const [activeTab, setActiveTab] = useState("general");
   const [isSaving, setIsSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
@@ -45,9 +46,9 @@ export default function Configurations() {
   const canManage = hasPermission('settings.manage');
 
   const { data: companyData, isLoading } = useQuery({ 
-    queryKey: ["company", user?.company_id], 
-    enabled: !!user?.company_id,
-    queryFn: () => api.get("companies", user?.company_id) 
+    queryKey: ["company", companyId], 
+    enabled: !!companyId,
+    queryFn: () => api.get("companies", companyId as string) 
   });
   const company = companyData || {};
 
@@ -77,18 +78,18 @@ export default function Configurations() {
   }
 
   const saveData = (data: any) => {
-    if (!user?.company_id) return;
+    if (!companyId) return;
     setIsSaving(true);
-    api.put("companies", user.company_id, data).then(() => {
+    api.put("companies", companyId, data).then(() => {
       api.log({
         action: 'UPDATE',
         entity: 'companies',
-        entity_id: user.company_id,
+        entity_id: companyId,
         description: `Atualizou configurações da empresa`,
         metadata: data,
         changes: calculateDiff(company, data)
       });
-      queryClient.invalidateQueries({ queryKey: ["company", user.company_id] });
+      queryClient.invalidateQueries({ queryKey: ["company", companyId] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
       toast.success("Configurações salvas com sucesso!");
     }).catch((error) => {
@@ -100,9 +101,37 @@ export default function Configurations() {
     });
   };
 
+  const handleToggleNegativeStock = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.checked;
+    setConfirmModal({
+      isOpen: true,
+      title: "Confirmar Alteração",
+      message: `Deseja realmente ${newValue ? "habilitar" : "desabilitar"} o estoque negativo?`,
+      variant: 'warning',
+      onConfirm: () => {
+        setAllowNegativeStock(newValue);
+        saveData({ allow_negative_stock: newValue });
+      }
+    });
+  };
+
+  const handleToggleDisableImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.checked;
+    setConfirmModal({
+      isOpen: true,
+      title: "Confirmar Alteração",
+      message: `Deseja realmente ${newValue ? "desabilitar" : "habilitar"} as fotos de produtos?`,
+      variant: 'warning',
+      onConfirm: () => {
+        setDisableImages(newValue);
+        saveData({ disable_product_images: newValue });
+      }
+    });
+  };
+
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user?.company_id) return;
+    if (!companyId) return;
 
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
@@ -119,51 +148,18 @@ export default function Configurations() {
         if (formData.get(`perm_admin_${p.id}`)) rolePermissions.admin.push(p.id);
       });
 
-      api.put("companies", user.company_id, { role_permissions: rolePermissions }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ["company", user.company_id] });
+      api.put("companies", companyId, { role_permissions: rolePermissions }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["company", companyId] });
         toast.success("Permissões atualizadas com sucesso!");
       });
       return;
     }
     
-    // Settings that should be persisted across tabs if changed
-    const currentAllowNegative = company.allow_negative_stock === "true" || company.allow_negative_stock === true;
-    const currentDisableImages = company.disable_product_images === "true" || company.disable_product_images === true;
-
-    const allowNegativeChanged = currentAllowNegative !== allowNegativeStock;
-    const disableImagesChanged = user?.role === 'master' && currentDisableImages !== disableImages;
-
     if (activeTab === "general") {
       data.allow_negative_stock = allowNegativeStock;
       if (user?.role === 'master') {
         data.disable_product_images = disableImages;
       }
-    }
-    
-    if (allowNegativeChanged || disableImagesChanged) {
-      const changesMsg = [];
-      if (allowNegativeChanged) {
-        changesMsg.push(`• Estoque Negativo: ${allowNegativeStock ? "Habilitado" : "Desabilitado"}`);
-      }
-      if (disableImagesChanged) {
-        changesMsg.push(`• Fotos de Produtos: ${disableImages ? "Desabilitadas" : "Habilitadas"}`);
-      }
-
-      setConfirmModal({
-        isOpen: true,
-        title: "Confirmar Alterações de Sistema",
-        message: `Deseja salvar as seguintes alterações?\n\n${changesMsg.join('\n')}`,
-        variant: 'warning',
-        onConfirm: () => {
-          const finalData = { ...data };
-          finalData.allow_negative_stock = allowNegativeStock;
-          if (user?.role === 'master') {
-            finalData.disable_product_images = disableImages;
-          }
-          saveData(finalData);
-        }
-      });
-      return;
     }
 
     saveData(data);
@@ -262,7 +258,7 @@ export default function Configurations() {
                             type="checkbox" 
                             name="allow_negative_stock" 
                             checked={allowNegativeStock}
-                            onChange={(e) => setAllowNegativeStock(e.target.checked)}
+                            onChange={handleToggleNegativeStock}
                             className="sr-only peer" 
                             value="true"
                           />
@@ -281,7 +277,7 @@ export default function Configurations() {
                               type="checkbox" 
                               name="disable_product_images" 
                               checked={disableImages}
-                              onChange={(e) => setDisableImages(e.target.checked)}
+                              onChange={handleToggleDisableImages}
                               className="sr-only peer" 
                               value="true"
                             />

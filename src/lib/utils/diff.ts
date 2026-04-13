@@ -13,8 +13,9 @@ export const calculateDiff = (oldData: any, newData: any) => {
     // Skip internal or irrelevant fields
     if (['updated_at', 'created_at', 'id', 'company_id', 'timestamp'].includes(key)) return;
 
-    const oldValue = oldData[key];
-    const newValue = newData[key];
+    // Convert undefined to null for Firestore compatibility
+    const oldValue = oldData[key] === undefined ? null : oldData[key];
+    const newValue = newData[key] === undefined ? null : newData[key];
 
     // Simple deep comparison using JSON.stringify for objects/arrays
     const isOldObject = oldValue !== null && typeof oldValue === 'object';
