@@ -69,6 +69,8 @@ export const inventory = {
       const componentDocs = new Map();
 
       for (const item of items) {
+        if (item.type === 'service') continue; // Skip services
+
         if (!productDocs.has(item.id)) {
           const productRef = doc(db, "products", item.id);
           const productDoc = await transaction.get(productRef);
@@ -95,6 +97,8 @@ export const inventory = {
       const stockUpdates = new Map(); // Track stock in memory to handle duplicate items
 
       for (const item of items) {
+        if (item.type === 'service') continue; // Skip services
+
         const productDoc = productDocs.get(item.id);
         const productData = productDoc.data();
         
