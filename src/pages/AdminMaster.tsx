@@ -29,7 +29,8 @@ import {
   ArrowDownRight,
   DollarSign,
   BarChart3,
-  Loader2
+  Loader2,
+  MessageSquare
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -96,6 +97,21 @@ export default function AdminMaster() {
     queryKey: ["audit_logs", "all"], 
     queryFn: () => api.get("audit_logs", { _all: true }),
     enabled: activeTab === "Auditoria"
+  });
+  const { data: supportTickets = [] } = useQuery({ 
+    queryKey: ["support_tickets", "all"], 
+    queryFn: () => api.get("support_tickets", { _all: true }),
+    enabled: activeTab === "Suporte"
+  });
+
+  const ticketMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: any }) => {
+      return api.put("support_tickets", id, { ...data, updated_at: new Date().toISOString() });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_tickets"] });
+      toast.success("Ticket atualizado!");
+    }
   });
 
   const searchCEP = async () => {
@@ -341,7 +357,7 @@ export default function AdminMaster() {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar">
-        {["Visão Geral", "Usuários", "Empresas", "Auditoria", "APIs"].map(tab => (
+        {["Visão Geral", "Usuários", "Empresas", "Suporte", "Auditoria", "APIs"].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -763,6 +779,76 @@ export default function AdminMaster() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "Suporte" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-50 bg-gray-50/50">
+                  <th className="px-6 py-4 font-medium">Ticket</th>
+                  <th className="px-6 py-4 font-medium">Usuário / Empresa</th>
+                  <th className="px-6 py-4 font-medium">Assunto</th>
+                  <th className="px-6 py-4 font-medium">Status</th>
+                  <th className="px-6 py-4 font-medium text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {supportTickets.map((ticket: any) => (
+                  <tr key={ticket.id} className="text-sm hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4 font-mono text-xs text-gray-400">
+                      #{ticket.id.substr(0, 8).toUpperCase()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-gray-900">{ticket.user_name}</p>
+                      <p className="text-xs text-gray-500">{companies.find((c: any) => c.id === ticket.company_id)?.name || "N/A"}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-gray-700">{ticket.subject}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <select 
+                        value={ticket.status}
+                        onChange={(e) => ticketMutation.mutate({ id: ticket.id, data: { status: e.target.value } })}
+                        className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase outline-none ${
+                          ticket.status === "OPEN" ? "bg-blue-100 text-blue-700" :
+                          ticket.status === "IN_PROGRESS" ? "bg-orange-100 text-orange-700" :
+                          "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        <option value="OPEN">Aberto</option>
+                        <option value="IN_PROGRESS">Em Atendimento</option>
+                        <option value="CLOSED">Concluído</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => {
+                          const note = prompt("Notas internas / Resposta:", ticket.internal_notes || "");
+                          if (note !== null) {
+                            ticketMutation.mutate({ id: ticket.id, data: { internal_notes: note } });
+                          }
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Adicionar nota/resposta"
+                      >
+                        <MessageSquare size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {supportTickets.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                      Nenhum ticket encontrado.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

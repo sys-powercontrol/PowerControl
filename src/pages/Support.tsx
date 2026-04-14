@@ -1,27 +1,81 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { 
   HelpCircle, 
   Mail, 
   MessageSquare, 
   ExternalLink,
   ChevronRight,
-  BookOpen
+  BookOpen,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  History
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatBR } from "../lib/dateUtils";
 
 export default function Support() {
-  const [isSending, setIsSending] = useState(false);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [tickets, setTickets] = useState<any[]>([]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = api.subscribe("support_tickets", { user_id: user.id }, (data) => {
+      setTickets(data.sort((a, b) => {
+        const dateA = a.created_at?.seconds || a.created_at || 0;
+        const dateB = b.created_at?.seconds || b.created_at || 0;
+        return dateB > dateA ? 1 : -1;
+      }));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const createTicketMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return api.post("support_tickets", {
+        ...data,
+        user_id: user?.id,
+        user_name: user?.full_name,
+        user_email: user?.email,
+        company_id: user?.company_id,
+        status: "OPEN",
+        priority: "MEDIUM",
+        updated_at: new Date().toISOString()
+      });
+    },
+    onSuccess: () => {
+      toast.success("Chamado aberto com sucesso! Retornaremos em breve.");
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao abrir chamado: " + error.message);
+    }
+  });
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSending(true);
-    setTimeout(() => {
-      setIsSending(false);
-      toast.success("Mensagem enviada! Retornaremos em breve.");
-      (e.target as HTMLFormElement).reset();
-    }, 1500);
+    const formData = new FormData(e.currentTarget);
+    const subject = formData.get("subject") as string;
+    const message = formData.get("message") as string;
+
+    await createTicketMutation.mutateAsync({ subject, message });
+    (e.target as HTMLFormElement).reset();
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "OPEN":
+        return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase flex items-center gap-1"><Clock size={10} /> Aberto</span>;
+      case "IN_PROGRESS":
+        return <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase flex items-center gap-1"><AlertCircle size={10} /> Em Atendimento</span>;
+      case "CLOSED":
+        return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase flex items-center gap-1"><CheckCircle2 size={10} /> Concluído</span>;
+      default:
+        return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-[10px] font-bold uppercase">{status}</span>;
+    }
   };
 
   const faqs = [
@@ -31,7 +85,7 @@ export default function Support() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12">
+    <div className="max-w-6xl mx-auto space-y-12">
       <div className="text-center space-y-4">
         <div className="w-20 h-20 bg-blue-600 text-white rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-100">
           <HelpCircle size={40} />
@@ -40,40 +94,76 @@ export default function Support() {
         <p className="text-gray-500 max-w-md mx-auto">Estamos aqui para garantir que sua experiência com o PowerControl seja incrível.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Contact Form */}
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <MessageSquare size={20} className="text-blue-600" /> Envie uma mensagem
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Assunto</label>
-              <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">Selecione um assunto...</option>
-                <option value="Dúvida Técnica">Dúvida Técnica</option>
-                <option value="Financeiro">Financeiro</option>
-                <option value="Sugestão">Sugestão</option>
-                <option value="Erro no Sistema">Erro no Sistema</option>
-              </select>
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <MessageSquare size={20} className="text-blue-600" /> Envie uma mensagem
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">Assunto</label>
+                <select 
+                  name="subject"
+                  required 
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione um assunto...</option>
+                  <option value="Dúvida Técnica">Dúvida Técnica</option>
+                  <option value="Financeiro">Financeiro</option>
+                  <option value="Sugestão">Sugestão</option>
+                  <option value="Erro no Sistema">Erro no Sistema</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">Mensagem</label>
+                <textarea 
+                  name="message"
+                  required 
+                  rows={4} 
+                  placeholder="Descreva seu problema ou dúvida em detalhes..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={createTicketMutation.isPending}
+                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+              >
+                {createTicketMutation.isPending ? "Enviando..." : "Enviar Mensagem"}
+              </button>
+            </form>
+          </div>
+
+          {/* My Tickets */}
+          {tickets.length > 0 && (
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <History size={20} className="text-blue-600" /> Meus Chamados
+              </h2>
+              <div className="space-y-4">
+                {tickets.map((ticket) => (
+                  <div key={ticket.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-400 uppercase">#{ticket.id.substr(0, 8).toUpperCase()}</span>
+                      {getStatusBadge(ticket.status)}
+                    </div>
+                    <h3 className="font-bold text-gray-900">{ticket.subject}</h3>
+                    <p className="text-sm text-gray-500 line-clamp-2">{ticket.message}</p>
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-200/50">
+                      <span className="text-[10px] text-gray-400 font-medium">
+                        Aberto em {formatBR(ticket.created_at, "dd/MM/yyyy HH:mm")}
+                      </span>
+                      {ticket.internal_notes && (
+                        <span className="text-[10px] text-blue-600 font-bold italic">Resposta disponível</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Mensagem</label>
-              <textarea 
-                required 
-                rows={4} 
-                placeholder="Descreva seu problema ou dúvida em detalhes..."
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={isSending}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
-            >
-              {isSending ? "Enviando..." : "Enviar Mensagem"}
-            </button>
-          </form>
+          )}
         </div>
 
         {/* FAQ & Quick Links */}

@@ -144,6 +144,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /support_tickets/{ticketId} {
+      allow read: if isAuthenticated() && (isMaster() || resource.data.user_id == request.auth.uid || (isAdmin() && resource.data.company_id == getUserData().company_id));
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isAuthenticated() && (isMaster() || (resource.data.user_id == request.auth.uid && request.resource.data.status == resource.data.status));
+      allow delete: if isMaster();
+    }
+
     match /categories/{id} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();

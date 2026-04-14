@@ -118,6 +118,11 @@ export default function Sales() {
     queryFn: () => api.get("cashiers", currentCompanyId ? { company_id: currentCompanyId } : {}),
     enabled: !!currentCompanyId
   });
+  const { data: bankAccountsData = [] } = useQuery({ 
+    queryKey: ["bankAccounts", currentCompanyId], 
+    queryFn: () => api.get("bankAccounts", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    enabled: !!currentCompanyId
+  });
   const { data: sellersData = [] } = useQuery({ 
     queryKey: ["sellers", currentCompanyId], 
     queryFn: () => api.get("sellers", currentCompanyId ? { company_id: currentCompanyId } : {}),
@@ -144,10 +149,17 @@ export default function Sales() {
     return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
   }, [cashiersData, currentCompanyId]);
 
+  const bankAccounts = useMemo(() => {
+    if (!currentCompanyId) return bankAccountsData;
+    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+  }, [bankAccountsData, currentCompanyId]);
+
   const sellers = useMemo(() => {
     if (!currentCompanyId) return sellersData;
     return sellersData.filter((item: any) => item.company_id === currentCompanyId);
   }, [sellersData, currentCompanyId]);
+
+  const [selectedBankAccount, setSelectedBankAccount] = useState<any>(null);
 
   const hasOpenCashier = useMemo(() => {
     const today = getTodayBR();
@@ -280,7 +292,8 @@ export default function Sales() {
         client_id: selectedClient.id,
         client_name: selectedClient.name,
         client_document: selectedClient.document || "",
-        cashier_id: selectedCashier.id,
+        ...(paymentMethod === "Dinheiro" ? { cashier_id: selectedCashier.id } : {}),
+        ...((paymentMethod === "PIX" || paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito" || paymentMethod === "Boleto") ? { bank_account_id: selectedBankAccount?.id } : {}),
         seller_id: selectedSeller.id,
         seller_name: selectedSeller.name,
         commission_amount: commissionAmount,
@@ -556,22 +569,41 @@ export default function Sales() {
           <h2 className="font-bold text-xl">Resumo</h2>
 
           <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">Caixa Destino *</label>
-              <select 
-                className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                onChange={(e) => {
-                  const cashier = cashiers.find((c: any) => c.id === e.target.value);
-                  setSelectedCashier(cashier || null);
-                }}
-                value={selectedCashier?.id || ""}
-              >
-                <option value="">Selecione o caixa...</option>
-                {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name} (R$ {c.balance?.toLocaleString()})</option>
-                ))}
-              </select>
-            </div>
+            {paymentMethod === "Dinheiro" ? (
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Caixa Destino *</label>
+                <select 
+                  className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={(e) => {
+                    const cashier = cashiers.find((c: any) => c.id === e.target.value);
+                    setSelectedCashier(cashier || null);
+                  }}
+                  value={selectedCashier?.id || ""}
+                >
+                  <option value="">Selecione o caixa...</option>
+                  {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name} (R$ {c.balance?.toLocaleString()})</option>
+                  ))}
+                </select>
+              </div>
+            ) : (paymentMethod === "PIX" || paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito" || paymentMethod === "Boleto") ? (
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Conta Bancária Destino *</label>
+                <select 
+                  className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={(e) => {
+                    const account = bankAccounts.find((a: any) => a.id === e.target.value);
+                    setSelectedBankAccount(account || null);
+                  }}
+                  value={selectedBankAccount?.id || ""}
+                >
+                  <option value="">Selecione a conta bancária...</option>
+                  {bankAccounts.map((a: any) => (
+                    <option key={a.id} value={a.id}>{a.name} (R$ {a.balance?.toLocaleString()})</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase">Forma de Pagamento *</label>

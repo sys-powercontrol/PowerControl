@@ -121,3 +121,18 @@ export interface ReconciliationRule {
   auto_confirm: boolean;
   created_at: any;
 }
+
+export interface SupportTicket {
+  id: string;
+  company_id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  subject: string;
+  message: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'CLOSED';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  internal_notes?: string;
+  created_at: any;
+  updated_at: any;
+}

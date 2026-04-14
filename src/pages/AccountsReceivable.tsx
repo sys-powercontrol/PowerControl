@@ -117,12 +117,8 @@ export default function AccountsReceivable() {
       // Get current account data to check for recurrence
       const currentAccount = accounts.find((a: any) => a.id === id);
       
-      const result = await api.put("accountsReceivable", id, { 
-        status: "Pago", 
-        receipt_date: new Date().toISOString(),
-        bank_account_id: account.type === 'bank' ? account.id : undefined,
-        cashier_id: account.type === 'cashier' ? account.id : undefined
-      });
+      const { processAccountReceipt } = await import("../lib/finance");
+      await processAccountReceipt(id, currentAccount, account);
 
       // If recurring, create the next one
       if (currentAccount?.is_recurring && currentAccount?.frequency) {
@@ -142,12 +138,13 @@ export default function AccountsReceivable() {
         toast.info(`Próximo lançamento gerado para ${formatBR(nextDueDate)}`);
       }
 
-      return result;
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
       toast.success("Conta marcada como recebida!");
     }
   });

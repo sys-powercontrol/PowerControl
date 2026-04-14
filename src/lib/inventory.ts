@@ -197,6 +197,33 @@ export const inventory = {
           status: "Pendente",
           created_at: serverTimestamp()
         });
+      } else if (saleData.cashier_id || saleData.bank_account_id) {
+        // Update balance for immediate payments
+        const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
+        const accountId = saleData.bank_account_id || saleData.cashier_id;
+        const accountRef = doc(db, collectionName, accountId);
+        const accountDoc = await transaction.get(accountRef);
+        
+        if (accountDoc.exists()) {
+          const accountData = accountDoc.data();
+          transaction.update(accountRef, {
+            balance: (accountData.balance || 0) + saleData.total
+          });
+
+          // Create movement record
+          const movementRef = doc(collection(db, "movements"));
+          transaction.set(movementRef, {
+            company_id: user.company_id,
+            type: "Entrada",
+            description: `Venda #${saleRef.id.substr(0, 8).toUpperCase()}`,
+            amount: saleData.total,
+            to_account_type: saleData.bank_account_id ? 'Banco' : 'Caixa',
+            to_account_id: accountId,
+            category: "Vendas",
+            movement_date: new Date().toISOString(),
+            created_at: serverTimestamp()
+          });
+        }
       }
 
       return { id: saleRef.id, ...finalSaleData };
@@ -276,6 +303,33 @@ export const inventory = {
           status: "Pendente",
           created_at: serverTimestamp()
         });
+      } else if (purchaseData.bank_account_id || purchaseData.cashier_id) {
+        // Update balance for immediate payments
+        const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
+        const accountId = purchaseData.bank_account_id || purchaseData.cashier_id;
+        const accountRef = doc(db, collectionName, accountId);
+        const accountDoc = await transaction.get(accountRef);
+        
+        if (accountDoc.exists()) {
+          const accountData = accountDoc.data();
+          transaction.update(accountRef, {
+            balance: (accountData.balance || 0) - purchaseData.total
+          });
+
+          // Create movement record
+          const movementRef = doc(collection(db, "movements"));
+          transaction.set(movementRef, {
+            company_id: user.company_id,
+            type: "Saída",
+            description: `Compra #${purchaseRef.id.substr(0, 8).toUpperCase()}`,
+            amount: purchaseData.total,
+            from_account_type: purchaseData.bank_account_id ? 'Banco' : 'Caixa',
+            from_account_id: accountId,
+            category: "Compras",
+            movement_date: new Date().toISOString(),
+            created_at: serverTimestamp()
+          });
+        }
       }
 
       return { id: purchaseRef.id, ...finalPurchaseData };

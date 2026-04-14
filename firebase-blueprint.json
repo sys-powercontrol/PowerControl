@@ -281,6 +281,25 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["number", "status", "company_id"]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "Customer support request",
+      "type": "object",
+      "properties": {
+        "company_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "user_email": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["OPEN", "IN_PROGRESS", "CLOSED"] },
+        "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+        "internal_notes": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "subject", "message", "status"]
     }
   },
   "firestore": {
@@ -303,6 +322,7 @@
     "inventory_movements": { "schema": "InventoryMovement", "description": "Inventory movement logs" },
     "certificates": { "schema": "Certificate", "description": "Digital certificates A1" },
     "notifications": { "schema": "Notification", "description": "System notifications" },
-    "invoices": { "schema": "Invoice", "description": "Fiscal invoices" }
+    "invoices": { "schema": "Invoice", "description": "Fiscal invoices" },
+    "support_tickets": { "schema": "SupportTicket", "description": "Support tickets" }
   }
 }

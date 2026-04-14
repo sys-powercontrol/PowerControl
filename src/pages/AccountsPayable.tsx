@@ -106,12 +106,8 @@ export default function AccountsPayable() {
       // Get current account data to check for recurrence
       const currentAccount = accounts.find((a: any) => a.id === id);
       
-      const result = await api.put("accountsPayable", id, { 
-        status: "Pago", 
-        payment_date: new Date().toISOString(),
-        bank_account_id: account.type === 'bank' ? account.id : undefined,
-        cashier_id: account.type === 'cashier' ? account.id : undefined
-      });
+      const { processAccountPayment } = await import("../lib/finance");
+      await processAccountPayment(id, currentAccount, account);
 
       // If recurring, create the next one
       if (currentAccount?.is_recurring && currentAccount?.frequency) {
@@ -131,12 +127,13 @@ export default function AccountsPayable() {
         toast.info(`Próximo lançamento gerado para ${formatBR(nextDueDate)}`);
       }
 
-      return result;
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
       toast.success("Conta marcada como paga!");
     }
   });
