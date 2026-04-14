@@ -64,9 +64,19 @@ export const inventory = {
       const companyData = companyDoc.data() || {};
       const allowNegativeStock = companyData.allow_negative_stock === "true" || companyData.allow_negative_stock === true;
 
-      // 2. Read all products and components FIRST
+      // 2. Read all products, components, and accounts FIRST
       const productDocs = new Map();
       const componentDocs = new Map();
+      let accountDoc = null;
+      let accountRef = null;
+
+      if (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado" && (saleData.cashier_id || saleData.bank_account_id)) {
+        const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
+        const accountId = saleData.bank_account_id || saleData.cashier_id;
+        accountRef = doc(db, collectionName, accountId);
+        accountDoc = await transaction.get(accountRef);
+        if (!accountDoc.exists()) throw new Error(`Conta de destino (${collectionName}) não encontrada.`);
+      }
 
       for (const item of items) {
         if (item.type === 'service') continue; // Skip services
@@ -197,43 +207,34 @@ export const inventory = {
           status: "Pendente",
           created_at: serverTimestamp()
         });
-      } else if (saleData.cashier_id || saleData.bank_account_id) {
+      } else if (accountDoc && accountRef) {
         // Update balance for immediate payments
-        const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
-        const accountId = saleData.bank_account_id || saleData.cashier_id;
-        const accountRef = doc(db, collectionName, accountId);
-        const accountDoc = await transaction.get(accountRef);
-        
-        if (accountDoc.exists()) {
-          const accountData = accountDoc.data();
-          const currentBalance = accountData.balance || 0;
-          const newBalance = currentBalance + (saleData.total || 0);
+        const accountData = accountDoc.data();
+        const currentBalance = accountData.balance || 0;
+        const newBalance = currentBalance + (saleData.total || 0);
 
-          if (isNaN(newBalance)) {
-            throw new Error("Erro ao calcular novo saldo: valor inválido.");
-          }
-
-          transaction.update(accountRef, {
-            balance: newBalance
-          });
-
-          // Create movement record
-          const movementRef = doc(collection(db, "movements"));
-          transaction.set(movementRef, {
-            company_id: user.company_id,
-            type: "Entrada",
-            description: `Venda #${saleRef.id.substr(0, 8).toUpperCase()}`,
-            amount: saleData.total,
-            to_account_type: saleData.bank_account_id ? 'Banco' : 'Caixa',
-            to_account_id: accountId,
-            to_account_name: accountData.name || "Conta Desconhecida",
-            category: "Vendas",
-            movement_date: new Date().toISOString(),
-            created_at: serverTimestamp()
-          });
-        } else {
-          throw new Error(`Conta de destino (${collectionName}) não encontrada.`);
+        if (isNaN(newBalance)) {
+          throw new Error("Erro ao calcular novo saldo: valor inválido.");
         }
+
+        transaction.update(accountRef, {
+          balance: newBalance
+        });
+
+        // Create movement record
+        const movementRef = doc(collection(db, "movements"));
+        transaction.set(movementRef, {
+          company_id: user.company_id,
+          type: "Entrada",
+          description: `Venda #${saleRef.id.substr(0, 8).toUpperCase()}`,
+          amount: saleData.total,
+          to_account_type: saleData.bank_account_id ? 'Banco' : 'Caixa',
+          to_account_id: saleData.bank_account_id || saleData.cashier_id,
+          to_account_name: accountData.name || "Conta Desconhecida",
+          category: "Vendas",
+          movement_date: new Date().toISOString(),
+          created_at: serverTimestamp()
+        });
       }
 
       return { id: saleRef.id, ...finalSaleData };
@@ -245,8 +246,19 @@ export const inventory = {
     if (!user) throw new Error("Usuário não autenticado");
 
     return runTransaction(db, async (transaction) => {
-      // 1. Read all products FIRST
+      // 1. Read all products and accounts FIRST
       const productDocs = new Map();
+      let accountDoc = null;
+      let accountRef = null;
+
+      if (purchaseData.payment_status !== "Pendente" && (purchaseData.bank_account_id || purchaseData.cashier_id)) {
+        const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
+        const accountId = purchaseData.bank_account_id || purchaseData.cashier_id;
+        accountRef = doc(db, collectionName, accountId);
+        accountDoc = await transaction.get(accountRef);
+        if (!accountDoc.exists()) throw new Error(`Conta de origem (${collectionName}) não encontrada.`);
+      }
+
       for (const item of items) {
         if (!productDocs.has(item.id)) {
           const productRef = doc(db, "products", item.id);
@@ -313,43 +325,34 @@ export const inventory = {
           status: "Pendente",
           created_at: serverTimestamp()
         });
-      } else if (purchaseData.bank_account_id || purchaseData.cashier_id) {
+      } else if (accountDoc && accountRef) {
         // Update balance for immediate payments
-        const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
-        const accountId = purchaseData.bank_account_id || purchaseData.cashier_id;
-        const accountRef = doc(db, collectionName, accountId);
-        const accountDoc = await transaction.get(accountRef);
-        
-        if (accountDoc.exists()) {
-          const accountData = accountDoc.data();
-          const currentBalance = accountData.balance || 0;
-          const newBalance = currentBalance - (purchaseData.total || 0);
+        const accountData = accountDoc.data();
+        const currentBalance = accountData.balance || 0;
+        const newBalance = currentBalance - (purchaseData.total || 0);
 
-          if (isNaN(newBalance)) {
-            throw new Error("Erro ao calcular novo saldo: valor inválido.");
-          }
-
-          transaction.update(accountRef, {
-            balance: newBalance
-          });
-
-          // Create movement record
-          const movementRef = doc(collection(db, "movements"));
-          transaction.set(movementRef, {
-            company_id: user.company_id,
-            type: "Saída",
-            description: `Compra #${purchaseRef.id.substr(0, 8).toUpperCase()}`,
-            amount: purchaseData.total,
-            from_account_type: purchaseData.bank_account_id ? 'Banco' : 'Caixa',
-            from_account_id: accountId,
-            from_account_name: accountData.name || "Conta Desconhecida",
-            category: "Compras",
-            movement_date: new Date().toISOString(),
-            created_at: serverTimestamp()
-          });
-        } else {
-          throw new Error(`Conta de origem (${collectionName}) não encontrada.`);
+        if (isNaN(newBalance)) {
+          throw new Error("Erro ao calcular novo saldo: valor inválido.");
         }
+
+        transaction.update(accountRef, {
+          balance: newBalance
+        });
+
+        // Create movement record
+        const movementRef = doc(collection(db, "movements"));
+        transaction.set(movementRef, {
+          company_id: user.company_id,
+          type: "Saída",
+          description: `Compra #${purchaseRef.id.substr(0, 8).toUpperCase()}`,
+          amount: purchaseData.total,
+          from_account_type: purchaseData.bank_account_id ? 'Banco' : 'Caixa',
+          from_account_id: purchaseData.bank_account_id || purchaseData.cashier_id,
+          from_account_name: accountData.name || "Conta Desconhecida",
+          category: "Compras",
+          movement_date: new Date().toISOString(),
+          created_at: serverTimestamp()
+        });
       }
 
       return { id: purchaseRef.id, ...finalPurchaseData };
