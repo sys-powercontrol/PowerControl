@@ -35,10 +35,30 @@ interface MatchResult {
   isRuleMatch?: boolean;
 }
 
+// Common bank noise to remove for better matching
+const BANK_NOISE = [
+  'DOC', 'TED', 'PIX', 'PAGTO', 'TRANSF', 'DEPOSITO', 'SAQUE', 'TAR', 'TARIFA',
+  'CH', 'CHEQUE', 'LIQ', 'LIQUIDACAO', 'EST', 'ESTORNO', 'REF', 'REFERENTE',
+  'CONV', 'CONVENIO', 'COB', 'COBRANCA', 'PG', 'PAG', 'PAGAMENTO'
+];
+
+function normalizeDescription(str: string): string {
+  let normalized = str.toUpperCase();
+  
+  // Remove noise words
+  BANK_NOISE.forEach(noise => {
+    const regex = new RegExp(`\\b${noise}\\b`, 'g');
+    normalized = normalized.replace(regex, '');
+  });
+
+  // Remove special characters and extra spaces
+  return normalized.replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+}
+
 // Simple string similarity (Dice's Coefficient)
 function getStringSimilarity(str1: string, str2: string): number {
-  const s1 = str1.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const s2 = str2.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const s1 = normalizeDescription(str1).toLowerCase();
+  const s2 = normalizeDescription(str2).toLowerCase();
   
   if (s1 === s2) return 1;
   if (s1.length < 2 || s2.length < 2) return 0;
@@ -102,7 +122,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
     let bestMatch: MatchResult | null = null;
     const isExpense = t.type === "DEBIT";
 
-    // 1. Check Rules first
+    // 1. Check Rules first to get a "boost" or "category hint"
     const matchingRule = rules.find((r: any) => {
       if (r.target_type !== (isExpense ? 'PAYABLE' : 'RECEIVABLE')) return false;
       
@@ -121,12 +141,6 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       return false;
     });
 
-    if (matchingRule) {
-      // If it's a rule match, we might still want to find a specific document
-      // but the rule itself provides categorization.
-      // For now, let's see if there's a document that matches the rule's criteria
-    }
-
     // 2. Score existing documents
     existing.forEach((e: any) => {
       if (e.status !== "Pendente") return;
@@ -134,16 +148,16 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       let score = 0;
       const reasons: string[] = [];
 
-      // Amount match (Crucial)
+      // Amount match (Crucial - Weight: 70)
       if (Math.abs(e.amount) === Math.abs(t.amount)) {
-        score += 60;
+        score += 70;
         reasons.push("Valor idêntico");
       } else if (Math.abs(Math.abs(e.amount) - Math.abs(t.amount)) < 0.05) {
         score += 40;
         reasons.push("Valor aproximado");
       }
 
-      // Date match
+      // Date match (Weight: 30)
       const eDate = new Date(e.due_date);
       const tDate = new Date(t.date);
       const diffDays = Math.abs(eDate.getTime() - tDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -158,7 +172,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
         score += 5;
       }
 
-      // Description match
+      // Description match (Weight: 40)
       const similarity = getStringSimilarity(t.memo, e.description);
       if (similarity > 0.8) {
         score += 40;
@@ -168,11 +182,28 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
         reasons.push("Descrição similar");
       }
 
+      // Rule match boost (Weight: 50)
+      if (matchingRule) {
+        // If the rule points to the same supplier/client, it's a very strong match
+        const ruleMatchesEntity = 
+          (matchingRule.supplier_id && e.supplier_id === matchingRule.supplier_id) ||
+          (matchingRule.client_id && e.client_id === matchingRule.client_id);
+          
+        if (ruleMatchesEntity) {
+          score += 50;
+          reasons.push("Regra de correspondência");
+        } else if (getStringSimilarity(t.memo, matchingRule.pattern) > 0.8) {
+          score += 20;
+          reasons.push("Padrão de regra");
+        }
+      }
+
       if (score > (bestMatch?.score || 30)) {
         bestMatch = {
           match: e,
           score,
-          reason: reasons.join(", ")
+          reason: reasons.join(", "),
+          isRuleMatch: !!matchingRule
         };
       }
     });
@@ -208,6 +239,16 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
             bank_account_id: bankAccountId
           });
         } else {
+          // Check for rule to pre-fill metadata
+          const matchingRule = rules.find((r: any) => {
+            if (r.target_type !== (isExpense ? 'PAYABLE' : 'RECEIVABLE')) return false;
+            const memo = t.memo.toLowerCase();
+            const pattern = r.pattern.toLowerCase();
+            if (r.type === 'EXACT') return memo === pattern;
+            if (r.type === 'CONTAINS') return memo.includes(pattern);
+            return false;
+          });
+
           // Create new entry
           await api.post(endpoint, {
             company_id: currentCompanyId,
@@ -217,6 +258,9 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
             [isExpense ? "payment_date" : "receipt_date"]: t.date,
             status: "Pago",
             bank_account_id: bankAccountId,
+            category_id: matchingRule?.category_id || null,
+            supplier_id: matchingRule?.supplier_id || null,
+            client_id: matchingRule?.client_id || null,
             created_at: new Date().toISOString()
           });
         }
