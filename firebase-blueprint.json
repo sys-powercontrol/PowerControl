@@ -300,10 +300,49 @@
         "updated_at": { "type": "string", "format": "date-time" }
       },
       "required": ["user_id", "subject", "message", "status"]
+    },
+    "Movement": {
+      "title": "Movement",
+      "description": "Financial movement record",
+      "type": "object",
+      "properties": {
+        "company_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["Entrada", "Saída", "Transferência"] },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "from_account_type": { "type": "string", "enum": ["Banco", "Caixa"] },
+        "from_account_id": { "type": "string" },
+        "from_account_name": { "type": "string" },
+        "to_account_type": { "type": "string", "enum": ["Banco", "Caixa"] },
+        "to_account_id": { "type": "string" },
+        "to_account_name": { "type": "string" },
+        "category": { "type": "string" },
+        "movement_date": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["company_id", "type", "amount"]
+    },
+    "BankAccount": {
+      "title": "Bank Account",
+      "description": "Bank account information",
+      "type": "object",
+      "properties": {
+        "company_id": { "type": "string" },
+        "name": { "type": "string" },
+        "bank_name": { "type": "string" },
+        "agency": { "type": "string" },
+        "account_number": { "type": "string" },
+        "balance": { "type": "number" },
+        "active": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["company_id", "name", "bank_name"]
     }
   },
   "firestore": {
     "users": { "schema": "User", "description": "User profiles" },
+    "movements": { "schema": "Movement", "description": "Financial movements" },
+    "bankAccounts": { "schema": "BankAccount", "description": "Bank accounts" },
     "companies": { "schema": "Company", "description": "Companies" },
     "products": { "schema": "Product", "description": "Products" },
     "sales": { "schema": "Sale", "description": "Sales" },

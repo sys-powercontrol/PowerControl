@@ -5,6 +5,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -78,22 +82,26 @@ service cloud.firestore {
 
     match /accountsPayable/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('inventory.manage'));
+      allow update: if belongsToCompany(resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /accountsReceivable/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create'));
+      allow update: if belongsToCompany(resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /bankAccounts/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow update: if belongsToCompany(resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
     }
 
     match /cashiers/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow update: if belongsToCompany(resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
     }
 
     match /suppliers/{id} {
@@ -158,7 +166,8 @@ service cloud.firestore {
 
     match /movements/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
+      allow update: if belongsToCompany(resource.data.company_id) && hasPermission('finance.manage');
     }
 
     match /companies/{companyId} {

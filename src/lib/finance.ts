@@ -73,7 +73,7 @@ export async function processMovement(data: any) {
       ...data,
       amount,
       movement_date: new Date().toISOString(),
-      created_at: new Date().toISOString()
+      created_at: serverTimestamp()
     };
     
     transaction.set(movementRef, movementData);
@@ -85,6 +85,7 @@ export async function processMovement(data: any) {
 export async function processAccountPayment(accountId: string, accountData: any, paymentData: { type: string, id: string }) {
   return runTransaction(db, async (transaction) => {
     const amount = parseFloat(accountData.amount);
+    if (isNaN(amount)) throw new Error("Valor do pagamento inválido");
     
     // Validate account
     const collectionName = paymentData.type === "bank" ? "bankAccounts" : "cashiers";
@@ -116,6 +117,7 @@ export async function processAccountPayment(accountId: string, accountData: any,
       amount: amount,
       from_account_type: paymentData.type === 'bank' ? 'Banco' : 'Caixa',
       from_account_id: paymentData.id,
+      from_account_name: paymentAccountData.name || "Conta Desconhecida",
       category: "Pagamento de Contas",
       movement_date: new Date().toISOString(),
       created_at: serverTimestamp()
@@ -128,6 +130,7 @@ export async function processAccountPayment(accountId: string, accountData: any,
 export async function processAccountReceipt(accountId: string, accountData: any, receiptData: { type: string, id: string }) {
   return runTransaction(db, async (transaction) => {
     const amount = parseFloat(accountData.amount);
+    if (isNaN(amount)) throw new Error("Valor do recebimento inválido");
     
     // Validate account
     const collectionName = receiptData.type === "bank" ? "bankAccounts" : "cashiers";
@@ -159,6 +162,7 @@ export async function processAccountReceipt(accountId: string, accountData: any,
       amount: amount,
       to_account_type: receiptData.type === 'bank' ? 'Banco' : 'Caixa',
       to_account_id: receiptData.id,
+      to_account_name: receiptAccountData.name || "Conta Desconhecida",
       category: "Recebimento de Contas",
       movement_date: new Date().toISOString(),
       created_at: serverTimestamp()

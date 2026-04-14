@@ -206,8 +206,15 @@ export const inventory = {
         
         if (accountDoc.exists()) {
           const accountData = accountDoc.data();
+          const currentBalance = accountData.balance || 0;
+          const newBalance = currentBalance + (saleData.total || 0);
+
+          if (isNaN(newBalance)) {
+            throw new Error("Erro ao calcular novo saldo: valor inválido.");
+          }
+
           transaction.update(accountRef, {
-            balance: (accountData.balance || 0) + saleData.total
+            balance: newBalance
           });
 
           // Create movement record
@@ -219,10 +226,13 @@ export const inventory = {
             amount: saleData.total,
             to_account_type: saleData.bank_account_id ? 'Banco' : 'Caixa',
             to_account_id: accountId,
+            to_account_name: accountData.name || "Conta Desconhecida",
             category: "Vendas",
             movement_date: new Date().toISOString(),
             created_at: serverTimestamp()
           });
+        } else {
+          throw new Error(`Conta de destino (${collectionName}) não encontrada.`);
         }
       }
 
@@ -312,8 +322,15 @@ export const inventory = {
         
         if (accountDoc.exists()) {
           const accountData = accountDoc.data();
+          const currentBalance = accountData.balance || 0;
+          const newBalance = currentBalance - (purchaseData.total || 0);
+
+          if (isNaN(newBalance)) {
+            throw new Error("Erro ao calcular novo saldo: valor inválido.");
+          }
+
           transaction.update(accountRef, {
-            balance: (accountData.balance || 0) - purchaseData.total
+            balance: newBalance
           });
 
           // Create movement record
@@ -325,10 +342,13 @@ export const inventory = {
             amount: purchaseData.total,
             from_account_type: purchaseData.bank_account_id ? 'Banco' : 'Caixa',
             from_account_id: accountId,
+            from_account_name: accountData.name || "Conta Desconhecida",
             category: "Compras",
             movement_date: new Date().toISOString(),
             created_at: serverTimestamp()
           });
+        } else {
+          throw new Error(`Conta de origem (${collectionName}) não encontrada.`);
         }
       }
 

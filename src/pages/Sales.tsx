@@ -287,6 +287,21 @@ export default function Sales() {
       
       const commissionAmount = (totalFiscalValue * (selectedSeller.commission_rate || 0)) / 100;
 
+      if (paymentMethod === "Dinheiro" && !selectedCashier) {
+        toast.error("Nenhum caixa aberto selecionado.");
+        return;
+      }
+
+      if ((paymentMethod === "PIX" || paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito" || paymentMethod === "Boleto") && !selectedBankAccount) {
+        toast.error("Nenhuma conta bancária selecionada.");
+        return;
+      }
+
+      if (isNaN(totalFiscalValue) || totalFiscalValue < 0) {
+        toast.error("Valor total da venda inválido.");
+        return;
+      }
+
       const saleData = {
         company_id: user?.company_id,
         client_id: selectedClient.id,
