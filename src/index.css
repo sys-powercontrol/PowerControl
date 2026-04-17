@@ -40,3 +40,9 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+@media print {
+  .hide-on-print {
+    display: none !important;
+  }
+}

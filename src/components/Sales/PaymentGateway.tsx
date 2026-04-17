@@ -46,7 +46,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
         amount,
         method: activeTab,
         metadata: { source: "SalesPDV" }
-      });
+      }, { timeout: 10000 });
       setPaymentId(response.data.id);
       if (activeTab === "pix") {
         setQrCode(response.data.qr_code);
@@ -55,7 +55,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
     } catch (error) {
       console.error("Error creating payment:", error);
       setStatus("ERROR");
-      toast.error("Erro ao gerar pagamento. Tente novamente.");
+      toast.error("Erro ao gerar pagamento (Timeout). Verifique a conexão.");
     } finally {
       setLoading(false);
     }
@@ -65,16 +65,28 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
   useEffect(() => {
     let interval: any;
     if (paymentId && status === "PENDING" && activeTab === "pix") {
+      let attempts = 0;
+      const maxAttempts = 60; // 3 mins with 3s interval
       interval = setInterval(async () => {
         try {
-          const response = await axios.get(`/api/payments/status/${paymentId}`);
+          attempts++;
+          const response = await axios.get(`/api/payments/status/${paymentId}`, { timeout: 5000 });
           if (response.data.status === "CONFIRMED") {
             setStatus("CONFIRMED");
             clearInterval(interval);
             setTimeout(onSuccess, 2000);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            setStatus("EXPIRED");
+            toast.error("Tempo limite do PIX excedido (Expirado).");
           }
         } catch (error) {
           console.error("Error checking status:", error);
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            setStatus("EXPIRED");
+            toast.error("Tempo limite do PIX excedido.");
+          }
         }
       }, 3000);
     }
@@ -90,21 +102,36 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
       await axios.post("/api/payments/confirm-card", {
         payment_id: paymentId,
         card_data: cardData
-      });
+      }, { timeout: 10000 }); // 10s Fail-safe timeout
       
       // Simulate polling for card confirmation
+      let attempts = 0;
+      const maxAttempts = 15;
       const checkStatus = setInterval(async () => {
-        const response = await axios.get(`/api/payments/status/${paymentId}`);
-        if (response.data.status === "CONFIRMED") {
-          setStatus("CONFIRMED");
-          clearInterval(checkStatus);
-          setTimeout(onSuccess, 2000);
+        try {
+          attempts++;
+          const response = await axios.get(`/api/payments/status/${paymentId}`, { timeout: 5000 });
+          if (response.data.status === "CONFIRMED") {
+            setStatus("CONFIRMED");
+            clearInterval(checkStatus);
+            setTimeout(onSuccess, 2000);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(checkStatus);
+            setStatus("ERROR");
+            toast.error("Tempo limite excedido na confirmação do pagamento.");
+          }
+        } catch (err) {
+           if (attempts >= maxAttempts) {
+             clearInterval(checkStatus);
+             setStatus("ERROR");
+             toast.error("Tempo limite excedido na confirmação do pagamento.");
+           }
         }
       }, 2000);
 
     } catch (error) {
       setStatus("ERROR");
-      toast.error("Erro ao processar cartão.");
+      toast.error("Erro ao processar cartão. Verifique sua conexão e tente novamente.");
     }
   };
 

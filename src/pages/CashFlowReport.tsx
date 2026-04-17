@@ -15,7 +15,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Shield,
-  Info
+  Info,
+  Printer,
+  FileText
 } from "lucide-react";
 import { 
   BarChart, 
@@ -41,6 +43,8 @@ import {
   endOfDay
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import ExportButton from "../components/ExportButton";
+import { exportToPdf } from "../lib/utils/pdfExport";
 
 const COLORS = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
 
@@ -133,6 +137,32 @@ export default function CashFlowReport() {
     const netProfit = grossProfit - totalOpEx;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
+    const detailedMovements = [
+      ...filteredSales.map((s: any) => ({
+        tipo: 'Receita (Venda)',
+        data: formatBR(s.sale_date, 'dd/MM/yyyy HH:mm'),
+        descricao: `Venda #${String(s.id).substring(0, 8).toUpperCase()} - ${s.client_name || 'Balcão'}`,
+        valor: s.total || 0,
+        forma_pagamento: s.payment_method || '-',
+      })),
+      ...filteredPurchases.map((p: any) => ({
+        tipo: 'CPV (Compra)',
+        data: formatBR(p.purchase_date, 'dd/MM/yyyy HH:mm'),
+        descricao: `Compra #${String(p.purchase_number)} - ${p.supplier_name || 'Fornecedor'}`,
+        valor: -(p.total || 0),
+        forma_pagamento: p.payment_status || '-',
+      })),
+      ...filteredExpenses.map((e: any) => ({
+        tipo: 'Despesa Operacional',
+        data: formatBR(e.payment_date || e.due_date, 'dd/MM/yyyy'),
+        descricao: e.description,
+        valor: -(e.amount || 0),
+        forma_pagamento: e.payment_method || '-',
+      }))
+    ];
+
+    // Sort by date strings is tricky but format is dd/MM/yyyy so we'll just leave it grouped by type
+    // or sort by original raw date
     return {
       totalRevenue,
       totalCOGS,
@@ -142,7 +172,8 @@ export default function CashFlowReport() {
       profitMargin,
       salesCount: filteredSales.length,
       purchasesCount: filteredPurchases.length,
-      expensesCount: filteredExpenses.length
+      expensesCount: filteredExpenses.length,
+      detailedMovements
     };
   }, [sales, purchases, accountsPayable, currentCompanyId, dateRange]);
 
@@ -163,7 +194,7 @@ export default function CashFlowReport() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" id="dre-report-content">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">DRE Simplificado</h1>
@@ -189,6 +220,40 @@ export default function CashFlowReport() {
             >
               Personalizado
             </button>
+          </div>
+          <div className="flex items-center gap-2 hide-on-print">
+            <button 
+              onClick={() => window.print()}
+              className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"
+              title="Imprimir Relatório"
+            >
+              <Printer size={18} />
+            </button>
+            <button 
+              onClick={() => exportToPdf({ 
+                elementId: 'dre-report-content', 
+                filename: 'DRE-Simplificado', 
+                title: 'DRE Simplificado',
+              })}
+              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center gap-2 font-bold text-sm"
+              title="Exportar como PDF"
+            >
+              <FileText size={16} />
+              PDF
+            </button>
+            <ExportButton 
+              data={dreData.detailedMovements} 
+              filename="DRE-Movimentacoes" 
+              format="xlsx" 
+              title="DRE - Movimentações"
+              headers={{
+                tipo: 'Tipo',
+                data: 'Data',
+                descricao: 'Descrição',
+                valor: 'Valor',
+                forma_pagamento: 'Forma de Pagto'
+              }}
+            />
           </div>
         </div>
       </div>

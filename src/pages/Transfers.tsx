@@ -71,7 +71,7 @@ export default function Transfers() {
       ...data,
       company_id: user?.company_id,
       user_id: user?.id,
-      user_name: user?.name,
+      user_name: user?.full_name || user?.email || "Sistema",
       amount: parseFloat(data.amount as string)
     }),
     onSuccess: (data) => {

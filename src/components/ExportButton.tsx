@@ -13,6 +13,11 @@ interface ExportButtonProps {
   title?: string;
   headers?: Record<string, string>;
   className?: string;
+  summaryBlocks?: {
+    label: string;
+    value: string;
+    isPrimary?: boolean;
+  }[];
 }
 
 export default function ExportButton({ 
@@ -21,7 +26,8 @@ export default function ExportButton({
   format, 
   title, 
   headers,
-  className 
+  className,
+  summaryBlocks
 }: ExportButtonProps) {
   
   const handleExport = () => {
@@ -63,22 +69,69 @@ export default function ExportButton({
   const exportToPDF = (preparedData: any[]) => {
     try {
       const doc = new jsPDF();
-      
+      let startY = 20;
+
       if (title) {
         doc.setFontSize(18);
+        doc.setTextColor(31, 41, 55);
         doc.text(title, 14, 22);
         doc.setFontSize(11);
-        doc.setTextColor(100);
+        doc.setTextColor(100, 116, 139);
         doc.text(`Gerado em: ${formatBR(getNowBR(), "dd/MM/yyyy HH:mm")}`, 14, 30);
+        startY = 35;
+      }
+
+      if (summaryBlocks && summaryBlocks.length > 0) {
+        const pageWidth = doc.internal.pageSize.getWidth();
+        let currentX = pageWidth - 14; 
+
+        // Draw backwards to stack them horizontally on the right
+        for (let i = summaryBlocks.length - 1; i >= 0; i--) {
+          const block = summaryBlocks[i];
+          
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "bold");
+          const labelWidth = doc.getTextWidth(block.label.toUpperCase());
+          
+          doc.setFontSize(9);
+          const valueWidth = doc.getTextWidth(block.value);
+          
+          const blockWidth = Math.max(labelWidth, valueWidth) + 12; 
+          const blockHeight = 14;
+          
+          currentX -= blockWidth;
+          
+          if (block.isPrimary) {
+            doc.setFillColor(37, 99, 235);
+          } else {
+            doc.setFillColor(243, 244, 246);
+          }
+          
+          doc.roundedRect(currentX, 15, blockWidth, blockHeight, 1.5, 1.5, 'F');
+          
+          if (block.isPrimary) doc.setTextColor(191, 219, 254);
+          else doc.setTextColor(156, 163, 175);
+          doc.setFontSize(7);
+          doc.text(block.label.toUpperCase(), currentX + 6, 20);
+          
+          if (block.isPrimary) doc.setTextColor(255, 255, 255);
+          else doc.setTextColor(55, 65, 81);
+          doc.setFontSize(9);
+          doc.text(block.value, currentX + 6, 26);
+          
+          currentX -= 4; 
+        }
+        
+        startY = 40; 
       }
 
       const tableHeaders = Object.keys(preparedData[0]);
-      const tableRows = preparedData.map(item => Object.values(item));
+      const tableRows = preparedData.map(item => Object.values(item).map(val => val !== null && val !== undefined ? String(val) : ''));
 
       autoTable(doc, {
         head: [tableHeaders],
         body: tableRows,
-        startY: title ? 35 : 20,
+        startY: startY,
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
         alternateRowStyles: { fillColor: [249, 250, 251] },

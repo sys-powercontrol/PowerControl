@@ -110,7 +110,13 @@ export const api = {
       const isUserEntity = baseEntity === "users";
       const isCompanyEntity = baseEntity === "companies";
 
-      if (!isSystemAdminStatus && currentCompanyId && !isCompanyEntity) {
+      const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
+
+      if (requiresIsolation) {
+        if (!currentCompanyId) {
+          console.error(`Blocked cross-tenant data leak. Missing company_id for entity ${entityPath}.`);
+          throw new Error("Sessão inválida: Identificador de empresa ausente. Faça login novamente.");
+        }
         conditions.push(where("company_id", "==", currentCompanyId));
       } else if (isSystemAdminStatus && currentCompanyId && !(paramsOrId && paramsOrId._all) && !isCompanyEntity) {
         conditions.push(where("company_id", "==", currentCompanyId));
@@ -184,7 +190,15 @@ export const api = {
     const baseEntity = pathSegments[0];
     const isCompanyEntity = baseEntity === "companies";
 
-    if (!isSystemAdminStatus && currentCompanyId && !isCompanyEntity) {
+    const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
+
+    if (requiresIsolation) {
+      if (!currentCompanyId) {
+        console.error(`Blocked cross-tenant data leak in subscribe. Missing company_id for entity ${entityPath}.`);
+        throw new Error("Sessão inválida: Identificador de empresa ausente na assinatura de dados. Atualize a página.");
+      }
+      conditions.push(where("company_id", "==", currentCompanyId));
+    } else if (isSystemAdminStatus && currentCompanyId && !(params && params._all) && !isCompanyEntity) {
       conditions.push(where("company_id", "==", currentCompanyId));
     }
 
@@ -205,16 +219,16 @@ export const api = {
       callback(data);
     });
   },
-  log: async (data: any) => {
-    const user = auth.currentUser;
+  log: async (data: any, userContext?: any) => {
+    const user = userContext ? userContext : auth.currentUser;
     if (!user) return;
 
     const logData = {
       ...data,
-      user_id: user.uid,
-      user_name: currentUserData?.full_name || user.email || "Sistema",
+      user_id: userContext?.id || user.uid || user.id,
+      user_name: userContext?.full_name || userContext?.email || currentUserData?.full_name || user.email || "Sistema",
       timestamp: serverTimestamp(),
-      company_id: data.company_id || currentCompanyId
+      company_id: data.company_id || userContext?.company_id || currentCompanyId
     };
 
     try {

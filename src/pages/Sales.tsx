@@ -260,7 +260,12 @@ export default function Sales() {
       const itemsWithTaxes = cart.map(item => {
         const hasST = !!item.mva_rate && item.mva_rate > 0;
         const cfop = fiscal.getCFOP(fiscalOperation, item.type, hasST);
-        const taxes = fiscal.calculateTaxes(item.price * item.quantity, {
+        
+        const itemGrossValue = item.price * item.quantity;
+        const discountProportional = subtotal > 0 ? (itemGrossValue / subtotal) * discount : 0;
+        const itemNetValue = itemGrossValue - discountProportional;
+
+        const taxes = fiscal.calculateTaxes(itemNetValue, {
           icms_rate: item.icms_rate || 0,
           ipi_rate: item.ipi_rate || 0,
           pis_rate: item.pis_rate || 0,
@@ -275,6 +280,7 @@ export default function Sales() {
         return {
           ...item,
           cfop,
+          discount_amount: discountProportional,
           taxes
         };
       });
@@ -282,8 +288,11 @@ export default function Sales() {
       const totalTaxes = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_taxes, 0);
       
       // The total commercial value is 'total' (subtotal - discount)
-      // But for fiscal purposes, the total value of the sale might include IPI and ICMS-ST
-      const totalFiscalValue = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_value, 0) - discount;
+      // Since taxes were calculated on net value, we don't need to subtract discount again from the sum of item total values (which already factored in discount indirectly or directly in the base).
+      // Wait, item.taxes.total_value from calculateTaxes includes the base value passed to it plus IPI, etc.
+      // So item.taxes.total_value is exactly itemNetValue + IPI + ST
+      // Therefore, the totalFiscalValue is just the sum of item.taxes.total_value.
+      const totalFiscalValue = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_value, 0);
       
       const commissionAmount = (totalFiscalValue * (selectedSeller.commission_rate || 0)) / 100;
 
@@ -325,11 +334,11 @@ export default function Sales() {
       };
 
       if (!navigator.onLine) {
-        await offlineStore.saveSale(saleData, itemsWithTaxes);
+        await offlineStore.saveSale(saleData, itemsWithTaxes, user);
         return { id: "offline-" + Date.now(), ...saleData, isOffline: true };
       }
 
-      const sale = await inventory.processSale(saleData, itemsWithTaxes);
+      const sale = await inventory.processSale(saleData, itemsWithTaxes, user);
       
       await api.log({
         action: 'CREATE',

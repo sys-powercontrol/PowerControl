@@ -119,15 +119,50 @@ export default function SalesHistory() {
     setIsCancelModalOpen(true);
   };
 
+  const { totalSales, paymentMethodTotals } = React.useMemo(() => {
+    let total = 0;
+    const totalsByMethod: Record<string, number> = {};
+
+    filteredSales.forEach((s: any) => {
+      // Exclude cancelled sales from totals
+      if (s.status !== "Cancelada") {
+        total += s.total || 0;
+        const method = s.payment_method || 'Outros';
+        totalsByMethod[method] = (totalsByMethod[method] || 0) + (s.total || 0);
+      }
+    });
+
+    return { totalSales: total, paymentMethodTotals: totalsByMethod };
+  }, [filteredSales]);
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Histórico de Vendas</h1>
-        <p className="text-gray-500">Consulte e gerencie todas as movimentações de venda.</p>
+    <div className="space-y-8" id="sales-history-content">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Histórico de Vendas</h1>
+          <p className="text-gray-500">Consulte e gerencie todas as movimentações de venda.</p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {Object.entries(paymentMethodTotals).map(([method, amount]) => (
+            <div key={method} className="bg-white px-4 py-2 flex flex-col rounded-xl border border-gray-100 shadow-sm">
+              <span className="text-[10px] uppercase font-bold text-gray-400">{method}</span>
+              <span className="text-sm font-bold text-gray-700">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount as number)}
+              </span>
+            </div>
+          ))}
+          <div className="bg-blue-600 px-4 py-2 flex flex-col rounded-xl border border-blue-700 shadow-sm text-white">
+            <span className="text-[10px] uppercase font-bold text-blue-200">Total</span>
+            <span className="text-sm font-bold">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSales)}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 hide-on-print">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input 
@@ -199,6 +234,18 @@ export default function SalesHistory() {
               status: 'Status',
               sale_date: 'Data'
             }}
+            summaryBlocks={[
+              {
+                label: 'Total',
+                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSales),
+                isPrimary: true
+              },
+              ...Object.entries(paymentMethodTotals).map(([method, amount]) => ({
+                label: method,
+                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount as number),
+                isPrimary: false
+              }))
+            ]}
           />
         </div>
       </div>

@@ -25,20 +25,22 @@ export const printReceipt = (sale: any, company: any) => {
             font-family: 'Courier New', Courier, monospace; 
             font-size: 12px; 
             width: 80mm; 
+            box-sizing: border-box;
             margin: 0 auto; 
-            padding: 10mm;
+            padding: 10mm 5mm;
             color: #000;
           }
           .header { text-align: center; margin-bottom: 15px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
           .company-name { font-size: 14px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; }
           .details { margin-bottom: 15px; font-size: 11px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
+          th, td { word-wrap: break-word; }
           th { border-bottom: 1px solid #000; padding: 4px 0; text-align: left; font-size: 11px; }
           .totals { text-align: right; border-top: 1px dashed #000; padding-top: 10px; line-height: 1.4; }
           .total-row { font-size: 14px; font-weight: bold; margin-top: 4px; }
           .footer { text-align: center; margin-top: 20px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
           @media print {
-            body { width: 100%; padding: 5mm; }
+            body { padding: 10mm 5mm; }
           }
         </style>
       </head>
@@ -119,20 +121,22 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
             font-family: 'Courier New', Courier, monospace; 
             font-size: 12px; 
             width: 80mm; 
+            box-sizing: border-box;
             margin: 0 auto; 
-            padding: 10mm;
+            padding: 10mm 5mm;
             color: #000;
           }
           .header { text-align: center; margin-bottom: 15px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
           .company-name { font-size: 14px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; }
           .details { margin-bottom: 15px; font-size: 11px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
+          th, td { word-wrap: break-word; }
           th { border-bottom: 1px solid #000; padding: 4px 0; text-align: left; font-size: 11px; }
           .totals { text-align: right; border-top: 1px dashed #000; padding-top: 10px; line-height: 1.4; }
           .total-row { font-size: 14px; font-weight: bold; margin-top: 4px; }
           .footer { text-align: center; margin-top: 20px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
           @media print {
-            body { width: 100%; padding: 5mm; }
+            body { padding: 10mm 5mm; }
           }
         </style>
       </head>

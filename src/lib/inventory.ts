@@ -189,6 +189,9 @@ export const inventory = {
       const saleRef = doc(collection(db, "sales"));
       const finalSaleData = cleanObject({
         ...saleData,
+        user_id: user.id,
+        user_name: user.full_name || user.email || "Sistema",
+        company_id: user.company_id, // ensure company_id comes from context
         created_at: serverTimestamp()
       });
       transaction.set(saleRef, finalSaleData);
@@ -307,6 +310,9 @@ export const inventory = {
       const purchaseRef = doc(collection(db, "purchases"));
       const finalPurchaseData = cleanObject({
         ...purchaseData,
+        user_id: user.id,
+        user_name: user.full_name || user.email || "Sistema",
+        company_id: user.company_id,
         created_at: serverTimestamp()
       });
       transaction.set(purchaseRef, finalPurchaseData);

@@ -15,7 +15,9 @@ import {
   Wrench,
   Download,
   Shield,
-  BarChart3
+  BarChart3,
+  Printer,
+  FileText
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -34,6 +36,7 @@ import {
 import { subDays, isAfter, format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ExportButton from "../components/ExportButton";
+import { exportToPdf } from "../lib/utils/pdfExport";
 
 const COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#0891b2'];
 
@@ -191,7 +194,7 @@ export default function ProfitabilityReport() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" id="profitability-report-content">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Relatório de Lucratividade</h1>
@@ -217,18 +220,39 @@ export default function ProfitabilityReport() {
               </button>
             ))}
           </div>
-          <ExportButton 
-            data={reportData.topProducts} 
-            filename="relatorio-lucratividade" 
-            format="xlsx" 
-            title="Relatório de Lucratividade - Top Produtos"
-            headers={{
-              name: 'Produto',
-              qty: 'Qtd Vendida',
-              revenue: 'Receita Total',
-              profit: 'Lucro Bruto'
-            }}
-          />
+          <div className="flex items-center gap-2 hide-on-print">
+            <button 
+              onClick={() => window.print()}
+              className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"
+              title="Imprimir Relatório"
+            >
+              <Printer size={18} />
+            </button>
+            <button 
+              onClick={() => exportToPdf({ 
+                elementId: 'profitability-report-content', 
+                filename: 'Relatorio-Lucratividade', 
+                title: 'Relatório de Lucratividade',
+              })}
+              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center gap-2 font-bold text-sm"
+              title="Exportar como PDF"
+            >
+              <FileText size={16} />
+              PDF
+            </button>
+            <ExportButton 
+              data={reportData.topProducts} 
+              filename="relatorio-lucratividade" 
+              format="xlsx" 
+              title="Relatório de Lucratividade - Top Produtos"
+              headers={{
+                name: 'Produto',
+                qty: 'Qtd Vendida',
+                revenue: 'Receita Total',
+                profit: 'Lucro Bruto'
+              }}
+            />
+          </div>
         </div>
       </div>
 

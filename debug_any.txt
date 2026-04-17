@@ -1,0 +1,384 @@
+src/components/BOMBuilder.tsx:40:    return products.filter((p: any) => 
+src/components/BOMBuilder.tsx:48:  const addItem = (product: any) => {
+src/components/BOMBuilder.tsx:94:                {filteredProducts.map((p: any) => (
+src/components/ExportButton.tsx:10:  data: any[];
+src/components/ExportButton.tsx:42:      const newItem: any = {};
+src/components/ExportButton.tsx:56:  const exportToExcel = (preparedData: any[]) => {
+src/components/ExportButton.tsx:69:  const exportToPDF = (preparedData: any[]) => {
+src/components/Financial/OFXImporter.tsx:32:  match: any;
+src/components/Financial/OFXImporter.tsx:95:  const [manualMatches, setManualMatches] = useState<Record<string, any>>({});
+src/components/Financial/OFXImporter.tsx:121:  const findBestMatch = (t: OFXTransaction, existing: any[]): MatchResult | null => {
+src/components/Financial/OFXImporter.tsx:126:    const matchingRule = rules.find((r: any) => {
+src/components/Financial/OFXImporter.tsx:145:    existing.forEach((e: any) => {
+src/components/Financial/OFXImporter.tsx:243:          const matchingRule = rules.find((r: any) => {
+src/components/Financial/OFXImporter.tsx:309:      const parsedTransactions: OFXTransaction[] = (Array.isArray(tranList) ? tranList : [tranList]).map((t: any) => {
+src/components/Financial/OFXImporter.tsx:356:  const handleManualMatch = (transactionId: string, match: any) => {
+src/components/Financial/OFXImporter.tsx:611:                    .filter((e: any) => e.status === "Pendente")
+src/components/Financial/OFXImporter.tsx:612:                    .map((e: any) => (
+src/components/NotificationCenter.tsx:86:      const unread = notifications.filter((n: any) => n.status === "unread");
+src/components/NotificationCenter.tsx:87:      await Promise.all(unread.map((n: any) => api.put("notifications", n.id, { status: "read" })));
+src/components/NotificationCenter.tsx:97:    products.filter((p: any) => p.stock_quantity <= p.min_stock).forEach((p: any) => {
+src/components/NotificationCenter.tsx:109:    accountsPayable.filter((a: any) => a.due_date === today && a.status === "Pendente").forEach((a: any) => {
+src/components/NotificationCenter.tsx:120:    accountsReceivable.filter((a: any) => a.due_date === today && a.status === "Pendente").forEach((a: any) => {
+src/components/NotificationCenter.tsx:132:    invoices.filter((i: any) => i.status === "Rejeitada").forEach((i: any) => {
+src/components/NotificationCenter.tsx:144:    notifications.forEach((n: any) => {
+src/components/Sales/PaymentGateway.tsx:66:    let interval: any;
+src/components/GlobalSearch.tsx:85:          .filter((p: any) => p.name?.toLowerCase().includes(searchLower))
+src/components/GlobalSearch.tsx:87:          .map((p: any) => ({
+src/components/GlobalSearch.tsx:96:          .filter((c: any) => c.name?.toLowerCase().includes(searchLower) || c.document?.includes(query))
+src/components/GlobalSearch.tsx:98:          .map((c: any) => ({
+src/components/GlobalSearch.tsx:107:          .filter((s: any) => 
+src/components/GlobalSearch.tsx:112:          .map((s: any) => ({
+src/components/ui/InputMask.tsx:5:  mask: string | any[];
+src/components/LabelPrinter.tsx:21:  products: any[];
+src/components/LabelPrinter.tsx:153:    const itemsToPrint: any[] = [];
+src/components/Layout.tsx:88:    icon: any; 
+src/components/Layout.tsx:97:      icon?: any; 
+src/components/Layout.tsx:197:        submenu: item.submenu.filter((sub: any) => {
+src/components/Layout.tsx:291:                {companies.map((c: any) => (
+src/components/Fiscal/TaxRuleForm.tsx:7:  initialData?: any;
+src/pages/ProfitabilityReport.tsx:96:    const filteredSales = sales.filter((s: any) => {
+src/pages/ProfitabilityReport.tsx:101:    const filteredExpenses = accountsPayable.filter((e: any) => {
+src/pages/ProfitabilityReport.tsx:113:    filteredSales.forEach((sale: any) => {
+src/pages/ProfitabilityReport.tsx:116:      (sale.items || []).forEach((item: any) => {
+src/pages/ProfitabilityReport.tsx:133:        const catName = categories.find((c: any) => c.id === catId)?.name || 'Sem Categoria';
+src/pages/ProfitabilityReport.tsx:143:    const totalExpenses = filteredExpenses.reduce((acc: number, e: any) => acc + (e.amount || 0), 0);
+src/pages/ProfitabilityReport.tsx:158:    filteredSales.forEach((s: any) => {
+src/pages/ProfitabilityReport.tsx:162:        const saleCOGS = (s.items || []).reduce((acc: number, item: any) => acc + ((item.cost_price || 0) * item.quantity), 0);
+src/pages/ProfitabilityReport.tsx:167:    filteredExpenses.forEach((e: any) => {
+src/pages/ProfitabilityReport.tsx:425:                {reportData.topProducts.map((p: any, index) => (
+src/pages/Fiscal.tsx:75:  const filteredInvoices = invoices.filter((i: any) => 
+src/pages/Fiscal.tsx:91:    mutationFn: async (invoice: any) => {
+src/pages/Fiscal.tsx:108:      const result = await fiscalApi.cancel(fiscalConfig as any, invoice.reference, reason);
+src/pages/Fiscal.tsx:120:    onError: (error: any) => {
+src/pages/Fiscal.tsx:138:    mutationFn: async (data: any) => {
+src/pages/Fiscal.tsx:139:      const sale = sales.find((s: any) => s.id === data.sale_id);
+src/pages/Fiscal.tsx:142:      const client = clients.find((c: any) => c.id === sale.client_id) || { name: sale.client_name };
+src/pages/Fiscal.tsx:154:      const result = await fiscalApi.emit(fiscalConfig as any, {
+src/pages/Fiscal.tsx:183:    onError: (error: any) => {
+src/pages/Fiscal.tsx:189:    mutationFn: async (invoice: any) => {
+src/pages/Fiscal.tsx:198:      const result = await fiscalApi.checkStatus(fiscalConfig as any, invoice.reference, invoice.type);
+src/pages/Fiscal.tsx:237:    onError: (error: any) => {
+src/pages/Fiscal.tsx:342:              ) : filteredInvoices.map((invoice: any) => (
+src/pages/Fiscal.tsx:430:                  {sales.filter((s: any) => s.status === "Concluída").map((s: any) => (
+src/pages/SellerDashboard.tsx:41:    return sellersData.find((s: any) => s.email?.toLowerCase() === user?.email?.toLowerCase());
+src/pages/SellerDashboard.tsx:46:    return salesData.filter((sale: any) => sale.seller_id === currentSeller.id);
+src/pages/SellerDashboard.tsx:53:    const salesToday = sellerSales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === today);
+src/pages/SellerDashboard.tsx:54:    const salesMonth = sellerSales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM') === thisMonth);
+src/pages/SellerDashboard.tsx:56:    const totalToday = salesToday.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+src/pages/SellerDashboard.tsx:57:    const totalMonth = salesMonth.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+src/pages/SellerDashboard.tsx:85:      const daySales = sellerSales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === date);
+src/pages/SellerDashboard.tsx:88:        value: daySales.reduce((acc: number, s: any) => acc + (s.total || 0), 0)
+src/pages/SellerDashboard.tsx:93:  const StatCard = ({ title, value, icon: Icon, color, subtitle, progress }: any) => (
+src/pages/SellerDashboard.tsx:243:              {[...sellerSales].sort((a: any, b: any) => new Date(b.sale_date).getTime() - new Date(a.sale_date).getTime()).slice(0, 5).map((sale: any) => (
+src/pages/Purchases.tsx:79:    return productsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Purchases.tsx:84:    return suppliersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Purchases.tsx:89:    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Purchases.tsx:94:    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Purchases.tsx:97:  const filteredProducts = products.filter((p: any) => 
+src/pages/Purchases.tsx:104:  const addToCart = (product: any) => {
+src/pages/Purchases.tsx:194:    onError: (err: any) => {
+src/pages/Purchases.tsx:215:            onChange={(e) => setSelectedSupplier(suppliers.find((s: any) => s.id === e.target.value))}
+src/pages/Purchases.tsx:219:            {suppliers.map((s: any) => (
+src/pages/Purchases.tsx:240:            {filteredProducts.map((p: any) => (
+src/pages/Purchases.tsx:349:                    {bankAccounts.map((a: any) => (
+src/pages/Purchases.tsx:354:                    {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
+src/pages/BankAccounts.tsx:57:    return accountsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/BankAccounts.tsx:61:    mutationFn: (data: any) => editingAccount 
+src/pages/BankAccounts.tsx:87:  const openEditModal = (account: any) => {
+src/pages/BankAccounts.tsx:117:              R$ {accounts.reduce((acc: number, a: any) => acc + (a.balance || 0), 0).toLocaleString()}
+src/pages/BankAccounts.tsx:139:        ) : accounts.map((acc: any) => (
+src/pages/AuditLogs.tsx:119:  const formatMetadata = (metadata: any) => {
+src/pages/AuditLogs.tsx:128:  const renderDiff = (changes: any) => {
+src/pages/AuditLogs.tsx:323:                      {companies.find((c: any) => c.id === log.company_id)?.name || "Global"}
+src/pages/SalesHistory.tsx:74:  const filteredSales = sales.filter((s: any) => {
+src/pages/SalesHistory.tsx:126:    filteredSales.forEach((s: any) => {
+src/pages/SalesHistory.tsx:261:        ) : filteredSales.map((sale: any) => (
+src/pages/SalesHistory.tsx:319:                {sale.items?.slice(0, 3).map((item: any, i: number) => (
+src/pages/SalesHistory.tsx:371:                  {selectedSale.items?.map((item: any, i: number) => (
+src/pages/Sales.tsx:134:    return productsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Sales.tsx:139:    return servicesData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Sales.tsx:144:    return clientsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Sales.tsx:149:    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Sales.tsx:154:    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Sales.tsx:159:    return sellersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Sales.tsx:166:    return cashiers.some((c: any) => 
+src/pages/Sales.tsx:176:      const myOpenCashier = cashiers.find((c: any) => c.status === "Aberto" && c.opened_by_id === user?.id);
+src/pages/Sales.tsx:198:    const p = products.map((item: any) => ({ ...item, type: 'product' }));
+src/pages/Sales.tsx:199:    const s = services.map((item: any) => ({ ...item, type: 'service', stock_quantity: Infinity }));
+src/pages/Sales.tsx:200:    return [...p, ...s].filter((item: any) => 
+src/pages/Sales.tsx:210:  const addToCart = (item: any) => {
+src/pages/Sales.tsx:235:    const item = [...products, ...services].find((i: any) => i.id === id);
+src/pages/Sales.tsx:353:    onSuccess: (sale: any) => {
+src/pages/Sales.tsx:372:    onError: (err: any) => {
+src/pages/Sales.tsx:461:              onChange={(e) => setSelectedClient(clients.find((c: any) => c.id === e.target.value))}
+src/pages/Sales.tsx:465:              {clients.map((c: any) => (
+src/pages/Sales.tsx:477:              onChange={(e) => setSelectedSeller(sellers.find((s: any) => s.id === e.target.value))}
+src/pages/Sales.tsx:481:              {sellers.filter((s: any) => s.active !== false).map((s: any) => (
+src/pages/Sales.tsx:504:            {filteredItems.map((p: any) => (
+src/pages/Sales.tsx:602:                    const cashier = cashiers.find((c: any) => c.id === e.target.value);
+src/pages/Sales.tsx:608:                  {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
+src/pages/Sales.tsx:619:                    const account = bankAccounts.find((a: any) => a.id === e.target.value);
+src/pages/Sales.tsx:625:                  {bankAccounts.map((a: any) => (
+src/pages/Profile.tsx:31:    mutationFn: (data: any) => api.put("users", user?.id, data),
+src/pages/Profile.tsx:39:    mutationFn: async (data: any) => {
+src/pages/PurchaseHistory.tsx:65:    return purchasesData.filter((p: any) => 
+src/pages/PurchaseHistory.tsx:157:              ) : filteredPurchases.map((p: any) => (
+src/pages/PurchaseHistory.tsx:257:                      {selectedPurchase.items?.map((item: any, i: number) => (
+src/pages/InventoryHistory.tsx:44:      result = result.filter((m: any) => 
+src/pages/InventoryHistory.tsx:52:      result = result.filter((m: any) => m.type === filterType);
+src/pages/InventoryHistory.tsx:56:      result = result.filter((m: any) => m.reason === filterReason);
+src/pages/InventoryHistory.tsx:62:  const formatDate = (timestamp: any) => {
+src/pages/InventoryHistory.tsx:181:              ) : filteredMovements.map((m: any) => (
+src/pages/TaxSettings.tsx:50:  const filteredRules = taxRules.filter((rule: any) => 
+src/pages/TaxSettings.tsx:56:    mutationFn: (data: any) => editingRule 
+src/pages/TaxSettings.tsx:93:  const openEditModal = (rule: any) => {
+src/pages/TaxSettings.tsx:145:        ) : filteredRules.map((rule: any) => (
+src/pages/CertificateManager.tsx:42:  const activeCertificate = certificates.find((c: any) => c.active);
+src/pages/CertificateManager.tsx:74:              } catch (e: any) {
+src/pages/CertificateManager.tsx:92:        const oldCerts = certificates.filter((c: any) => c.active);
+src/pages/CertificateManager.tsx:135:    onError: (error: any) => {
+src/pages/CertificateManager.tsx:141:    mutationFn: async (cert: any) => {
+src/pages/Suppliers.tsx:69:    return suppliersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Suppliers.tsx:72:  const filteredSuppliers = suppliers.filter((s: any) => 
+src/pages/Suppliers.tsx:98:      setFetchedData((prev: any) => ({
+src/pages/Suppliers.tsx:106:    } catch (error: any) {
+src/pages/Suppliers.tsx:123:      setFetchedData((prev: any) => ({
+src/pages/Suppliers.tsx:136:    } catch (error: any) {
+src/pages/Suppliers.tsx:247:              ) : filteredSuppliers.map((supplier: any) => (
+src/pages/AccountsReceivable.tsx:63:    return accountsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsReceivable.tsx:74:    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsReceivable.tsx:85:    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsReceivable.tsx:96:    return clientsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsReceivable.tsx:101:    return cashiers.some((c: any) => 
+src/pages/AccountsReceivable.tsx:108:  const filteredAccounts = accounts.filter((acc: any) => {
+src/pages/AccountsReceivable.tsx:118:      const currentAccount = accounts.find((a: any) => a.id === id);
+src/pages/AccountsReceivable.tsx:153:    mutationFn: (data: any) => api.post("accountsReceivable", {
+src/pages/AccountsReceivable.tsx:265:            R$ {accounts.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+src/pages/AccountsReceivable.tsx:271:            R$ {accounts.filter((a: any) => a.status === "Pago").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+src/pages/AccountsReceivable.tsx:277:            {accounts.filter((a: any) => a.status === "Atrasado").length}
+src/pages/AccountsReceivable.tsx:305:        ) : filteredAccounts.map((acc: any) => (
+src/pages/AccountsReceivable.tsx:364:                    {bankAccounts.map((a: any) => (
+src/pages/AccountsReceivable.tsx:369:                    {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
+src/pages/AccountsReceivable.tsx:412:                  {clients.map((c: any) => (
+src/pages/GlobalDashboard.tsx:72:    const activeCompanies = companies.filter((c: any) => c.is_active).length;
+src/pages/GlobalDashboard.tsx:73:    const totalRevenue = sales.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+src/pages/GlobalDashboard.tsx:75:    const monthlySales = sales.filter((s: any) => {
+src/pages/GlobalDashboard.tsx:80:    const monthlyRevenue = monthlySales.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+src/pages/GlobalDashboard.tsx:84:    sales.forEach((s: any) => {
+src/pages/GlobalDashboard.tsx:93:        name: companies.find((c: any) => c.id === id)?.name || "Desconhecida",
+src/pages/GlobalDashboard.tsx:105:      const daySales = sales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === date);
+src/pages/GlobalDashboard.tsx:108:        total: daySales.reduce((acc: number, s: any) => acc + (s.total || 0), 0)
+src/pages/GlobalDashboard.tsx:123:  const StatCard = ({ title, value, icon: Icon, color, subtitle }: any) => (
+src/pages/InventoryTurnoverReport.tsx:89:    const salesMovements = movements.filter((m: any) => 
+src/pages/InventoryTurnoverReport.tsx:93:    return products.map((product: any) => {
+src/pages/InventoryTurnoverReport.tsx:94:      const productSales = salesMovements.filter((m: any) => m.product_id === product.id);
+src/pages/InventoryTurnoverReport.tsx:98:          .filter((m: any) => {
+src/pages/InventoryTurnoverReport.tsx:102:          .reduce((acc: number, m: any) => acc + m.quantity, 0);
+src/pages/InventoryTurnoverReport.tsx:132:    }).filter((p: any) => {
+src/pages/InventoryTurnoverReport.tsx:281:                {categories.map((c: any) => (
+src/pages/InventoryTurnoverReport.tsx:294:                {suppliers.map((s: any) => (
+src/pages/InventoryTurnoverReport.tsx:325:              {reportData.map((p: any) => (
+src/pages/BankReconciliation.tsx:32:  const selectedAccount = accounts.find((a: any) => a.id === selectedAccountId);
+src/pages/BankReconciliation.tsx:72:                accounts.map((acc: any) => (
+src/pages/Company.tsx:54:    mutationFn: (data: any) => api.put("companies", companyId, data),
+src/pages/Company.tsx:59:    onError: (error: any) => {
+src/pages/Company.tsx:87:      setFetchedData((prev: any) => ({
+src/pages/Company.tsx:95:    } catch (error: any) {
+src/pages/Company.tsx:112:      setFetchedData((prev: any) => ({
+src/pages/Company.tsx:126:    } catch (error: any) {
+src/pages/Transfers.tsx:65:    ...bankAccounts.map((a: any) => ({ ...a, account_type: "Banco" })),
+src/pages/Transfers.tsx:66:    ...cashiers.map((c: any) => ({ ...c, account_type: "Caixa" }))
+src/pages/Transfers.tsx:70:    mutationFn: (data: any) => processMovement({
+src/pages/Transfers.tsx:91:    onError: (error: any) => {
+src/pages/Transfers.tsx:143:  const filteredMovements = movements.filter((m: any) => 
+src/pages/Transfers.tsx:147:  ).sort((a: any, b: any) => new Date(b.movement_date).getTime() - new Date(a.movement_date).getTime());
+src/pages/Transfers.tsx:185:        ) : filteredMovements.map((m: any) => (
+src/pages/CashFlowReport.tsx:110:    const filteredSales = sales.filter((s: any) => {
+src/pages/CashFlowReport.tsx:117:    const filteredPurchases = purchases.filter((p: any) => {
+src/pages/CashFlowReport.tsx:124:    const filteredExpenses = accountsPayable.filter((a: any) => {
+src/pages/CashFlowReport.tsx:132:    const totalRevenue = filteredSales.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+src/pages/CashFlowReport.tsx:133:    const totalCOGS = filteredPurchases.reduce((acc: number, p: any) => acc + (p.total || 0), 0);
+src/pages/CashFlowReport.tsx:134:    const totalOpEx = filteredExpenses.reduce((acc: number, a: any) => acc + (a.amount || 0), 0);
+src/pages/CashFlowReport.tsx:141:      ...filteredSales.map((s: any) => ({
+src/pages/CashFlowReport.tsx:148:      ...filteredPurchases.map((p: any) => ({
+src/pages/CashFlowReport.tsx:155:      ...filteredExpenses.map((e: any) => ({
+src/pages/Sellers.tsx:57:  const filteredSellers = sellers.filter((s: any) => 
+src/pages/Sellers.tsx:72:    mutationFn: (data: any) => editingSeller 
+src/pages/Sellers.tsx:75:    onSuccess: (result: any) => {
+src/pages/Sellers.tsx:193:        ) : filteredSellers.map((seller: any) => (
+src/pages/Products.tsx:83:    return productsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Products.tsx:88:    return categoriesData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Products.tsx:93:    return brandsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Products.tsx:96:  const filteredProducts = products.filter((p: any) => 
+src/pages/Products.tsx:101:  const filteredCategories = categories.filter((c: any) => 
+src/pages/Products.tsx:105:  const filteredBrands = brands.filter((b: any) => 
+src/pages/Products.tsx:110:    mutationFn: async (data: any) => {
+src/pages/Products.tsx:144:    mutationFn: async ({ id, data }: any) => {
+src/pages/Products.tsx:145:      const oldProduct = products.find((p: any) => p.id === id);
+src/pages/Products.tsx:183:    mutationFn: async (data: any) => {
+src/pages/Products.tsx:208:    mutationFn: async (data: any) => {
+src/pages/Products.tsx:418:            ) : filteredProducts.map((p: any) => (
+src/pages/Products.tsx:511:            ) : filteredCategories.map((c: any) => (
+src/pages/Products.tsx:571:            ) : filteredBrands.map((b: any) => (
+src/pages/Products.tsx:739:                    {categories.map((c: any) => (
+src/pages/Products.tsx:752:                    {brands.map((b: any) => (
+src/pages/CommissionPayouts.tsx:80:    return sales.filter((sale: any) => {
+src/pages/CommissionPayouts.tsx:90:    }).sort((a: any, b: any) => new Date(b.sale_date || b.created_at).getTime() - new Date(a.sale_date || a.created_at).getTime());
+src/pages/CommissionPayouts.tsx:94:    return filteredSales.reduce((acc: number, sale: any) => acc + (sale.commission_amount || 0), 0);
+src/pages/CommissionPayouts.tsx:98:    mutationFn: async (sale: any) => {
+src/pages/CommissionPayouts.tsx:131:    onError: (error: any) => {
+src/pages/CommissionPayouts.tsx:177:            {sellers.filter((s: any) => s.active !== false).length}
+src/pages/CommissionPayouts.tsx:195:                {sellers.map((s: any) => (
+src/pages/CommissionPayouts.tsx:268:                  {filteredSales.map((sale: any) => (
+src/pages/AccountsPayable.tsx:64:    return accountsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsPayable.tsx:75:    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsPayable.tsx:86:    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsPayable.tsx:97:    return suppliersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/AccountsPayable.tsx:102:    return cashiers.some((c: any) => 
+src/pages/AccountsPayable.tsx:109:  const filteredAccounts = accounts.filter((acc: any) => {
+src/pages/AccountsPayable.tsx:119:      const currentAccount = accounts.find((a: any) => a.id === id);
+src/pages/AccountsPayable.tsx:154:    mutationFn: (data: any) => api.post("accountsPayable", {
+src/pages/AccountsPayable.tsx:266:            R$ {accounts.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+src/pages/AccountsPayable.tsx:272:            R$ {accounts.filter((a: any) => a.status === "Pago").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+src/pages/AccountsPayable.tsx:278:            {accounts.filter((a: any) => a.status === "Atrasado").length}
+src/pages/AccountsPayable.tsx:306:        ) : filteredAccounts.map((acc: any) => (
+src/pages/AccountsPayable.tsx:365:                    {bankAccounts.map((a: any) => (
+src/pages/AccountsPayable.tsx:370:                    {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
+src/pages/AccountsPayable.tsx:413:                  {suppliers.map((s: any) => (
+src/pages/AdminMaster.tsx:108:    mutationFn: async ({ id, data }: { id: string, data: any }) => {
+src/pages/AdminMaster.tsx:127:      setFetchedData((prev: any) => ({
+src/pages/AdminMaster.tsx:135:    } catch (error: any) {
+src/pages/AdminMaster.tsx:152:      setFetchedData((prev: any) => ({
+src/pages/AdminMaster.tsx:166:    } catch (error: any) {
+src/pages/AdminMaster.tsx:173:  const filteredUsers = users.filter((u: any) => 
+src/pages/AdminMaster.tsx:178:  const filteredCompanies = companies.filter((c: any) => 
+src/pages/AdminMaster.tsx:194:    .sort((a: any, b: any) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+src/pages/AdminMaster.tsx:196:  const totalRevenue = sales.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+src/pages/AdminMaster.tsx:209:    sales.forEach((s: any) => {
+src/pages/AdminMaster.tsx:222:    sales.forEach((s: any) => {
+src/pages/AdminMaster.tsx:230:        name: companies.find((c: any) => c.id === id)?.name || "Desconhecida",
+src/pages/AdminMaster.tsx:241:    mutationFn: async (data: any) => {
+src/pages/AdminMaster.tsx:266:    mutationFn: async (data: any) => {
+src/pages/AdminMaster.tsx:295:    const userData: any = {
+src/pages/AdminMaster.tsx:429:              <p className="text-3xl font-bold text-gray-900 mt-1">{users.filter((u: any) => u.role === 'master').length}</p>
+src/pages/AdminMaster.tsx:652:                {filteredUsers.map((u: any) => (
+src/pages/AdminMaster.tsx:666:                      {companies.find((c: any) => c.id === u.company_id)?.name || "Nenhuma"}
+src/pages/AdminMaster.tsx:739:                {filteredCompanies.map((c: any) => (
+src/pages/AdminMaster.tsx:802:                {supportTickets.map((ticket: any) => (
+src/pages/AdminMaster.tsx:809:                      <p className="text-xs text-gray-500">{companies.find((c: any) => c.id === ticket.company_id)?.name || "N/A"}</p>
+src/pages/AdminMaster.tsx:899:                {filteredAuditLogs.map((log: any) => (
+src/pages/AdminMaster.tsx:913:                      {companies.find((c: any) => c.id === log.company_id)?.name || "Global"}
+src/pages/AdminMaster.tsx:1029:                    {companies.map((c: any) => (
+src/pages/Dashboard.tsx:85:    return salesData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Dashboard.tsx:90:    return productsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Dashboard.tsx:95:    return clientsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Dashboard.tsx:100:    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Dashboard.tsx:105:    return accountsPayableData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Dashboard.tsx:110:    return accountsReceivableData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Dashboard.tsx:115:    return purchasesData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Dashboard.tsx:118:  const totalSalesMonth = sales.reduce((acc: number, sale: any) => acc + (sale.total || 0), 0);
+src/pages/Dashboard.tsx:119:  const totalReceivable = accountsReceivable.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0);
+src/pages/Dashboard.tsx:120:  const totalPayable = accountsPayable.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0);
+src/pages/Dashboard.tsx:121:  const totalPurchases = purchases.reduce((acc: number, p: any) => acc + (p.total || 0), 0);
+src/pages/Dashboard.tsx:122:  const openCashiers = cashiers.filter((c: any) => c.status === "Aberto").length;
+src/pages/Dashboard.tsx:123:  const lowStockProducts = products.filter((p: any) => p.stock_quantity <= p.min_stock);
+src/pages/Dashboard.tsx:133:    const daySales = sales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === date);
+src/pages/Dashboard.tsx:136:      value: daySales.reduce((acc: number, s: any) => acc + (s.total || 0), 0)
+src/pages/Dashboard.tsx:140:  const StatCard = ({ title, value, icon: Icon, color, subtitle }: any) => (
+src/pages/Dashboard.tsx:282:                {lowStockProducts.slice(0, 3).map((p: any) => (
+src/pages/Dashboard.tsx:317:              {[...sales].sort((a: any, b: any) => new Date(b.sale_date).getTime() - new Date(a.sale_date).getTime()).slice(0, 5).map((sale: any) => (
+src/pages/Cashiers.tsx:59:    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Cashiers.tsx:67:    mutationFn: (data: any) => {
+src/pages/Cashiers.tsx:91:  const openEditModal = (cashier: any) => {
+src/pages/Cashiers.tsx:97:    mutationFn: (data: any) => api.put("cashiers", selectedCashier.id, {
+src/pages/Cashiers.tsx:151:          <p className="text-2xl font-bold text-green-600 mt-1">{cashiers.filter((c: any) => c.status === "Aberto").length}</p>
+src/pages/Cashiers.tsx:161:            {showGlobalBalance ? `R$ ${cashiers.reduce((acc: number, c: any) => acc + (c.balance || 0), 0).toLocaleString()}` : "R$ ••••••"}
+src/pages/Cashiers.tsx:170:        ) : cashiers.map((c: any) => (
+src/pages/Configurations.tsx:80:  const saveData = (data: any) => {
+src/pages/Clients.tsx:62:    return clientsData.filter((item: any) => item.company_id === currentCompanyId);
+src/pages/Clients.tsx:65:  const filteredClients = clients.filter((c: any) => 
+src/pages/Clients.tsx:102:    } catch (error: any) {
+src/pages/Clients.tsx:188:        ) : filteredClients.map((c: any) => (
+src/pages/Invite.tsx:54:    mutationFn: async (data: any) => {
+src/pages/Invite.tsx:117:  const filteredInvites = invites.filter((i: any) => 
+src/pages/Invite.tsx:168:              {filteredInvites.map((invite: any) => (
+src/pages/Services.tsx:31:  const filteredServices = services.filter((s: any) => 
+src/pages/Services.tsx:45:    mutationFn: (data: any) => editingService 
+src/pages/Services.tsx:48:    onSuccess: (result: any) => {
+src/pages/Services.tsx:155:        ) : filteredServices.map((service: any) => (
+src/pages/Employees.tsx:63:  const filteredEmployees = employees.filter((e: any) => 
+src/pages/Employees.tsx:69:    mutationFn: (data: any) => api.put("users", editingEmployee.id, data),
+src/pages/Employees.tsx:80:      const foundUser: any = await api.findUserByEmail(email);
+src/pages/Employees.tsx:91:    onError: (error: any) => {
+src/pages/Employees.tsx:170:        ) : filteredEmployees.map((employee: any) => (
+src/pages/InventoryAdjustments.tsx:35:  const filteredProducts = products.filter((p: any) => 
+src/pages/InventoryAdjustments.tsx:40:  const selectedProduct = products.find((p: any) => p.id === selectedProductId);
+src/pages/InventoryAdjustments.tsx:43:    mutationFn: (data: any) => inventory.recordMovement(data),
+src/pages/InventoryAdjustments.tsx:55:    onError: (error: any) => {
+src/pages/InventoryAdjustments.tsx:113:                ) : filteredProducts.map((p: any) => (
+src/pages/Support.tsx:40:    mutationFn: async (data: any) => {
+src/pages/Support.tsx:63:    onError: (error: any) => {
+src/lib/firebase.ts:16:    (firebaseConfig as any).firestoreDatabaseId = "ai-studio-ebf7fabd-0d29-4956-b2cc-835a0409d727";
+src/lib/auth.tsx:29:  register: (data: any) => Promise<void>;
+src/lib/auth.tsx:90:  const register = async (data: any) => {
+src/lib/offlineStore.ts:12:  saleData: any;
+src/lib/offlineStore.ts:13:  items: any[];
+src/lib/offlineStore.ts:14:  userContext?: any;
+src/lib/offlineStore.ts:39:  async saveSale(saleData: any, items: any[], userContext?: any) {
+src/lib/offlineStore.ts:60:        await (registration as any).sync.register('sync-sales');
+src/lib/utils/diff.ts:5:export const calculateDiff = (oldData: any, newData: any) => {
+src/lib/utils/diff.ts:8:  const diff: { old: any; new: any } = { old: {}, new: {} };
+src/lib/utils/print.ts:1:export const printReceipt = (sale: any, company: any) => {
+src/lib/utils/print.ts:8:  const itemsHtml = sale.items.map((item: any) => `
+src/lib/utils/print.ts:97:export const printPurchaseReceipt = (purchase: any, company: any) => {
+src/lib/utils/print.ts:104:  const itemsHtml = purchase.items.map((item: any) => `
+src/lib/finance.ts:29:export async function processMovement(data: any) {
+src/lib/finance.ts:85:export async function processAccountPayment(accountId: string, accountData: any, paymentData: { type: string, id: string }) {
+src/lib/finance.ts:130:export async function processAccountReceipt(accountId: string, accountData: any, receiptData: { type: string, id: string }) {
+src/lib/inventory.ts:6:const cleanObject = (obj: any) => {
+src/lib/inventory.ts:17:  async recordMovement(data: Omit<InventoryMovement, "id" | "timestamp" | "user_id" | "user_name" | "previous_stock" | "current_stock">, userContext?: any) {
+src/lib/inventory.ts:42:      const movement: any = cleanObject({
+src/lib/inventory.ts:56:  async processSale(saleData: any, items: any[], userContext?: any) {
+src/lib/inventory.ts:171:          const movement: any = {
+src/lib/inventory.ts:247:  async processPurchase(purchaseData: any, items: any[], userContext?: any) {
+src/lib/inventory.ts:293:        const movement: any = {
+src/lib/api.ts:6:let currentUserData: any = null;
+src/lib/api.ts:8:const cleanObject = (obj: any) => {
+src/lib/api.ts:37:  get: async (entityPath: string, paramsOrId?: any): Promise<any> => {
+src/lib/api.ts:98:      let q = collection(db, entityPath) as any;
+src/lib/api.ts:99:      const conditions: any[] = [];
+src/lib/api.ts:125:      const queryConstraints: any[] = [...conditions];
+src/lib/api.ts:147:  post: async (entity: string, data: any) => {
+src/lib/api.ts:166:  put: async (entity: string, id: string, data: any) => {
+src/lib/api.ts:177:  subscribe: (entityPath: string, params: any, callback: (data: any[]) => void) => {
+src/lib/api.ts:178:    let q = collection(db, entityPath) as any;
+src/lib/api.ts:179:    const conditions: any[] = [];
+src/lib/api.ts:205:    const queryConstraints: any[] = [...conditions];
+src/lib/api.ts:217:    return onSnapshot(q, (snapshot: any) => {
+src/lib/api.ts:218:      const data = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+src/lib/api.ts:222:  log: async (data: any, userContext?: any) => {
+src/services/externalApi.ts:64:    } catch (error: any) {
+src/services/notificationApi.ts:4:  async sendSupportWebhook(ticketData: any) {
+src/services/fiscalApi.ts:14:  client: any;
+src/services/fiscalApi.ts:15:  items: any[];
+src/services/fiscalApi.ts:17:  company: any;
+src/services/fiscalApi.ts:167:  } catch (error: any) {
+src/services/fiscalApi.ts:242:  } catch (error: any) {
+src/services/fiscalApi.ts:276:  } catch (error: any) {
+src/services/fiscalApi.ts:303:  } catch (error: any) {
+src/services/fiscalApi.ts:329:  } catch (error: any) {
+src/services/fiscalApi.ts:353:  } catch (error: any) {
+src/types.ts:3:  timestamp: any;
+src/types.ts:12:  metadata?: any;
+src/types.ts:24:  created_at: any;
+src/types.ts:38:  created_at: any;
+src/types.ts:55:  timestamp: any;
+src/types.ts:68:  created_at: any;
+src/types.ts:84:  created_at: any;
+src/types.ts:95:  items: any[];
+src/types.ts:105:  created_at: any;
+src/types.ts:122:  created_at: any;
+src/types.ts:136:  created_at: any;
+src/types.ts:137:  updated_at: any;
+src/sw.ts:22:self.addEventListener('sync', (event: any) => {

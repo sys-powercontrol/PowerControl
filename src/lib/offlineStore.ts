@@ -36,9 +36,14 @@ export const offlineStore = {
     return db.getAll(STORE_NAME);
   },
 
-  async saveSale(saleData: any, items: any[]) {
+  async saveSale(saleData: any, items: any[], userContext?: any) {
     const db = await getDB();
-    const user = api.getCurrentUser();
+    const user = userContext || api.getCurrentUser();
+    
+    if (!user) {
+        throw new Error("Contexto de usuário indisponível para salvar venda offline.");
+    }
+
     const newSale: OfflineSale = {
       id: crypto.randomUUID(),
       saleData,
@@ -74,7 +79,16 @@ export const offlineStore = {
 
     for (const sale of pending) {
       try {
-        await inventory.processSale(sale.saleData, sale.items, sale.userContext);
+        const processedSaleData = await inventory.processSale(sale.saleData, sale.items, sale.userContext);
+        
+        await api.log({
+          action: 'CREATE',
+          entity: 'sales',
+          entity_id: processedSaleData.id,
+          description: `Venda Offline Sincronizada #${processedSaleData.id.substr(0, 8).toUpperCase()}`,
+          metadata: { isOfflineSync: true, timestamp: sale.timestamp }
+        }, sale.userContext);
+
         await db.delete(STORE_NAME, sale.id);
         successCount++;
       } catch (error) {

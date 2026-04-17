@@ -20,10 +20,12 @@ export default function Cashiers() {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [showBalance, setShowBalance] = useState<Record<string, boolean>>({});
+  const [showGlobalBalance, setShowGlobalBalance] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOpeningModalOpen, setIsOpeningModalOpen] = useState(false);
   const [selectedCashier, setSelectedCashier] = useState<any>(null);
   const [editingCashier, setEditingCashier] = useState<any>(null);
+  const [historyCashier, setHistoryCashier] = useState<any>(null);
 
   const canView = hasPermission('finance.view');
 
@@ -149,9 +151,14 @@ export default function Cashiers() {
           <p className="text-2xl font-bold text-green-600 mt-1">{cashiers.filter((c: any) => c.status === "Aberto").length}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase">Saldo Consolidado</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">
-            R$ {cashiers.reduce((acc: number, c: any) => acc + (c.balance || 0), 0).toLocaleString()}
+          <div className="flex justify-between items-center mb-1">
+            <p className="text-xs font-bold text-gray-500 uppercase">Saldo Consolidado</p>
+            <button onClick={() => setShowGlobalBalance(!showGlobalBalance)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              {showGlobalBalance ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          <p className="text-2xl font-bold text-blue-600">
+            {showGlobalBalance ? `R$ ${cashiers.reduce((acc: number, c: any) => acc + (c.balance || 0), 0).toLocaleString()}` : "R$ ••••••"}
           </p>
         </div>
       </div>
@@ -227,7 +234,11 @@ export default function Cashiers() {
                   <Lock size={14} /> Fechar Caixa
                 </button>
               )}
-              <button className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-blue-600">
+              <button 
+                onClick={() => setHistoryCashier(c)}
+                title="Ver Histórico"
+                className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 transition-colors"
+              >
                 <History size={16} />
               </button>
             </div>
@@ -301,6 +312,77 @@ export default function Cashiers() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* History Modal */}
+      {historyCashier && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setHistoryCashier(null)} />
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900">
+                  <History className="text-blue-600" size={24} />
+                  Histórico do Caixa
+                </h2>
+                <p className="text-sm text-gray-500 mt-1 font-medium">{historyCashier.name}</p>
+              </div>
+              <button onClick={() => setHistoryCashier(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            
+            <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
+                
+                {/* Fechamento Block (Top, newest) */}
+                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 relative z-10 ${historyCashier.closed_at ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>
+                    <Lock size={16} />
+                  </div>
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-gray-100 bg-white shadow-sm">
+                    <div className="flex items-center justify-between space-x-2 mb-1">
+                      <div className="font-bold text-gray-900">Fechamento</div>
+                      <time className="text-xs font-bold text-gray-500 uppercase">{historyCashier.closed_at ? formatBR(historyCashier.closed_at, "dd/MM/yyyy HH:mm") : "---"}</time>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {historyCashier.closed_at ? (
+                        <>Fechado por <span className="font-bold text-gray-900">{historyCashier.closed_by || "Sistema"}</span></>
+                      ) : (
+                        <span className="text-green-600 font-medium">Caixa em andamento...</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Abertura Block (Bottom, oldest) */}
+                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 relative z-10 ${historyCashier.opened_at ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                    <Unlock size={16} />
+                  </div>
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-gray-100 bg-white shadow-sm">
+                    <div className="flex items-center justify-between space-x-2 mb-1">
+                      <div className="font-bold text-gray-900">Abertura</div>
+                      <time className="text-xs font-bold text-gray-500 uppercase">{historyCashier.opened_at ? formatBR(historyCashier.opened_at, "dd/MM/yyyy HH:mm") : "---"}</time>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {historyCashier.opened_at ? (
+                        <>Aberto por <span className="font-bold text-gray-900">{historyCashier.opened_by || "Sistema"}</span></>
+                      ) : (
+                        <span>Sem registro de abertura</span>
+                      )}
+                    </div>
+                    {historyCashier.opening_balance !== undefined && (
+                      <div className="text-[13px] font-bold text-blue-600 mt-2 bg-blue-50 p-2 rounded-lg inline-block">
+                        Saldo Inicial: R$ {Number(historyCashier.opening_balance).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+              </div>
+            </div>
           </div>
         </div>
       )}

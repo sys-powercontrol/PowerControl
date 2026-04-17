@@ -56,6 +56,10 @@ export default function Company() {
       queryClient.invalidateQueries({ queryKey: ["company", companyId] });
       toast.success("Dados da empresa atualizados com sucesso!");
     },
+    onError: (error: any) => {
+      console.error("Erro ao atualizar empresa:", error);
+      toast.error(error.message || "Falha ao salvar as configurações da empresa.");
+    }
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

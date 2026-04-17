@@ -233,6 +233,10 @@ export default function Fiscal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Status da nota atualizado!");
+    },
+    onError: (error: any) => {
+      console.error("Erro ao verificar status da nota:", error);
+      toast.error(error.message || "Falha ao consultar status da nota fiscal. Tente novamente.");
     }
   });
 
