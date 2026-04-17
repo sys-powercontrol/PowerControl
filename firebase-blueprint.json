@@ -28,6 +28,7 @@
         "phone": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "pix_key": { "type": "string" },
+        "logo_url": { "type": "string" },
         "fiscal_token": { "type": "string" },
         "fiscal_environment": { "type": "string", "enum": ["sandbox", "production"] },
         "fiscal_provider": { "type": "string", "enum": ["FocusNFe", "WebmaniaBR"] },

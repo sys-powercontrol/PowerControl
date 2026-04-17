@@ -22,10 +22,18 @@ const FOCUSNFE_URLS = {
   production: "https://api.focusnfe.com.br/v2"
 };
 
+const WEBMANIABR_URLS = {
+  sandbox: "https://webmaniabr.com/api/1/nfe",
+  production: "https://webmaniabr.com/api/1/nfe"
+};
+
 export const fiscalApi = {
   emit: async (config: FiscalConfig, data: FiscalInvoiceData) => {
     if (config.provider === "FocusNFe") {
       return emitFocusNFe(config, data);
+    }
+    if (config.provider === "WebmaniaBR") {
+      return emitWebmaniaBR(config, data);
     }
     throw new Error("Provedor fiscal não suportado");
   },
@@ -34,12 +42,22 @@ export const fiscalApi = {
     if (config.provider === "FocusNFe") {
       return checkFocusNFeStatus(config, reference, type);
     }
+    if (config.provider === "WebmaniaBR") {
+      return checkWebmaniaBRStatus(config, reference);
+    }
     throw new Error("Provedor fiscal não suportado");
+  },
+
+  checkWebmaniaBRStatus: async (config: FiscalConfig, uuid: string) => {
+    return checkWebmaniaBRStatus(config, uuid);
   },
 
   cancel: async (config: FiscalConfig, reference: string, reason: string) => {
     if (config.provider === "FocusNFe") {
       return cancelFocusNFe(config, reference, reason);
+    }
+    if (config.provider === "WebmaniaBR") {
+      return cancelWebmaniaBR(config, reference, reason);
     }
     throw new Error("Provedor fiscal não suportado");
   },
@@ -82,26 +100,27 @@ async function emitFocusNFe(config: FiscalConfig, data: FiscalInvoiceData) {
     data_emissao: new Date().toISOString(),
     tipo_documento: 1, // 1 = Saída
     finalidade_emissao: 1, // 1 = Normal
-    cnpj_emitente: data.company.document?.replace(/\D/g, ""),
+    cnpj_emitente: data.company.cnpj?.replace(/\D/g, ""),
     nome_emitente: data.company.name,
     logradouro_emitente: data.company.address || "Rua Principal",
-    numero_emitente: "123",
-    bairro_emitente: "Centro",
-    municipio_emitente: "Sao Paulo",
-    uf_emitente: "SP",
-    cep_emitente: "01001000",
+    numero_emitente: data.company.address_number || "SN",
+    bairro_emitente: data.company.neighborhood || "Centro",
+    municipio_emitente: data.company.city || "Sao Paulo",
+    uf_emitente: data.company.state || "SP",
+    cep_emitente: data.company.zip_code?.replace(/\D/g, "") || "01001000",
     inscricao_estadual_emitente: data.company.ie || "123456789",
     regime_tributario_emitente: parseInt(data.company.regime_tributario || "1"),
 
     nome_destinatario: data.client.name,
-    cpf_destinatario: data.client.document?.replace(/\D/g, ""),
-    inscricao_estadual_destinatario: "",
+    cpf_destinatario: (data.client.cpf || data.client.document)?.replace(/\D/g, "").length === 11 ? (data.client.cpf || data.client.document)?.replace(/\D/g, "") : undefined,
+    cnpj_destinatario: (data.client.cpf || data.client.document)?.replace(/\D/g, "").length === 14 ? (data.client.cpf || data.client.document)?.replace(/\D/g, "") : undefined,
+    inscricao_estadual_destinatario: data.client.ie || "",
     logradouro_destinatario: data.client.address || "Rua Destino",
-    numero_destinatario: "1",
-    bairro_destinatario: "Bairro",
-    municipio_destinatario: "Sao Paulo",
-    uf_destinatario: "SP",
-    cep_destinatario: "01001000",
+    numero_destinatario: data.client.address_number || "SN",
+    bairro_destinatario: data.client.neighborhood || "Bairro",
+    municipio_destinatario: data.client.city || "Sao Paulo",
+    uf_destinatario: data.client.state || "SP",
+    cep_destinatario: data.client.zip_code?.replace(/\D/g, "") || "01001000",
 
     items: data.items.map((item, index) => ({
       numero_item: index + 1,
@@ -148,6 +167,142 @@ async function emitFocusNFe(config: FiscalConfig, data: FiscalInvoiceData) {
   } catch (error: any) {
     console.error("FocusNFe Error:", error.response?.data || error.message);
     throw new Error(error.response?.data?.mensagem || "Erro ao comunicar com FocusNFe");
+  }
+}
+
+async function emitWebmaniaBR(config: FiscalConfig, data: FiscalInvoiceData) {
+  const baseUrl = WEBMANIABR_URLS[config.environment];
+  const reference = `${data.sale_id}_${Date.now()}`;
+
+  // WebmaniaBR uses a different structure
+  // Documentation: https://webmaniabr.com/docs/rest-api-nfe/
+  const payload = {
+    ID: reference,
+    operacao: 1, // 1 = Saída
+    natureza_operacao: "Venda de mercadoria",
+    modelo: data.type === "NFe" ? 1 : 2, // 1 = NFe, 2 = NFCe
+    finalidade: 1, // 1 = Normal
+    ambiente: config.environment === "sandbox" ? 2 : 1, // 1 = Produção, 2 = Homologação
+    cliente: {
+      cpf: (data.client.cpf || data.client.document)?.replace(/\D/g, "").length === 11 ? (data.client.cpf || data.client.document)?.replace(/\D/g, "") : undefined,
+      cnpj: (data.client.cpf || data.client.document)?.replace(/\D/g, "").length === 14 ? (data.client.cpf || data.client.document)?.replace(/\D/g, "") : undefined,
+      nome_completo: data.client.name,
+      endereco: data.client.address,
+      complemento: data.client.complement,
+      numero: data.client.address_number,
+      bairro: data.client.neighborhood,
+      cidade: data.client.city,
+      uf: data.client.state,
+      cep: data.client.zip_code,
+      telefone: data.client.phone,
+      email: data.client.email
+    },
+    produtos: data.items.map(item => ({
+      nome: item.name,
+      codigo: item.sku || item.id,
+      ncm: item.ncm || "00000000",
+      cest: item.cest,
+      quantidade: item.quantity,
+      unidade: "UN",
+      origem: 0,
+      subtotal: item.sale_price,
+      total: item.sale_price * item.quantity,
+      classe_imposto: item.tax_class || "REF1234" // Placeholder or mapped from product
+    })),
+    pedido: {
+      pagamento: 0, // 0 = Pagamento à vista
+      presenca: 1, // 1 = Operação presencial
+      modalidade_frete: 9 // 9 = Sem frete
+    }
+  };
+
+  try {
+    // WebmaniaBR usually requires Consumer Key, Consumer Secret, Access Token, Access Token Secret
+    // If the user only provides one token, we might need to split it or handle it
+    // For this implementation, we'll assume the token is "ConsumerKey:ConsumerSecret:AccessToken:AccessTokenSecret"
+    const [ck, cs, at, ats] = config.token.split(":");
+
+    const response = await axios.post(`${baseUrl}/emissao/`, payload, {
+      headers: {
+        "X-Consumer-Key": ck,
+        "X-Consumer-Secret": cs,
+        "X-AccessToken": at,
+        "X-AccessToken-Secret": ats,
+        "Content-Type": "application/json"
+      }
+    });
+
+    return {
+      reference: response.data.uuid || reference,
+      status: response.data.status === "success" ? "processando" : "erro",
+      message: response.data.error || response.data.status,
+      protocol: response.data.uuid,
+      access_key: response.data.chave
+    };
+  } catch (error: any) {
+    console.error("WebmaniaBR Error:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || "Erro ao comunicar com WebmaniaBR");
+  }
+}
+
+async function checkWebmaniaBRStatus(config: FiscalConfig, uuid: string) {
+  const baseUrl = WEBMANIABR_URLS[config.environment];
+  const [ck, cs, at, ats] = config.token.split(":");
+
+  try {
+    const response = await axios.get(`${baseUrl}/consulta/?uuid=${uuid}`, {
+      headers: {
+        "X-Consumer-Key": ck,
+        "X-Consumer-Secret": cs,
+        "X-AccessToken": at,
+        "X-AccessToken-Secret": ats
+      }
+    });
+
+    const status = response.data.status;
+    let mappedStatus = "pendente";
+    if (status === "aprovado") mappedStatus = "autorizado";
+    if (status === "reprovado") mappedStatus = "erro_autorizacao";
+    if (status === "cancelado") mappedStatus = "cancelado";
+
+    return {
+      status: mappedStatus,
+      protocol: response.data.nfe,
+      access_key: response.data.chave,
+      xml_url: response.data.xml,
+      pdf_url: response.data.danfe,
+      error_message: response.data.motivo
+    };
+  } catch (error: any) {
+    console.error("WebmaniaBR Status Error:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || "Erro ao consultar status na WebmaniaBR");
+  }
+}
+
+async function cancelWebmaniaBR(config: FiscalConfig, uuid: string, reason: string) {
+  const baseUrl = WEBMANIABR_URLS[config.environment];
+  const [ck, cs, at, ats] = config.token.split(":");
+
+  try {
+    const response = await axios.put(`${baseUrl}/cancelar/`, {
+      uuid: uuid,
+      justificativa: reason
+    }, {
+      headers: {
+        "X-Consumer-Key": ck,
+        "X-Consumer-Secret": cs,
+        "X-AccessToken": at,
+        "X-AccessToken-Secret": ats
+      }
+    });
+
+    return {
+      status: response.data.status === "success" ? "cancelado" : "erro",
+      message: response.data.error || response.data.status
+    };
+  } catch (error: any) {
+    console.error("WebmaniaBR Cancel Error:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || "Erro ao cancelar na WebmaniaBR");
   }
 }
 

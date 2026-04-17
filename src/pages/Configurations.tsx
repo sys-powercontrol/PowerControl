@@ -149,7 +149,16 @@ export default function Configurations() {
       });
 
       api.put("companies", companyId, { role_permissions: rolePermissions }).then(() => {
+        api.log({
+          action: 'UPDATE',
+          entity: 'companies',
+          entity_id: companyId,
+          description: `Atualizou matriz de permissões`,
+          metadata: { role_permissions: rolePermissions },
+          changes: calculateDiff({ role_permissions: company.role_permissions }, { role_permissions: rolePermissions })
+        });
         queryClient.invalidateQueries({ queryKey: ["company", companyId] });
+        queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
         toast.success("Permissões atualizadas com sucesso!");
       });
       return;
@@ -371,7 +380,7 @@ export default function Configurations() {
                       <label className="text-sm font-bold text-gray-700">Provedor Fiscal</label>
                       <select name="fiscal_provider" defaultValue={company.fiscal_provider || "FocusNFe"} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="FocusNFe">FocusNFe</option>
-                        <option value="WebmaniaBR">WebmaniaBR (Em breve)</option>
+                        <option value="WebmaniaBR" disabled>WebmaniaBR (Em breve)</option>
                       </select>
                     </div>
                     <div className="space-y-2">

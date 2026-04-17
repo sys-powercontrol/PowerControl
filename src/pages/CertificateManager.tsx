@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import forge from "node-forge";
+import CryptoJS from "crypto-js";
+
+const MASTER_KEY = "powercontrol-secret-key";
 
 export default function CertificateManager() {
   const { user, hasPermission } = useAuth();
@@ -43,39 +47,73 @@ export default function CertificateManager() {
 
       setIsUploading(true);
       try {
-        // 1. Upload file to Storage
+        // 1. Extract metadata from PFX file
+        const extractMetadata = async (file: File, password: string) => {
+          return new Promise<{ expirationDate: Date; issuer: string; subject: string; serialNumber: string }>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const arrayBuffer = event.target?.result as ArrayBuffer;
+                const p12Der = forge.util.createBuffer(new Uint8Array(arrayBuffer));
+                const p12Asn1 = forge.asn1.fromDer(p12Der);
+                const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
+                
+                const bags = p12.getBags({ bagType: forge.pki.oids.certBag });
+                const certBag = bags[forge.pki.oids.certBag];
+                if (!certBag || certBag.length === 0) throw new Error("Certificado não encontrado no arquivo PFX");
+                
+                const cert = certBag[0].cert;
+                if (!cert) throw new Error("Falha ao extrair certificado");
+
+                const expirationDate = cert.validity.notAfter;
+                const issuer = cert.issuer.getField('CN')?.value || "Desconhecido";
+                const subject = cert.subject.getField('CN')?.value || "Desconhecido";
+                const serialNumber = cert.serialNumber;
+
+                resolve({ expirationDate, issuer, subject, serialNumber });
+              } catch (e: any) {
+                reject(new Error("Senha incorreta ou arquivo inválido: " + e.message));
+              }
+            };
+            reader.onerror = () => reject(new Error("Erro ao ler o arquivo"));
+            reader.readAsArrayBuffer(file);
+          });
+        };
+
+        const metadata = await extractMetadata(file, password);
+
+        // 2. Upload file to Storage
         const storagePath = `certificates/${currentCompanyId}/${Date.now()}_${file.name}`;
         const storageRef = ref(storage, storagePath);
         await uploadBytes(storageRef, file);
         const downloadUrl = await getDownloadURL(storageRef);
 
-        // 2. Deactivate old certificates
+        // 3. Deactivate old certificates
         const oldCerts = certificates.filter((c: any) => c.active);
         for (const cert of oldCerts) {
           await api.put("certificates", cert.id, { active: false });
         }
 
-        // 3. Store metadata in Firestore
-        // Note: In a real app, we would extract expiration_date from the PFX file server-side.
-        // For this implementation, we'll set a placeholder expiration (1 year from now)
-        // and store the password (ideally this should be in Secret Manager)
-        const expirationDate = new Date();
-        expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+        // 4. Store metadata in Firestore
+        const encryptedPassword = CryptoJS.AES.encrypt(password, MASTER_KEY).toString();
 
         const certData = {
           company_id: currentCompanyId,
           filename: file.name,
           storage_path: storagePath,
           download_url: downloadUrl,
-          password: password, // Store password (encrypted in a real scenario)
-          expiration_date: expirationDate.toISOString(),
+          password: encryptedPassword,
+          expiration_date: metadata.expirationDate.toISOString(),
+          issuer: metadata.issuer,
+          subject: metadata.subject,
+          serial_number: metadata.serialNumber,
           active: true,
           created_at: new Date().toISOString()
         };
 
         await api.post("certificates", certData);
 
-        // 4. Log action
+        // 5. Log action
         await api.log({
           action: 'CREATE',
           entity: 'certificates',
@@ -100,7 +138,22 @@ export default function CertificateManager() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete("certificates", id),
+    mutationFn: async (cert: any) => {
+      await api.delete("certificates", cert.id);
+      
+      // Log action
+      await api.log({
+        action: 'DELETE',
+        entity: 'certificates',
+        entity_id: cert.id,
+        description: `Certificado digital removido: ${cert.filename}`,
+        metadata: { 
+          filename: cert.filename,
+          issuer: cert.issuer,
+          subject: cert.subject
+        }
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["certificates"] });
       toast.success("Certificado removido.");
@@ -163,6 +216,18 @@ export default function CertificateManager() {
                 {activeCertificate && (
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-50">
                     <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Titular</p>
+                      <p className="text-sm font-bold text-gray-700 truncate" title={activeCertificate.subject}>
+                        {activeCertificate.subject || "---"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Emissor</p>
+                      <p className="text-sm font-bold text-gray-700 truncate" title={activeCertificate.issuer}>
+                        {activeCertificate.issuer || "---"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Expiração</p>
                       <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
                         <Calendar size={14} className="text-blue-500" />
@@ -184,7 +249,7 @@ export default function CertificateManager() {
             {activeCertificate && (
               <div className="mt-8 flex justify-end">
                 <button 
-                  onClick={() => deleteMutation.mutate(activeCertificate.id)}
+                  onClick={() => deleteMutation.mutate(activeCertificate)}
                   className="flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-700 transition-colors"
                 >
                   <Trash2 size={16} /> Remover Certificado

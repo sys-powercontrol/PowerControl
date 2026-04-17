@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { storage } from "../lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Building2, Save, Upload, Phone, Mail, MapPin, Globe, QrCode, Shield, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
@@ -12,7 +14,8 @@ export default function Company() {
   const { user, hasPermission } = useAuth();
   const companyId = user?.company_id;
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isSearchingCEP, setIsSearchingCEP] = useState(false);
   const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
   const [zipCode, setZipCode] = useState("");
@@ -43,7 +46,7 @@ export default function Company() {
 
   useEffect(() => {
     if (company?.logo_url) {
-      setLogoBase64(company.logo_url);
+      setLogoPreview(company.logo_url);
     }
   }, [company]);
 
@@ -58,15 +61,12 @@ export default function Company() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 500000) { // 500KB limit for base64 storage
-        toast.error("O logo deve ter menos de 500KB.");
+      if (file.size > 2000000) { // 2MB limit for storage is reasonable
+        toast.error("O logo deve ter menos de 2MB.");
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoBase64(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
     }
   };
 
@@ -126,11 +126,29 @@ export default function Company() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    updateMutation.mutate({ ...data, logo_url: logoBase64 });
+    
+    let finalLogoUrl = company.logo_url;
+
+    if (logoFile) {
+      try {
+        toast.loading("Fazendo upload da logomarca...", { id: "upload-logo" });
+        const storageRef = ref(storage, `companies/${companyId}/logo`);
+        await uploadBytes(storageRef, logoFile);
+        finalLogoUrl = await getDownloadURL(storageRef);
+        toast.dismiss("upload-logo");
+      } catch (error) {
+        console.error("Error uploading logo:", error);
+        toast.error("Erro ao fazer upload da logomarca.");
+        toast.dismiss("upload-logo");
+        return;
+      }
+    }
+
+    updateMutation.mutate({ ...data, logo_url: finalLogoUrl });
   };
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Carregando dados da empresa...</div>;
@@ -149,8 +167,8 @@ export default function Company() {
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="relative group">
               <div className="w-32 h-32 bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-50 flex items-center justify-center">
-                {logoBase64 ? (
-                  <img src={logoBase64} alt="Logo" className="w-full h-full object-cover" />
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
                   <Building2 size={48} className="text-gray-300" />
                 )}

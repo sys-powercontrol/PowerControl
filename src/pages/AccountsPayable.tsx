@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { formatBR } from "../lib/dateUtils";
+import { formatBR, getTodayBR } from "../lib/dateUtils";
 import { 
   TrendingDown, 
   Plus, 
@@ -13,7 +14,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Shield,
-  Repeat
+  Repeat,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculateNextDueDate, Frequency } from "../lib/finance";
@@ -22,6 +24,7 @@ import ExportButton from "../components/ExportButton";
 export default function AccountsPayable() {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const canView = hasPermission('finance.view');
 
@@ -93,6 +96,15 @@ export default function AccountsPayable() {
     if (!currentCompanyId) return suppliersData;
     return suppliersData.filter((item: any) => item.company_id === currentCompanyId);
   }, [suppliersData, currentCompanyId]);
+
+  const hasOpenCashier = React.useMemo(() => {
+    const today = getTodayBR();
+    return cashiers.some((c: any) => 
+      c.status === "Aberto" && 
+      c.opened_by_id === user?.id &&
+      c.opened_at?.startsWith(today)
+    );
+  }, [cashiers, user?.id]);
 
   const filteredAccounts = accounts.filter((acc: any) => {
     if (activeTab === "Pendentes") return acc.status === "Pendente";
@@ -178,7 +190,30 @@ export default function AccountsPayable() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      {!hasOpenCashier && (user?.role !== 'admin' && user?.role !== 'master') && (
+        <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-sm flex items-center justify-center p-6 rounded-3xl">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 text-center max-w-md space-y-6">
+            <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+              <Lock size={40} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-gray-900">Caixa Fechado</h2>
+              <p className="text-gray-500">
+                Você precisa ter um caixa aberto para realizar recebimentos. 
+                Por favor, abra um caixa antes de continuar.
+              </p>
+            </div>
+            <button 
+              onClick={() => navigate("/caixas")}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-100"
+            >
+              Ir para Gestão de Caixas
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contas a Pagar</h1>

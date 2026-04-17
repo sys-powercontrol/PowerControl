@@ -190,7 +190,7 @@ export default function AccountsReceivable() {
 
   return (
     <div className="space-y-8 relative">
-      {!hasOpenCashier && user?.role !== 'master' && (
+      {!hasOpenCashier && (user?.role !== 'admin' && user?.role !== 'master') && (
         <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-sm flex items-center justify-center p-6 rounded-3xl">
           <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 text-center max-w-md space-y-6">
             <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">

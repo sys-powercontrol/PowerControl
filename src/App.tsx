@@ -28,6 +28,7 @@ import BankAccounts from "./pages/BankAccounts";
 import BankReconciliation from "./pages/BankReconciliation";
 import Transfers from "./pages/Transfers";
 import Support from "./pages/Support";
+import KnowledgeBase from "./pages/KnowledgeBase";
 import Services from "./pages/Services";
 import Sellers from "./pages/Sellers";
 import Suppliers from "./pages/Suppliers";
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="ConfiguracoesFiscais" element={<TaxSettings />} />
               <Route path="Fiscal" element={<Fiscal />} />
               <Route path="Suporte" element={<Support />} />
+              <Route path="BaseConhecimento" element={<KnowledgeBase />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

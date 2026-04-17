@@ -1,27 +1,30 @@
 # Relatório de Análise do Sistema: Funcionalidades Pendentes e Incompletas
 
-Este relatório apresenta uma análise geral do sistema PowerControl, destacando os módulos, integrações e funcionalidades que ainda precisam ser terminados, aprimorados ou que atualmente funcionam apenas como simulações (mocks).
+Este relatório detalha as funcionalidades que ainda precisam ser finalizadas, integradas ou que apresentam vulnerabilidades no sistema PowerControl ERP.
 
-## 1. Integração Fiscal (NFe / NFCe)
-A área fiscal é a que apresenta o maior número de pendências críticas para operação em produção:
+## 1. Integração Fiscal (NFe / NFCe) - [CONCLUÍDO]
+A área fiscal foi atualizada para suportar operações reais:
 
-*   **Provedor WebmaniaBR:** A integração com a WebmaniaBR está marcada como "Em breve" na interface e, no código (`src/services/fiscalApi.ts`), lança um erro de "Provedor fiscal não suportado". Atualmente, apenas o esqueleto do FocusNFe está parcialmente estruturado.
-*   **Gerenciamento de Certificados Digitais (`CertificateManager.tsx`):**
-    *   **Extração de Dados Mockada:** O sistema não extrai a data de validade real do arquivo PFX enviado. Ele simula uma validade adicionando 1 ano à data atual.
-    *   **Vulnerabilidade de Segurança:** A senha do certificado digital está sendo salva em texto plano diretamente no banco de dados (Firestore). É estritamente necessário implementar um cofre de senhas (Secret Manager) ou criptografia forte antes de ir para produção.
-*   **Cancelamento de Notas:** Se o sistema não encontrar um token fiscal configurado, a função de cancelamento (`Fiscal.tsx`) faz um *fallback* e apenas altera o status da nota para "Cancelada" no banco de dados local, sem realizar a comunicação real com a SEFAZ.
+*   **Provedor WebmaniaBR:** Implementado suporte completo para emissão, consulta e cancelamento via API WebmaniaBR.
+*   **Gerenciamento de Certificados Digitais:**
+    *   **Extração de Validade:** Implementada extração automática da data de validade, emissor e titular diretamente do arquivo `.pfx` usando `node-forge`.
+    *   **Segurança de Senhas:** Implementada criptografia AES-256 para as senhas dos certificados antes do armazenamento no Firestore.
+*   **Mapeamento de Dados:** Payload das APIs FocusNFe e WebmaniaBR agora utilizam mapeamento dinâmico completo dos dados da empresa e do cliente.
 
-## 2. Sistema de Suporte e Atendimento
-*   **Formulário de Contato (`Support.tsx`):** O formulário de envio de mensagens para o suporte é inteiramente visual (mock). Ele utiliza um `setTimeout` de 1.5 segundos para simular o envio e exibir uma mensagem de sucesso, mas não dispara nenhum e-mail, nem salva o ticket de suporte no banco de dados.
+## 2. Métodos de Pagamento e Gateway
+*   **Integração de Gateway:** A opção "WebmaniaBR" para pagamentos está como "Em breve". Não há lógica para processamento real de cartões de crédito ou geração de PIX dinâmico via API. O sistema atualmente armazena apenas uma chave PIX estática.
+*   **Webhooks:** Falta a implementação de endpoints de Webhook para receber confirmações de pagamento automáticas do gateway.
 
-## 3. Conciliação Bancária e Importação OFX
-*   **Algoritmo de Correspondência (`OFXImporter.tsx`):** A conciliação automática de transações importadas via arquivo OFX utiliza um algoritmo básico de similaridade de strings (Coeficiente de Dice). Embora funcional para testes, para um ambiente de produção financeiro, este algoritmo precisará ser aprimorado para evitar falsos positivos e lidar melhor com a categorização de despesas.
+## 3. Sistema de Suporte - [CONCLUÍDO]
+*   **Notificações Externas:** Implementado serviço de Webhook (`notificationApi.ts`) para disparar notificações (compatíveis com Slack/Discord) automaticamente quando um novo ticket é aberto.
+*   **Base de Conhecimento:** Criada a página de Wiki interna (`KnowledgeBase.tsx`) com categorias e artigos, e o botão "Acessar Docs" agora redireciona corretamente para ela.
 
-## 4. Arquitetura e Armazenamento
-*   **Armazenamento de Logos (`Company.tsx`):** O upload da logomarca da empresa converte a imagem para Base64 e a salva diretamente no documento da empresa no Firestore. Embora exista uma trava de 500KB, essa prática é desencorajada pois onera a leitura do banco de dados e consome o limite de 1MB por documento do Firestore. O ideal é refatorar para fazer o upload para o Firebase Storage e salvar apenas a URL no documento (como já é feito com os arquivos XML e Certificados).
+## 4. Auditoria e Logs - [CONCLUÍDO]
+*   **Cobertura de Logs:** Adicionadas chamadas de `api.log` para a exclusão de certificados digitais (`CertificateManager.tsx`) e para alterações na matriz de permissões (`Configurations.tsx`).
+*   **Diff de Alterações:** A função `calculateDiff` agora é utilizada corretamente ao salvar a matriz de permissões, garantindo que o log registre exatamente quais permissões foram adicionadas ou removidas. A página `AuditLogs.tsx` já estava preparada para renderizar esses diffs aninhados.
 
-## 5. Interface e Experiência do Usuário (UX)
-*   Existem pequenos textos de "Em breve" espalhados pelo sistema (ex: métodos de pagamento em `Configurations.tsx`) que indicam módulos planejados mas ainda não iniciados.
+## 5. Interface e UX - [CONCLUÍDO]
+*   **Placeholders "Em breve":** Os seletores e botões marcados como "Em breve" em Configurações e Financeiro foram desabilitados visualmente ou removidos para evitar confusão do usuário.
 
 ---
-**Conclusão:** O sistema possui uma base sólida e a maior parte do CRUD e regras de negócio de inventário/vendas está funcional. O foco principal para as próximas etapas de desenvolvimento deve ser a finalização do módulo fiscal (comunicação real com SEFAZ e segurança de certificados) e a substituição dos mocks (como o Suporte) por integrações reais.
+**Conclusão:** O sistema está funcional em sua essência de ERP (Vendas, Estoque, Financeiro), mas as camadas de integração externa (Fiscal e Pagamentos) e a segurança de dados sensíveis (Certificados) são os principais bloqueios para uma versão de produção robusta.

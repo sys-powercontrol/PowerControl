@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { notificationApi } from "../services/notificationApi";
 import { 
   HelpCircle, 
   Mail, 
@@ -47,8 +49,16 @@ export default function Support() {
         updated_at: new Date().toISOString()
       });
     },
-    onSuccess: () => {
+    onSuccess: async (data, variables) => {
       toast.success("Chamado aberto com sucesso! Retornaremos em breve.");
+      
+      // Enviar notificação via Webhook
+      await notificationApi.sendSupportWebhook({
+        ...variables,
+        user_name: user?.full_name,
+        user_email: user?.email,
+        company_id: user?.company_id,
+      });
     },
     onError: (error: any) => {
       toast.error("Erro ao abrir chamado: " + error.message);
@@ -192,9 +202,9 @@ export default function Support() {
           <div className="bg-blue-600 p-8 rounded-3xl text-white shadow-xl shadow-blue-100 space-y-4">
             <h3 className="font-bold text-lg">Documentação Completa</h3>
             <p className="text-sm opacity-80">Acesse nosso guia completo para dominar todas as ferramentas do PowerControl.</p>
-            <button className="flex items-center gap-2 text-sm font-bold bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl transition-colors">
+            <Link to="/BaseConhecimento" className="flex items-center justify-center gap-2 text-sm font-bold bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl transition-colors w-max">
               Acessar Docs <ExternalLink size={14} />
-            </button>
+            </Link>
           </div>
         </div>
       </div>
