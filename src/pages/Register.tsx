@@ -145,7 +145,7 @@ export default function Register() {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="seu@email.com"
-                  className={`w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium ${!!inviteData ? "opacity-70 cursor-not-allowed" : ""}`}
+                  className={`w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium ${inviteData ? "opacity-70 cursor-not-allowed" : ""}`}
                 />
               </div>
             </div>

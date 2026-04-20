@@ -37,7 +37,7 @@ export default function BOMBuilder({ items, onChange, excludeProductId }: BOMBui
   });
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p: any) => 
+    return products.filter((p: { id: string, name?: string, sku?: string, stock_quantity: number, unit?: string }) => 
       p.id !== excludeProductId &&
       !items.some(item => item.product_id === p.id) &&
       (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -45,10 +45,10 @@ export default function BOMBuilder({ items, onChange, excludeProductId }: BOMBui
     ).slice(0, 5);
   }, [products, searchTerm, items, excludeProductId]);
 
-  const addItem = (product: any) => {
+  const addItem = (product: { id: string, name?: string }) => {
     onChange([...items, { 
       product_id: product.id, 
-      product_name: product.name, 
+      product_name: product.name || 'Componente Sem Nome', 
       quantity: 1 
     }]);
     setSearchTerm("");
@@ -91,7 +91,7 @@ export default function BOMBuilder({ items, onChange, excludeProductId }: BOMBui
               <div className="p-4 text-center text-xs text-gray-400">Nenhum produto encontrado</div>
             ) : (
               <div className="divide-y divide-gray-50">
-                {filteredProducts.map((p: any) => (
+                {filteredProducts.map((p: { id: string, name?: string, stock_quantity: number, unit?: string }) => (
                   <button
                     key={p.id}
                     type="button"

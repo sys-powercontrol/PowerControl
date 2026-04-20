@@ -46,22 +46,7 @@ export default function ProfitabilityReport() {
   
   const canView = hasPermission('reports.view');
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar o relatório de lucratividade. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const currentCompanyId = api.getCompanyId();
 
@@ -107,8 +92,8 @@ export default function ProfitabilityReport() {
     // Calculate metrics
     let totalRevenue = 0;
     let totalCOGS = 0;
-    let productProfit: Record<string, { name: string, profit: number, revenue: number, qty: number }> = {};
-    let categoryProfit: Record<string, { name: string, profit: number, revenue: number }> = {};
+    const productProfit: Record<string, { name: string, profit: number, revenue: number, qty: number }> = {};
+    const categoryProfit: Record<string, { name: string, profit: number, revenue: number }> = {};
 
     filteredSales.forEach((sale: any) => {
       totalRevenue += sale.total || 0;
@@ -189,6 +174,23 @@ export default function ProfitabilityReport() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar o relatório de lucratividade. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
       </div>
     );
   }

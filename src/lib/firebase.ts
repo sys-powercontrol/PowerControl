@@ -22,7 +22,7 @@ try {
   storage = getStorage(app);
 } catch (error) {
   console.error("CRITICAL ERROR: Failed to initialize Firebase.", error);
-  throw new Error(`Falha crítica na inicialização do Firebase: ${(error as Error).message}. Verifique sua conexão e configurações.`);
+  throw new Error(`Falha crítica na inicialização do Firebase: ${(error as Error).message}. Verifique sua conexão e configurações.`, { cause: error });
 }
 
 export { app, auth, db, storage };

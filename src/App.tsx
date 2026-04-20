@@ -70,6 +70,34 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const queryClient = new QueryClient();
 
 export default function App() {
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'SYNC_COMPLETED') {
+          const { synced = 0, failed = 0, abandoned = 0 } = event.data.payload || {};
+          
+          if (synced > 0) {
+            toast.success(`${synced} ${synced === 1 ? 'venda offline sincronizada' : 'vendas offline sincronizadas'} com sucesso!`);
+          }
+          if (failed > 0) {
+            toast.warning(`${failed} ${failed === 1 ? 'venda contínua' : 'vendas continuam'} na fila de retentativa.`);
+          }
+          if (abandoned > 0) {
+            toast.error(`${abandoned} ${abandoned === 1 ? 'venda foi descartada' : 'vendas foram descartadas'} por excesso de falhas persistentes.`);
+          }
+        } else if (event.data?.type === 'SYNC_ERROR') {
+          toast.error(`Falha intermitente de rede no sincronismo: ${event.data.payload?.error}`);
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      };
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
@@ -82,6 +110,8 @@ export default function App() {
               <Route index element={<Dashboard />} />
               <Route path="PainelVendedor" element={<SellerDashboard />} />
               <Route path="Produtos" element={<Products />} />
+              <Route path="Categorias" element={<Products defaultTab="Categorias" />} />
+              <Route path="Marcas" element={<Products defaultTab="Marcas" />} />
               <Route path="Servicos" element={<Services />} />
               <Route path="AjustesEstoque" element={<InventoryAdjustments />} />
               <Route path="HistoricoEstoque" element={<InventoryHistory />} />

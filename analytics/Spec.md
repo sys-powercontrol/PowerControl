@@ -1,63 +1,49 @@
-# Especificação de Correções Técnicas (Spec.md)
+# Especificação de Funcionalidades a Finalizar (Spec.md)
 
-Este documento mapeia **exclusivamente os itens que precisam ser corrigidos**, derivados do relatório de análise de erros (`analytics/error.md`). Cada item detalha os artefatos afetados (Páginas, Componentes ou Arquivos) e o comportamento esperado após a correção.
-
----
-
-## 1. Refatoração de Tipagem e Remoção de `any`
-**Alvos (Arquivos/Componentes):**
-*   `GlobalSearch.tsx`, `OFXImporter.tsx`, `Layout.tsx`
-*   `ProfitabilityReport.tsx`, `Sales.tsx`
-*   `src/lib/api.ts`, `src/lib/inventory.ts`
-*   `package.json` (dependência de tipos)
-
-**Comportamento Esperado:**
-*   Nenhum objeto, parâmetro de função ou retorno de API deve depender do tipo genérico `any` implícito ou explícito.
-*   Devem ser criadas ou consumidas interfaces TypeScript estritas (ex: `ISale`, `IUser`, `ICompany`, `IOFXTransaction`).
-*   Blocos `catch (error)` devem fazer *type narrowing* para instâncias de `Error` formal.
-*   Garantir a instalação e linkagem correta de `@types/react` no ambiente de desenvolvimento para evitar avisos em base de hooks.
+Com base na análise descrita em `analytics/error.md`, este documento especifica tecnicamente e estritamente **apenas o que falta ser terminado** no sistema.
 
 ---
 
-## 2. Prevenção do Vazamento Cross-Tenant (Gerenciamento do Estado de Load)
-**Alvos (Arquivos/Páginas):**
-*   `src/lib/api.ts` (linhas 117, 197 - barreira atual de erro)
-*   Componentes provedores de Auth e páginas de visualização de dados (ex: Dashboards/Relatórios).
+## 1. Expansão do Fluxo de Suporte (Leitura e Réplica)
+*   **Page:** `src/pages/Support.tsx`
+*   **Component:** Card de Ticket (Listagem), Novo Modal de Detalhes do Chamado (`TicketDetailsModal`)
+*   **Behavior:** 
+    *   Transformar o selo "Resposta disponível" em uma ação clicável.
+    *   Abrir um modal/interface onde o usuário consiga ler integralmente as `internal_notes` elaboradas pela equipe técnica.
+    *   Implementar campo de chat/interação para o usuário enviar uma réplica, impedindo que o fluxo morra logo na listagem inicial.
 
-**Comportamento Esperado:**
-*   O sistema deve atrasar as requisições atreladas à permissão do inquilino (tenant) até a estabilização da sessão na memória.
-*   Em vez de acionar a cláusula de exceção `Blocked cross-tenant data leak` e quebrar a renderização, o fluxo deve escutar ativamente um "Loading State" (Spinner) transparente na UI durante o carregamento de restabelecimento do `onAuthStateChange` e injeção do `company_id`.
-*   Requisições prematuras (race conditions) aos sub-nós do banco de dados enquanto o perfil está sendo hidratado não podem ser disparadas.
+## 2. Dinamismo da Base de Conhecimento (Fim do Mock Local)
+*   **Page:** `src/pages/KnowledgeBase.tsx`
+*   **Component:** Listagem de Artigos (`categories`), Roteador de Conteúdo (`ArticleViewer`)
+*   **Behavior:** 
+    *   Excluir os dados simulados e estáticos (`const categories`) diretamente injetados no código-fonte.
+    *   Desenvolver o carregamento dessas informações por meio de uma coleção real do Firestore.
+    *   Criar estado e renderização do artigo (possivelmente suportando Markdown) para que o usuário clique no treinamento listado e leia o seu conteúdo textual na interface correspondente.
 
----
+## 3. Destravamento da Fila Fiscal WebmaniaBR
+*   **Page:** `src/pages/Configurations.tsx`
+*   **Component:** Aba `Integração Fiscal` (Select do campo `fiscal_provider`)
+*   **Behavior:** 
+    *   Remover a trava HTML `disabled` da `<option value="WebmaniaBR">` sinalizada no front-end como "(Em breve)".
+    *   Garantir a total liberação na seleção pela interface para que os lojistas possuam autonomia em utilizar esse provedor perfeitamente integrado no backend (em `fiscalApi.ts`).
 
-## 3. Segurança Contra Injeção XSS nas Impressões de Recibos
-**Alvos (Arquivos/Utilitários):**
-*   `src/lib/utils/print.ts`
+## 4. Cobertura Offline-First Transversal (Service Worker)
+*   **Page:** `src/sw.ts`
+*   **Component:** Escopo IndexedDB (`openDB`), Lógica de Sync Offline
+*   **Behavior:** 
+    *   Aproveitar o mecanismo resiliente estabelecido na *Issue 05* para transcender os limites atuais puramente voltados para transações de Balcão (Vendas/Sales).
+    *   Registrar manipuladores (handlers/tags no SyncManager) e armazéns no IDB para as filas locais de: *Novos Cadastros de Clientes*, *Lançamentos de Contas a Pagar* e *Notas de Compra*, dotando o PDV off-grid não só com o terminal, mas com cadastros essenciais de ERP.
 
-**Comportamento Esperado:**
-*   O utilitário de impressão não deve concatenar entradas dos usuários via *Template Strings* (como nomes de produtos: `${item.name}`) diretamente e puramente no HTML injetável do DOM.
-*   Todas as chaves interpoladas dependentes de cadastros e inserções de texto livre devem passar por uma rotina de `escaping` (substituição de `<` por `&lt;`, de aspas e injeções de quebra de tags) ou validação via biblioteca de `sanitize` para evitar a contaminação local no navegador via injeção HTML/JS.
+## 5. Algoritmo PIX Dinâmico no PDV
+*   **Page:** `src/pages/Sales.tsx`, `src/pages/Configurations.tsx`
+*   **Component:** Modal do PDV (`CheckoutModal`), Componente Emissor (`QRCodeManager`)
+*   **Behavior:** 
+    *   No estado vigente o lojista consegue armazenar a chave PIX, porém seu PDV não tira proveito real disso.
+    *   Furar a dependência estática por meio de uma rotina ou biblioteca capaz de aglutinar a string PIX do Lojista + Soma do Checkout ("Valor do Carrinho") gerando fisicamente via tela o **QR Code (BR Code / Copia e Cola) validado**. Integrar esse display diretamente na etapa final do caixa.
 
----
-
-## 4. Normalização do Linter de Front End
-**Alvos (Arquivos/Configurações):**
-*   `package.json` (scripts e devDependencies)
-*   `eslint.config.js` (Novo arquivo a ser criado na raiz)
-
-**Comportamento Esperado:**
-*   A execução de `npm run lint` passa a verificar tanto o `tsc` (tipos) quanto as regras lint do ecossistema React.
-*   Configurar ativamente a suite `@eslint` somada ao `eslint-plugin-react-hooks`.
-*   O projeto deverá sinalizar imediatamente em modo de desenvolvimento se hooks nativos (`useEffect`, `useCallback`, `useMemo`) não cumprirem a regra formal do `exhaustive-deps`, forçando a adição explícita correta de dependências nas matrizes para estabilizar os componentes.
-
----
-
-## 5. Resiliência no Fallback Assíncrono do Service Worker (Offline)
-**Alvos (Arquivos Worker):**
-*   `src/sw.ts` (Contexto Sync)
-
-**Comportamento Esperado:**
-*   A rotina de sincronização não pode manter retornos ou quedas de `fetch` silenciosas e limitadas apenas a um rastro frágil de `console.error`.
-*   A fila de requisições retidas ("Vendas Offline") tem que implementar tratamento de re-tentativas baseada em retornos formais, impedindo que requisições presas virem ciclos contínuos irrecuperáveis por pequenas falhas eventuais na formatação do pacote de rede.
-*   A camada de log assíncrono final deve ser capaz de postar mensagens de volta (via `postMessage`) direto à UI (PDV) informando o esvaziamento correto ou não da fila paralela.
+## 6. Desacoplamento da Gestão de Webhooks
+*   **Page:** `src/pages/Configurations.tsx`
+*   **Component:** Aba `Notificações`
+*   **Behavior:** 
+    *   Substituir a invocação de `import.meta.env.VITE_SUPPORT_WEBHOOK_URL` existente nos serviços.
+    *   Adicionar campo de URL Customizada gerida via banco, expondo ao administrador (Master e respectivos Tenants) um input para inserir livremente o seu ponto de acesso para Slack/Discord sem dependência rígida de *commits* ou ambiente global do projeto.

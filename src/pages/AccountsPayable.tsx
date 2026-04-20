@@ -15,7 +15,10 @@ import {
   AlertCircle,
   Shield,
   Repeat,
-  Lock
+  Lock,
+  History,
+  CalendarClock,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculateNextDueDate, Frequency } from "../lib/finance";
@@ -28,28 +31,17 @@ export default function AccountsPayable() {
 
   const canView = hasPermission('finance.view');
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar as contas a pagar. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const [activeTab, setActiveTab] = useState("Pendentes");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [isEditDateModalOpen, setIsEditDateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [newDueDate, setNewDueDate] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
 
   const currentCompanyId = api.getCompanyId();
 
@@ -106,7 +98,18 @@ export default function AccountsPayable() {
     );
   }, [cashiers, user?.id]);
 
-  const filteredAccounts = accounts.filter((acc: any) => {
+  const accountsWithDynamicStatus = React.useMemo(() => {
+    const today = getTodayBR();
+    return accounts.map((acc: any) => {
+      let currentStatus = acc.status;
+      if (currentStatus === "Pendente" && acc.due_date && acc.due_date < today) {
+        currentStatus = "Atrasado";
+      }
+      return { ...acc, status: currentStatus };
+    });
+  }, [accounts]);
+
+  const filteredAccounts = accountsWithDynamicStatus.filter((acc: any) => {
     if (activeTab === "Pendentes") return acc.status === "Pendente";
     if (activeTab === "Pagas") return acc.status === "Pago";
     if (activeTab === "Atrasadas") return acc.status === "Atrasado";
@@ -169,7 +172,24 @@ export default function AccountsPayable() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    createMutation.mutate(data);
+    
+    let supplier_name = data.supplier;
+    let supplier_id = data.supplier_id;
+    
+    if (supplier_id) {
+        const sup = suppliers.find((s: any) => s.id === supplier_id);
+        if (sup) supplier_name = sup.name;
+    } else if (supplier_name) {
+        const sup = suppliers.find((s: any) => s.name === supplier_name);
+        if (sup) supplier_id = sup.id;
+    }
+
+    createMutation.mutate({
+       ...data,
+       supplier: supplier_name,
+       supplier_name: supplier_name,
+       supplier_id: supplier_id
+    });
   };
 
   const handlePay = (id: string) => {
@@ -188,6 +208,89 @@ export default function AccountsPayable() {
     setSelectedAccountId("");
     setCurrentAccountId(null);
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete("accountsPayable", id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      toast.success("Conta excluída com sucesso.");
+    }
+  });
+
+  const extendDateMutation = useMutation({
+    mutationFn: (data: { id: string, newDate: string, oldDate: string }) => {
+      const dbAccount = accounts.find((a: any) => a.id === data.id);
+      const historyRecord = {
+        old_date: data.oldDate,
+        new_date: data.newDate,
+        changed_at: new Date().toISOString(),
+        changed_by: user?.id,
+        user_name: user?.name
+      };
+      
+      const updatedHistory = dbAccount.due_date_history ? [...dbAccount.due_date_history, historyRecord] : [historyRecord];
+
+      return api.put("accountsPayable", data.id, {
+        due_date: data.newDate,
+        status: data.newDate >= getTodayBR() ? "Pendente" : "Atrasado",
+        due_date_history: updatedHistory
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      toast.success("Vencimento alterado com sucesso!");
+      setIsEditDateModalOpen(false);
+      setNewDueDate("");
+    }
+  });
+
+  const handleDelete = (id: string) => {
+    setAccountToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (accountToDelete) {
+      deleteMutation.mutate(accountToDelete);
+      setIsDeleteModalOpen(false);
+      setAccountToDelete(null);
+    }
+  };
+
+  const handleEditDate = (id: string, currentDate: string) => {
+    setCurrentAccountId(id);
+    setNewDueDate(currentDate);
+    setIsEditDateModalOpen(true);
+  };
+
+  const confirmDateEdit = () => {
+    if (!currentAccountId || !newDueDate) return;
+    const account = accounts.find((a: any) => a.id === currentAccountId);
+    if (account) {
+        if (newDueDate === account.due_date) {
+             toast.error("O novo vencimento deve ser diferente do atual.");
+             return;
+        }
+        extendDateMutation.mutate({ id: currentAccountId, newDate: newDueDate, oldDate: account.due_date });
+    }
+  };
+
+if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar as contas a pagar. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 relative">
@@ -263,19 +366,19 @@ export default function AccountsPayable() {
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-red-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Pendente</p>
           <p className="text-2xl font-bold text-red-600 mt-1">
-            R$ {accounts.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-green-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Pago (Mês)</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
-            R$ {accounts.filter((a: any) => a.status === "Pago").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Pago").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-orange-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Contas Atrasadas</p>
           <p className="text-2xl font-bold text-orange-600 mt-1">
-            {accounts.filter((a: any) => a.status === "Atrasado").length}
+            {accountsWithDynamicStatus.filter((a: any) => a.status === "Atrasado").length}
           </p>
         </div>
       </div>
@@ -312,32 +415,59 @@ export default function AccountsPayable() {
               <div>
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   {acc.description}
-                  {acc.is_recurring && <Repeat size={14} className="text-blue-500" title={`Recorrente (${acc.frequency})`} />}
+                  {acc.is_recurring && <span title={`Recorrente (${acc.frequency})`}><Repeat size={14} className="text-blue-500" /></span>}
                 </h3>
                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><Building2 size={12} /> {acc.supplier || "Fornecedor não inf."}</span>
+                  <span className="flex items-center gap-1"><Building2 size={12} /> {acc.supplier || acc.supplier_name || "Fornecedor não inf."}</span>
                   <span className="flex items-center gap-1"><Calendar size={12} /> Vence em: {formatBR(acc.due_date)}</span>
+                  {acc.due_date_history && acc.due_date_history.length > 0 && (
+                     <span className="flex items-center gap-1 text-yellow-600" title={`${acc.due_date_history.length} alterações de data no histórico`}>
+                         <History size={12} /> Alterada ({acc.due_date_history.length}x)
+                     </span>
+                  )}
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center justify-between md:justify-end gap-6">
+              <div className="flex items-center justify-between md:justify-end gap-6">
               <div className="text-right">
                 <p className="text-lg font-bold text-gray-900">R$ {acc.amount?.toLocaleString()}</p>
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                  acc.status === "Pago" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                  acc.status === "Pago" ? "bg-green-100 text-green-700" : 
+                  acc.status === "Atrasado" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
                 }`}>
                   {acc.status}
                 </span>
               </div>
-              {acc.status !== "Pago" && (
-                <button 
-                  onClick={() => handlePay(acc.id)}
-                  className="p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all"
-                >
-                  <CheckCircle2 size={20} />
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {acc.status !== "Pago" && (
+                  <>
+                    <button 
+                      onClick={() => handleEditDate(acc.id, acc.due_date)}
+                      className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all font-bold"
+                      title="Alterar Vencimento"
+                    >
+                      <CalendarClock size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handlePay(acc.id)}
+                      className="p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all font-bold"
+                      title="Registrar Pagamento"
+                    >
+                      <CheckCircle2 size={20} />
+                    </button>
+                  </>
+                )}
+                {(user?.role === 'admin' || user?.role === 'master') && (
+                  <button
+                    onClick={() => handleDelete(acc.id)}
+                    className="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all ml-1 font-bold"
+                    title="Excluir Conta"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -382,6 +512,82 @@ export default function AccountsPayable() {
         </div>
       )}
 
+      {/* Modal Alterar Vencimento */}
+      {isEditDateModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEditDateModalOpen(false)} />
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-xl font-bold flex flex-col">
+                <span>Alterar Vencimento</span>
+                <span className="text-xs text-gray-500 font-normal">A data atual será armazenada no histórico de alterações da conta.</span>
+              </h2>
+              <button onClick={() => setIsEditDateModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">Nova Data de Vencimento *</label>
+                <input 
+                  type="date"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                />
+              </div>
+              
+              {currentAccountId && accounts.find((a: any) => a.id === currentAccountId)?.due_date_history && (
+                <div className="pt-4 border-t border-gray-100">
+                  <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">Histórico Mapeado</h3>
+                  <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                    {accounts.find((a: any) => a.id === currentAccountId)?.due_date_history.map((hist: any, index: number) => (
+                      <div key={index} className="text-xs p-2 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">De <span className="font-bold text-gray-800">{formatBR(hist.old_date)}</span> para <span className="font-bold text-gray-800">{formatBR(hist.new_date)}</span></p>
+                        <p className="text-gray-400 mt-1">Por {hist.user_name || "Usuário não identificado"} em {formatBR(hist.changed_at?.substring(0, 10))}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-6">
+                <button onClick={() => setIsEditDateModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
+                <button onClick={confirmDateEdit} disabled={extendDateMutation.isPending} className="px-8 py-2 bg-yellow-500 text-white rounded-xl font-bold hover:bg-yellow-600">
+                  {extendDateMutation.isPending ? "Alterando..." : "Confirmar e Gravar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Exclusão */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setIsDeleteModalOpen(false); setAccountToDelete(null); }} />
+          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6">
+            <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+              <Trash2 size={40} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-gray-900">Excluir Conta?</h2>
+              <p className="text-gray-500">
+                Esta ação não pode ser desfeita. Deseja realmente excluir permanentemente este lançamento?
+              </p>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => { setIsDeleteModalOpen(false); setAccountToDelete(null); }} className="flex-1 py-3 text-gray-500 font-bold bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+              <button 
+                onClick={confirmDelete} 
+                disabled={deleteMutation.isPending}
+                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
+              >
+                {deleteMutation.isPending ? "Excluindo..." : "Excluir Conta"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Nova Conta */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -408,10 +614,10 @@ export default function AccountsPayable() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">Fornecedor</label>
-                <select name="supplier" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500">
+                <select name="supplier_id" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500">
                   <option value="">Selecione um fornecedor...</option>
                   {suppliers.map((s: any) => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>

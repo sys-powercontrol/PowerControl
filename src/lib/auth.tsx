@@ -13,18 +13,14 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { api } from "./api";
 
 import { PermissionId, DEFAULT_ROLE_PERMISSIONS } from "./permissions";
+import { User } from "../types";
 
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
-  role: 'admin' | 'user' | 'master';
-  company_id: string | null;
+export interface ExtendedUser extends User {
   permissions?: PermissionId[];
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: ExtendedUser | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: any) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -140,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user.role === 'master') return true;
     
     // Check user-specific permissions first
-    if (user.permissions?.includes(permission)) return true;
+    if ((user as ExtendedUser).permissions?.includes(permission)) return true;
     
     // Fallback to role-based defaults if no specific permissions are set
     // In a real app, we'd fetch company.role_permissions here, but for now we use defaults

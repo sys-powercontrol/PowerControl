@@ -162,7 +162,9 @@ export default function CertificateManager() {
 
   const canManage = hasPermission('fiscal.manage');
 
-  if (!canManage) {
+  
+
+if (!canManage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
         <div className="p-4 bg-red-50 text-red-600 rounded-full">

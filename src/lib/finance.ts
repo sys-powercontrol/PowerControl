@@ -171,3 +171,123 @@ export async function processAccountReceipt(accountId: string, accountData: any,
     return { success: true };
   });
 }
+
+// ---- Reversal Utilities ----
+
+export async function reverseAccountReceipt(accountData: any) {
+  return runTransaction(db, async (transaction) => {
+    const amount = parseFloat(accountData.amount);
+    if (isNaN(amount) || !amount) return { success: true };
+
+    const accountId = accountData.bank_account_id || accountData.cashier_id;
+    if (!accountId) return { success: true }; 
+
+    const collectionName = accountData.bank_account_id ? "bankAccounts" : "cashiers";
+    const receiptAccountRef = doc(db, collectionName, accountId);
+    const docSnap = await transaction.get(receiptAccountRef);
+    if (!docSnap.exists()) return { success: true }; 
+
+    const receiptAccountData = docSnap.data();
+
+    // Deduct balance
+    const currentBalance = receiptAccountData.balance || 0;
+    transaction.update(receiptAccountRef, {
+      balance: currentBalance - amount
+    });
+
+    // Create reversal movement record
+    const movementRef = doc(collection(db, "movements"));
+    transaction.set(movementRef, {
+      company_id: accountData.company_id,
+      type: "Saída",
+      description: `Estorno de Exclusão: ${accountData.description || 'Conta a Receber'}`,
+      amount: amount,
+      from_account_type: accountData.bank_account_id ? 'Banco' : 'Caixa',
+      from_account_id: accountId,
+      from_account_name: receiptAccountData.name || "Conta Desconhecida",
+      category: "Estorno",
+      movement_date: new Date().toISOString(),
+      created_at: serverTimestamp()
+    });
+
+    return { success: true };
+  });
+}
+
+export async function reverseSalePayment(saleData: any) {
+  return runTransaction(db, async (transaction) => {
+    const amount = parseFloat(saleData.total);
+    if (isNaN(amount) || !amount) return { success: true };
+
+    const accountId = saleData.bank_account_id || saleData.cashier_id;
+    if (!accountId) return { success: true };
+
+    const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
+    const receiptAccountRef = doc(db, collectionName, accountId);
+    const docSnap = await transaction.get(receiptAccountRef);
+    if (!docSnap.exists()) return { success: true };
+
+    const receiptAccountData = docSnap.data();
+
+    // Deduct balance
+    const currentBalance = receiptAccountData.balance || 0;
+    transaction.update(receiptAccountRef, {
+      balance: currentBalance - amount
+    });
+
+    const movementRef = doc(collection(db, "movements"));
+    transaction.set(movementRef, {
+      company_id: saleData.company_id,
+      type: "Saída",
+      description: `Estorno (Cancelamento/Exclusão Venda): #${saleData.id?.substring(0, 8).toUpperCase()}`,
+      amount: amount,
+      from_account_type: saleData.bank_account_id ? 'Banco' : 'Caixa',
+      from_account_id: accountId,
+      from_account_name: receiptAccountData.name || "Conta Desconhecida",
+      category: "Estorno",
+      movement_date: new Date().toISOString(),
+      created_at: serverTimestamp()
+    });
+
+    return { success: true };
+  });
+}
+
+export async function reversePurchasePayment(purchaseData: any) {
+  return runTransaction(db, async (transaction) => {
+    const amount = parseFloat(purchaseData.total);
+    if (isNaN(amount) || !amount) return { success: true };
+
+    const accountId = purchaseData.bank_account_id || purchaseData.cashier_id;
+    if (!accountId) return { success: true };
+
+    const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
+    const paymentAccountRef = doc(db, collectionName, accountId);
+    const docSnap = await transaction.get(paymentAccountRef);
+    if (!docSnap.exists()) return { success: true };
+
+    const paymentAccountData = docSnap.data();
+
+    // Add back balance
+    const currentBalance = paymentAccountData.balance || 0;
+    transaction.update(paymentAccountRef, {
+      balance: currentBalance + amount
+    });
+
+    const movementRef = doc(collection(db, "movements"));
+    transaction.set(movementRef, {
+      company_id: purchaseData.company_id,
+      type: "Entrada",
+      description: `Estorno (Cancelamento/Exclusão Compra): #${purchaseData.purchase_number || purchaseData.id?.substring(0, 8).toUpperCase()}`,
+      amount: amount,
+      to_account_type: purchaseData.bank_account_id ? 'Banco' : 'Caixa',
+      to_account_id: accountId,
+      to_account_name: paymentAccountData.name || "Conta Desconhecida",
+      category: "Estorno",
+      movement_date: new Date().toISOString(),
+      created_at: serverTimestamp()
+    });
+
+    return { success: true };
+  });
+}

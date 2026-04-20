@@ -1,6 +1,10 @@
+import { FieldValue } from 'firebase/firestore';
+
+export type FirebaseTimestamp = string | number | { seconds: number, nanoseconds: number } | Date | FieldValue;
+
 export interface AuditLog {
   id: string;
-  timestamp: any;
+  timestamp: FirebaseTimestamp;
   user_id: string;
   user_name: string;
   company_id: string | null;
@@ -9,7 +13,8 @@ export interface AuditLog {
   entity: string;
   entity_id: string;
   description: string;
-  metadata?: any;
+  changes?: Record<string, unknown> | string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface User {
@@ -21,7 +26,8 @@ export interface User {
   is_active: boolean;
   phone?: string;
   cpf?: string;
-  created_at: any;
+  address?: string;
+  created_at: FirebaseTimestamp;
 }
 
 export interface Company {
@@ -35,7 +41,7 @@ export interface Company {
   state?: string;
   is_active: boolean;
   logo_url?: string | null;
-  created_at: any;
+  created_at: FirebaseTimestamp;
 }
 
 export interface InventoryMovement {
@@ -52,7 +58,7 @@ export interface InventoryMovement {
   observation?: string;
   user_id: string;
   user_name: string;
-  timestamp: any;
+  timestamp: FirebaseTimestamp;
 }
 
 export interface AccountReceivable {
@@ -65,7 +71,7 @@ export interface AccountReceivable {
   amount: number;
   due_date: string;
   status: 'Pendente' | 'Pago' | 'Atrasado' | 'Cancelado';
-  created_at: any;
+  created_at: FirebaseTimestamp;
   receipt_date?: string;
   bank_account_id?: string;
   cashier_id?: string;
@@ -81,10 +87,23 @@ export interface AccountPayable {
   amount: number;
   due_date: string;
   status: 'Pendente' | 'Pago' | 'Atrasado' | 'Cancelado';
-  created_at: any;
+  created_at: FirebaseTimestamp;
   payment_date?: string;
   bank_account_id?: string;
   cashier_id?: string;
+}
+
+export interface SaleItem {
+  id: string;
+  product_id?: string;
+  service_id?: string;
+  name: string;
+  quantity: number;
+  price: number;
+  cost_price?: number;
+  total: number;
+  type: 'product' | 'service';
+  [key: string]: unknown; // Allow extensions without strictly breaking old entries
 }
 
 export interface Sale {
@@ -92,7 +111,7 @@ export interface Sale {
   sale_number?: string;
   client_id: string;
   client_name: string;
-  items: any[];
+  items: SaleItem[];
   total: number;
   subtotal: number;
   discount: number;
@@ -102,7 +121,7 @@ export interface Sale {
   commission_amount: number;
   commission_status: 'pending' | 'paid';
   company_id: string;
-  created_at: any;
+  created_at: FirebaseTimestamp;
   sale_date: string;
 }
 
@@ -119,7 +138,7 @@ export interface ReconciliationRule {
   client_id?: string;
   client_name?: string;
   auto_confirm: boolean;
-  created_at: any;
+  created_at: FirebaseTimestamp;
 }
 
 export interface SupportTicket {
@@ -133,6 +152,6 @@ export interface SupportTicket {
   status: 'OPEN' | 'IN_PROGRESS' | 'CLOSED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   internal_notes?: string;
-  created_at: any;
-  updated_at: any;
+  created_at: FirebaseTimestamp;
+  updated_at: FirebaseTimestamp;
 }

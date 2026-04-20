@@ -160,8 +160,13 @@ service cloud.firestore {
     }
 
     match /categories/{id} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
+    }
+
+    match /brands/{id} {
+      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
+      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
     }
 
     match /movements/{id} {

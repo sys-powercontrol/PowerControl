@@ -33,24 +33,23 @@ import { ptBR } from "date-fns/locale";
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#f43f5e'];
 
+const StatCard = ({ title, value, icon: Icon, color, subtitle }: any) => (
+  <div className={`p-6 rounded-2xl bg-gradient-to-br ${color} text-white shadow-lg`}>
+    <div className="flex justify-between items-start mb-4">
+      <div className="p-3 bg-white/20 rounded-xl">
+        <Icon size={24} className="text-white" />
+      </div>
+    </div>
+    <h3 className="text-sm font-medium opacity-80">{title}</h3>
+    <p className="text-3xl font-bold mt-1">{value}</p>
+    <p className="text-xs mt-2 opacity-70">{subtitle}</p>
+  </div>
+);
+
 export default function GlobalDashboard() {
   const { user } = useAuth();
 
-  if (user?.role !== 'master') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Globe size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Esta página é exclusiva para o Administrador Master do sistema.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const { data: companies = [] } = useQuery({ 
     queryKey: ["companies", "all"], 
@@ -120,22 +119,23 @@ export default function GlobalDashboard() {
     };
   }, [companies, sales, users]);
 
-  const StatCard = ({ title, value, icon: Icon, color, subtitle }: any) => (
-    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-2xl ${color}`}>
-          <Icon size={24} />
+
+
+if (user?.role !== 'master') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Globe size={48} />
         </div>
-        <div className="flex items-center gap-1 text-green-600 text-xs font-bold">
-          <ArrowUpRight size={14} />
-          <span>Ativo</span>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Esta página é exclusiva para o Administrador Master do sistema.
+          </p>
         </div>
       </div>
-      <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">{title}</p>
-      <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-      <p className="text-xs mt-2 text-gray-400 font-medium">{subtitle}</p>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="space-y-8">

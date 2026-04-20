@@ -11,7 +11,8 @@ import {
   XCircle,
   ChevronDown,
   Shield,
-  Calendar
+  Calendar,
+  Trash2
 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
@@ -32,22 +33,7 @@ export default function SalesHistory() {
   const canView = hasPermission('sales.view');
   const canDelete = hasPermission('sales.delete');
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar o histórico de vendas. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const currentCompanyId = api.getCompanyId();
 
@@ -104,15 +90,58 @@ export default function SalesHistory() {
   });
 
   const cancelSaleMutation = useMutation({
-    mutationFn: (id: string) => api.put("sales", id, { status: "Cancelada" }),
+    mutationFn: async (id: string) => {
+      const dbSale = sales.find((s: any) => s.id === id);
+      if (dbSale && dbSale.status !== "Cancelada") {
+        const { reverseSalePayment } = await import("../lib/finance");
+        // We revert the payment logic
+        await reverseSalePayment(dbSale);
+        
+        // Also if needed, we'd revert the AR if it was a prazo but that's handled manually
+        // We then set status to "Cancelada"
+        await api.put("sales", id, { status: "Cancelada" });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       toast.success("Venda cancelada com sucesso!");
       setIsDetailsModalOpen(false);
       setIsCancelModalOpen(false);
       setSaleToCancel(null);
     }
   });
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
+
+  const deleteSaleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const dbSale = sales.find((s: any) => s.id === id);
+      if (dbSale && dbSale.status !== "Cancelada") {
+        const { reverseSalePayment } = await import("../lib/finance");
+        await reverseSalePayment(dbSale);
+      }
+      return api.delete("sales", id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      toast.success("Venda excluída com sucesso!");
+      setIsDetailsModalOpen(false);
+      setIsDeleteModalOpen(false);
+      setSaleToDelete(null);
+    }
+  });
+
+  const handleDeleteClick = (id: string) => {
+    setSaleToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
 
   const handleCancelClick = (id: string) => {
     setSaleToCancel(id);
@@ -135,24 +164,41 @@ export default function SalesHistory() {
     return { totalSales: total, paymentMethodTotals: totalsByMethod };
   }, [filteredSales]);
 
+if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar o histórico de vendas. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8" id="sales-history-content">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Histórico de Vendas</h1>
           <p className="text-gray-500">Consulte e gerencie todas as movimentações de venda.</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap justify-end gap-3 lg:max-w-[600px]">
           {Object.entries(paymentMethodTotals).map(([method, amount]) => (
-            <div key={method} className="bg-white px-4 py-2 flex flex-col rounded-xl border border-gray-100 shadow-sm">
+            <div key={method} className="bg-white px-4 py-2 flex flex-col rounded-xl border border-gray-100 shadow-sm min-w-[130px] flex-1 max-w-[140px]">
               <span className="text-[10px] uppercase font-bold text-gray-400">{method}</span>
               <span className="text-sm font-bold text-gray-700">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount as number)}
               </span>
             </div>
           ))}
-          <div className="bg-blue-600 px-4 py-2 flex flex-col rounded-xl border border-blue-700 shadow-sm text-white">
+          <div className="bg-blue-600 px-4 py-2 flex flex-col rounded-xl border border-blue-700 shadow-sm text-white min-w-[130px] flex-1 max-w-[140px]">
             <span className="text-[10px] uppercase font-bold text-blue-200">Total</span>
             <span className="text-sm font-bold">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSales)}
@@ -220,6 +266,18 @@ export default function SalesHistory() {
               status: 'Status',
               sale_date: 'Data'
             }}
+            summaryBlocks={[
+              {
+                label: 'Total',
+                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSales),
+                isPrimary: true
+              },
+              ...Object.entries(paymentMethodTotals).map(([method, amount]) => ({
+                label: method,
+                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount as number),
+                isPrimary: false
+              }))
+            ]}
           />
           <ExportButton 
             data={filteredSales} 
@@ -298,9 +356,19 @@ export default function SalesHistory() {
                   {sale.status !== "Cancelada" && canDelete && (
                     <button 
                       onClick={() => handleCancelClick(sale.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                      title="Cancelar Venda"
                     >
                       <XCircle size={18} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button 
+                      onClick={() => handleDeleteClick(sale.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Excluir Venda"
+                    >
+                      <Trash2 size={18} />
                     </button>
                   )}
                 </div>
@@ -400,15 +468,24 @@ export default function SalesHistory() {
               <button 
                 onClick={() => printReceipt(selectedSale, company)}
                 className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors"
+                title="Imprimir Comprovante"
               >
-                <Printer size={18} /> Imprimir Comprovante
+                <Printer size={18} />
               </button>
-              {selectedSale.status !== "Cancelada" && (
+              {selectedSale.status !== "Cancelada" && canDelete && (
                 <button 
                   onClick={() => handleCancelClick(selectedSale.id)}
-                  className="flex-1 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
+                  className="flex-1 py-3 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-100 transition-colors"
                 >
                   <XCircle size={18} /> Cancelar Venda
+                </button>
+              )}
+              {canDelete && (
+                <button 
+                  onClick={() => handleDeleteClick(selectedSale.id)}
+                  className="flex-1 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 size={18} /> Excluir
                 </button>
               )}
             </div>
@@ -421,9 +498,19 @@ export default function SalesHistory() {
         onClose={() => setIsCancelModalOpen(false)}
         onConfirm={() => saleToCancel && cancelSaleMutation.mutate(saleToCancel)}
         title="Cancelar Venda"
-        message="Tem certeza que deseja cancelar esta venda? Esta ação irá reverter o estoque dos produtos e anular o lançamento financeiro. Esta ação não pode ser desfeita."
+        message="Tem certeza que deseja cancelar esta venda? Esta ação irá estornar o pagamento que a venda gerou no caixa. Esta ação não pode ser desfeita."
         confirmText="Sim, Cancelar"
         isLoading={cancelSaleMutation.isPending}
+      />
+
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => saleToDelete && deleteSaleMutation.mutate(saleToDelete)}
+        title="Excluir Venda"
+        message="ATENÇÃO: Tem certeza que deseja excluir completamente esta venda? O registro será deletado permanentemente do banco de dados e o pagamento que a venda gerou no caixa será retirado. Esta ação não pode ser desfeita."
+        confirmText="Sim, Excluir"
+        isLoading={deleteSaleMutation.isPending}
       />
     </div>
   );

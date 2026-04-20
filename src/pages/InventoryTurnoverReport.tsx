@@ -36,22 +36,7 @@ export default function InventoryTurnoverReport() {
 
   const canView = hasPermission('reports.view');
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Package size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar o relatório de giro de estoque. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const currentCompanyId = api.getCompanyId();
 
@@ -161,6 +146,23 @@ export default function InventoryTurnoverReport() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Package size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar o relatório de giro de estoque. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
       </div>
     );
   }

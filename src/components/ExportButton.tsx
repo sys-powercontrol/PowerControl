@@ -55,7 +55,35 @@ export default function ExportButton({
 
   const exportToExcel = (preparedData: any[]) => {
     try {
-      const worksheet = XLSX.utils.json_to_sheet(preparedData);
+      const wsData: any[][] = [];
+      
+      if (title) {
+        wsData.push([title]);
+        wsData.push([`Gerado em: ${formatBR(getNowBR(), "dd/MM/yyyy HH:mm")}`]);
+        wsData.push([]);
+      }
+
+      if (summaryBlocks && summaryBlocks.length > 0) {
+        // Group summary blocks by 4 per row
+        const chunkSize = 4;
+        for (let i = 0; i < summaryBlocks.length; i += chunkSize) {
+          const chunk = summaryBlocks.slice(i, i + chunkSize);
+          wsData.push(chunk.map((b) => b.label.toUpperCase()));
+          wsData.push(chunk.map((b) => b.value));
+          wsData.push([]); // spacer
+        }
+      }
+
+      if (preparedData.length > 0) {
+        const tableHeaders = Object.keys(preparedData[0]);
+        wsData.push(tableHeaders);
+        
+        preparedData.forEach(item => {
+          wsData.push(Object.values(item));
+        });
+      }
+
+      const worksheet = XLSX.utils.aoa_to_sheet(wsData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Dados");
       XLSX.writeFile(workbook, `${filename}.xlsx`);
@@ -83,9 +111,13 @@ export default function ExportButton({
 
       if (summaryBlocks && summaryBlocks.length > 0) {
         const pageWidth = doc.internal.pageSize.getWidth();
-        let currentX = pageWidth - 14; 
-
-        // Draw backwards to stack them horizontally on the right
+        const baseCurrentX = pageWidth - 14; 
+        
+        let currentY = 15;
+        let blocksInCurrentRow = 0;
+        let currentX = baseCurrentX;
+        
+        // Iterate backwards through the original array to render from right to left
         for (let i = summaryBlocks.length - 1; i >= 0; i--) {
           const block = summaryBlocks[i];
           
@@ -107,22 +139,34 @@ export default function ExportButton({
             doc.setFillColor(243, 244, 246);
           }
           
-          doc.roundedRect(currentX, 15, blockWidth, blockHeight, 1.5, 1.5, 'F');
+          doc.roundedRect(currentX, currentY, blockWidth, blockHeight, 1.5, 1.5, 'F');
           
           if (block.isPrimary) doc.setTextColor(191, 219, 254);
           else doc.setTextColor(156, 163, 175);
           doc.setFontSize(7);
-          doc.text(block.label.toUpperCase(), currentX + 6, 20);
+          doc.text(block.label.toUpperCase(), currentX + 6, currentY + 5);
           
           if (block.isPrimary) doc.setTextColor(255, 255, 255);
           else doc.setTextColor(55, 65, 81);
           doc.setFontSize(9);
-          doc.text(block.value, currentX + 6, 26);
+          doc.text(block.value, currentX + 6, currentY + 11);
           
           currentX -= 4; 
+          blocksInCurrentRow++;
+
+          if (blocksInCurrentRow >= 4 && i > 0) { // Move to next row
+             currentY += blockHeight + 4;
+             currentX = baseCurrentX;
+             blocksInCurrentRow = 0;
+             startY = currentY + blockHeight + 5;
+          }
         }
         
-        startY = 40; 
+        if (blocksInCurrentRow > 0 && startY === 35) {
+            startY = currentY + 19;
+        } else if (blocksInCurrentRow > 0) {
+            startY = currentY + 19;
+        }
       }
 
       const tableHeaders = Object.keys(preparedData[0]);

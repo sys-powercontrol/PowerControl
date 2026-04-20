@@ -74,21 +74,7 @@ export default function AdminMaster() {
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  if (currentUser?.role !== 'master') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Crown size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Esta página é exclusiva para o Administrador Master do sistema.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const { data: users = [] } = useQuery({ queryKey: ["users", "all"], queryFn: () => api.get("users", { _all: true }) });
   const { data: companies = [] } = useQuery({ queryKey: ["companies", "all"], queryFn: () => api.get("companies", { _all: true }) });
@@ -132,8 +118,8 @@ export default function AdminMaster() {
         state: data.uf
       }));
       toast.success("Endereço encontrado!");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao buscar CEP");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao buscar CEP");
     } finally {
       setIsSearchingCEP(false);
     }
@@ -163,8 +149,8 @@ export default function AdminMaster() {
         cnae: data.atividade_principal?.[0]?.code
       }));
       toast.success("Dados da empresa encontrados!");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao buscar CNPJ");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao buscar CNPJ");
     } finally {
       setIsSearchingCNPJ(false);
     }
@@ -246,7 +232,7 @@ export default function AdminMaster() {
       await api.log({
         action: editingUser ? 'UPDATE' : 'CREATE',
         entity: 'users',
-        entity_id: result.id,
+        entity_id: String(result.id),
         description: `${editingUser ? 'Atualizou' : 'Criou'} usuário ${data.full_name}`,
         metadata: { ...data, password: '***' }
       });
@@ -271,7 +257,7 @@ export default function AdminMaster() {
       await api.log({
         action: editingCompany ? 'UPDATE' : 'CREATE',
         entity: 'companies',
-        entity_id: result.id,
+        entity_id: String(result.id),
         description: `${editingCompany ? 'Atualizou' : 'Criou'} empresa ${data.name}`,
         metadata: data
       });
@@ -333,6 +319,22 @@ export default function AdminMaster() {
       reader.readAsDataURL(file);
     }
   };
+
+if (currentUser?.role !== 'master') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Crown size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Esta página é exclusiva para o Administrador Master do sistema.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -561,7 +563,7 @@ export default function AdminMaster() {
                         <td className="px-8 py-4">
                           <div className="flex items-center gap-1 text-green-600 font-bold text-sm">
                             <ArrowUpRight size={14} />
-                            <span>{Math.floor(Math.random() * 20) + 5}%</span>
+                            <span>{5 + (c.name.charCodeAt(0) % 20 || 0)}%</span>
                           </div>
                         </td>
                         <td className="px-8 py-4 text-right">

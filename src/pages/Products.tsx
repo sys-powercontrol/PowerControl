@@ -20,10 +20,21 @@ import BOMBuilder from "../components/BOMBuilder";
 import LabelPrinter from "../components/LabelPrinter";
 import ExportButton from "../components/ExportButton";
 
-export default function Products() {
+interface ProductsProps {
+  defaultTab?: string;
+}
+
+export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("Produtos");
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  React.useEffect(() => {
+    if (defaultTab && defaultTab !== activeTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);

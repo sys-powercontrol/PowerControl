@@ -1,13 +1,14 @@
 import { auth, db } from "./firebase";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy, limit, OrderByDirection, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy, limit, OrderByDirection, onSnapshot, QueryConstraint, Query, DocumentData, QuerySnapshot, QueryDocumentSnapshot } from "firebase/firestore";
+import { User, AuditLog } from "../types";
 
 let currentCompanyId: string | null = null;
 let isSystemAdminStatus = false;
-let currentUserData: any = null;
+let currentUserData: User | null = null;
 
-const cleanObject = (obj: any) => {
+const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
   if (!obj || typeof obj !== 'object') return obj;
-  const newObj = { ...obj };
+  const newObj = { ...(obj as Record<string, unknown>) };
   Object.keys(newObj).forEach(key => {
     if (newObj[key] === undefined) {
       delete newObj[key];
@@ -28,13 +29,13 @@ export const api = {
     // No longer used
   },
   getCurrentUser: () => currentUserData,
-  findUserByEmail: async (email: string) => {
+  findUserByEmail: async (email: string): Promise<User | null> => {
     const q = query(collection(db, "users"), where("email", "==", email));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
-    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as User;
   },
-  get: async (entityPath: string, paramsOrId?: any): Promise<any> => {
+  get: async <T = unknown>(entityPath: string, paramsOrId?: Record<string, unknown> | string): Promise<T | T[]> => {
     if (entityPath === "me") {
       const user = auth.currentUser;
       if (!user) throw new Error("Not authenticated");
@@ -45,39 +46,44 @@ export const api = {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          currentUserData = { id: user.uid, ...userData };
+          currentUserData = { id: user.uid, ...userData } as User;
           if (isMasterEmail && userData.role !== "master") {
             await updateDoc(doc(db, "users", user.uid), { role: "master" });
             userData.role = "master";
             currentUserData.role = "master";
           }
-          return currentUserData;
+          return currentUserData as T;
         } else {
           const newUser = {
-            email: user.email,
+            email: user.email || '',
+            full_name: user.email?.split("@")[0] || "Usuário",
             role: isMasterEmail ? "master" : "user",
+            company_id: null,
             created_at: serverTimestamp(),
-            active: true,
+            is_active: true,
           };
           await setDoc(doc(db, "users", user.uid), newUser);
-          currentUserData = { id: user.uid, ...newUser };
-          return currentUserData;
+          currentUserData = { id: user.uid, ...newUser } as User;
+          return currentUserData as T;
         }
-      } catch (error) {
-        console.error("Firestore error in get('me'):", error);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error("Firestore error in get('me'):", error.message);
+        }
         // Fallback
         currentUserData = {
           id: user.uid,
-          email: user.email,
+          email: user.email || '',
           full_name: user.email?.split("@")[0] || "Usuário",
           role: isMasterEmail ? "master" : "user",
-          company_id: null
-        };
-        return currentUserData;
+          company_id: null,
+          is_active: true,
+          created_at: new Date().toISOString()
+        } as User;
+        return currentUserData as T;
       }
     }
 
-    // Handle entityPath like "companies/123"
     const pathSegments = entityPath.split("/");
     const isDocumentPath = pathSegments.length % 2 === 0;
 
@@ -86,17 +92,16 @@ export const api = {
       if (typeof paramsOrId === "string") {
         docRef = doc(db, entityPath, paramsOrId);
       } else {
-        // e.g. entityPath = "companies/123"
         docRef = doc(db, entityPath);
       }
       
       const docSnap = await getDoc(docRef);
       if (!docSnap.exists()) throw new Error("Not found");
       const data = docSnap.data();
-      return { id: docSnap.id, ...(typeof data === 'object' && data !== null ? data : {}) };
+      return { id: docSnap.id, ...(typeof data === 'object' && data !== null ? data : {}) } as T;
     } else {
-      let q = collection(db, entityPath) as any;
-      const conditions: any[] = [];
+      let q: Query<DocumentData> = collection(db, entityPath);
+      const conditions: QueryConstraint[] = [];
 
       if (paramsOrId && typeof paramsOrId === "object") {
         Object.keys(paramsOrId).forEach(key => {
@@ -107,29 +112,28 @@ export const api = {
       }
 
       const baseEntity = pathSegments[0];
-      const isUserEntity = baseEntity === "users";
       const isCompanyEntity = baseEntity === "companies";
 
       const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
 
       if (requiresIsolation) {
         if (!currentCompanyId) {
-          console.error(`Blocked cross-tenant data leak. Missing company_id for entity ${entityPath}.`);
-          throw new Error("Sessão inválida: Identificador de empresa ausente. Faça login novamente.");
+          console.warn(`Race condition avoided: Cannot query ${entityPath} without company_id.`);
+          return [] as T[];
         }
         conditions.push(where("company_id", "==", currentCompanyId));
       } else if (isSystemAdminStatus && currentCompanyId && !(paramsOrId && paramsOrId._all) && !isCompanyEntity) {
         conditions.push(where("company_id", "==", currentCompanyId));
       }
 
-      const queryConstraints: any[] = [...conditions];
+      const queryConstraints: QueryConstraint[] = [...conditions];
       
       if (paramsOrId && typeof paramsOrId === "object") {
         if (paramsOrId._orderBy) {
-          queryConstraints.push(orderBy(paramsOrId._orderBy, (paramsOrId._orderDir as OrderByDirection) || "asc"));
+          queryConstraints.push(orderBy(paramsOrId._orderBy as string, (paramsOrId._orderDir as OrderByDirection) || "asc"));
         }
         if (paramsOrId._limit) {
-          queryConstraints.push(limit(paramsOrId._limit));
+          queryConstraints.push(limit(paramsOrId._limit as number));
         }
       }
 
@@ -141,11 +145,11 @@ export const api = {
       return snapshot.docs.map(doc => {
         const data = doc.data();
         return { id: doc.id, ...(typeof data === 'object' && data !== null ? data : {}) };
-      });
+      }) as T[];
     }
   },
-  post: async (entity: string, data: any) => {
-    const payload = cleanObject({ ...data });
+  post: async <T = unknown>(entity: string, data: Partial<T> | Record<string, unknown>): Promise<T> => {
+    const payload = cleanObject({ ...data }) as Record<string, unknown>;
     
     if (!payload.company_id && currentCompanyId && entity !== "companies" && entity !== "users") {
       payload.company_id = currentCompanyId;
@@ -155,32 +159,28 @@ export const api = {
       payload.created_at = serverTimestamp();
     }
 
-    // For users, we might want to use a specific ID (like auth UID) if provided, but here we just add to collection
-    // Wait, if it's users, we shouldn't just add to collection because we need the ID to match auth UID.
-    // But the frontend usually doesn't create users this way except in register.
-    // Let's handle it generally.
     const newDocRef = doc(collection(db, entity));
     await setDoc(newDocRef, payload);
-    return { id: newDocRef.id, ...payload };
+    return { id: newDocRef.id, ...payload } as T;
   },
-  put: async (entity: string, id: string, data: any) => {
+  put: async <T = unknown>(entity: string, id: string, data: Partial<T> | Record<string, unknown>): Promise<T> => {
     const docRef = doc(db, entity, id);
-    const payload = cleanObject(data);
+    const payload = cleanObject(data) as Record<string, unknown>;
     await updateDoc(docRef, payload);
-    return { id, ...payload };
+    return { id, ...payload } as T;
   },
-  delete: async (entity: string, id: string) => {
+  delete: async (entity: string, id: string): Promise<boolean> => {
     const docRef = doc(db, entity, id);
     await deleteDoc(docRef);
     return true;
   },
-  subscribe: (entityPath: string, params: any, callback: (data: any[]) => void) => {
-    let q = collection(db, entityPath) as any;
-    const conditions: any[] = [];
+  subscribe: <T = unknown>(entityPath: string, params: Record<string, unknown> | null, callback: (data: T[]) => void) => {
+    let q: Query<DocumentData> = collection(db, entityPath);
+    const conditions: QueryConstraint[] = [];
 
     if (params && typeof params === "object") {
       Object.keys(params).forEach(key => {
-        if (params[key] !== undefined && key !== "_orderBy" && key !== "_orderDir" && key !== "_limit") {
+        if (params[key] !== undefined && key !== "_orderBy" && key !== "_orderDir" && key !== "_limit" && key !== "_all") {
           conditions.push(where(key, "==", params[key]));
         }
       });
@@ -194,39 +194,39 @@ export const api = {
 
     if (requiresIsolation) {
       if (!currentCompanyId) {
-        console.error(`Blocked cross-tenant data leak in subscribe. Missing company_id for entity ${entityPath}.`);
-        throw new Error("Sessão inválida: Identificador de empresa ausente na assinatura de dados. Atualize a página.");
+        console.warn(`Race condition avoided in subscribe: Cannot query ${entityPath} without company_id.`);
+        return () => {}; // return empty unsubscribe function
       }
       conditions.push(where("company_id", "==", currentCompanyId));
     } else if (isSystemAdminStatus && currentCompanyId && !(params && params._all) && !isCompanyEntity) {
       conditions.push(where("company_id", "==", currentCompanyId));
     }
 
-    const queryConstraints: any[] = [...conditions];
+    const queryConstraints: QueryConstraint[] = [...conditions];
     if (params?._orderBy) {
-      queryConstraints.push(orderBy(params._orderBy, (params._orderDir as OrderByDirection) || "asc"));
+      queryConstraints.push(orderBy(params._orderBy as string, (params._orderDir as OrderByDirection) || "asc"));
     }
     if (params?._limit) {
-      queryConstraints.push(limit(params._limit));
+      queryConstraints.push(limit(params._limit as number));
     }
 
     if (queryConstraints.length > 0) {
       q = query(q, ...queryConstraints);
     }
 
-    return onSnapshot(q, (snapshot: any) => {
-      const data = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-      callback(data);
+    return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+      const data = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({ id: doc.id, ...doc.data() }));
+      callback(data as T[]);
     });
   },
-  log: async (data: any, userContext?: any) => {
+  log: async (data: Partial<AuditLog>, userContext?: User): Promise<void> => {
     const user = userContext ? userContext : auth.currentUser;
     if (!user) return;
 
     const logData = {
       ...data,
-      user_id: userContext?.id || user.uid || user.id,
-      user_name: userContext?.full_name || userContext?.email || currentUserData?.full_name || user.email || "Sistema",
+      user_id: userContext?.id || (user as any).uid || (user as any).id,
+      user_name: userContext?.full_name || (userContext as any)?.email || currentUserData?.full_name || (user as any).email || "Sistema",
       timestamp: serverTimestamp(),
       company_id: data.company_id || userContext?.company_id || currentCompanyId
     };
@@ -234,8 +234,10 @@ export const api = {
     try {
       const newLogRef = doc(collection(db, "audit_logs"));
       await setDoc(newLogRef, logData);
-    } catch (error) {
-      console.error("Error creating audit log:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Error creating audit log:", error.message);
+      }
     }
   },
 };

@@ -42,40 +42,11 @@ export default function AuditLogs() {
   });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar os logs de auditoria. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const isAdminMaster = currentUser?.role === 'master';
 
-  if (!isAdminMaster) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Esta página é exclusiva para o Administrador Master do sistema.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const { data: logs = [], isLoading } = useQuery({ 
     queryKey: ["audit_logs", "all"], 
@@ -103,8 +74,8 @@ export default function AuditLogs() {
       const matchesUser = !selectedUserId || log.user_id === selectedUserId;
       const matchesAction = !selectedAction || log.action === selectedAction;
       
-      const logDate = log.timestamp?.seconds 
-        ? new Date(log.timestamp.seconds * 1000) 
+      const logDate = (log.timestamp as any)?.seconds 
+        ? new Date((log.timestamp as any).seconds * 1000) 
         : new Date();
         
       const matchesDate = isWithinInterval(logDate, {
@@ -161,6 +132,39 @@ export default function AuditLogs() {
       </div>
     );
   };
+
+if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar os logs de auditoria. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+if (!isAdminMaster) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Esta página é exclusiva para o Administrador Master do sistema.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -306,8 +310,8 @@ export default function AuditLogs() {
               ) : filteredLogs.map((log: AuditLog) => (
                 <tr key={log.id} className="text-sm hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
-                    {log.timestamp?.seconds 
-                      ? formatBR(log.timestamp.seconds * 1000, 'dd/MM/yy HH:mm') 
+                    {(log.timestamp as any)?.seconds 
+                      ? formatBR((log.timestamp as any).seconds * 1000, 'dd/MM/yy HH:mm') 
                       : 'Agora'}
                   </td>
                   <td className="px-6 py-4">
@@ -382,8 +386,8 @@ export default function AuditLogs() {
                 <div className="space-y-1">
                   <p className="text-xs font-bold text-gray-400 uppercase">Data/Hora</p>
                   <p className="font-medium text-gray-900">
-                    {selectedLog.timestamp?.seconds 
-                      ? formatBR(selectedLog.timestamp.seconds * 1000, 'dd/MM/yyyy HH:mm:ss') 
+                    {(selectedLog.timestamp as any)?.seconds 
+                      ? formatBR((selectedLog.timestamp as any).seconds * 1000, 'dd/MM/yyyy HH:mm:ss') 
                       : 'Agora'}
                   </p>
                 </div>

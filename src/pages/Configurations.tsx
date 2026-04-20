@@ -56,26 +56,14 @@ export default function Configurations() {
   const [allowNegativeStock, setAllowNegativeStock] = useState(company.allow_negative_stock === "true" || company.allow_negative_stock === true);
 
   useEffect(() => {
-    setDisableImages(company.disable_product_images === "true" || company.disable_product_images === true);
+    setTimeout(() => setDisableImages(company.disable_product_images === "true" || company.disable_product_images === true), 0);
   }, [company.disable_product_images]);
 
   useEffect(() => {
-    setAllowNegativeStock(company.allow_negative_stock === "true" || company.allow_negative_stock === true);
+    setTimeout(() => setAllowNegativeStock(company.allow_negative_stock === "true" || company.allow_negative_stock === true), 0);
   }, [company.allow_negative_stock]);
 
-  if (!canManage) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
-        <p className="text-gray-500 max-w-md">
-          Esta página é restrita a usuários autorizados. Entre em contato com o administrador para solicitar acesso.
-        </p>
-      </div>
-    );
-  }
+  
 
   const saveData = (data: any) => {
     if (!companyId) return;
@@ -134,7 +122,7 @@ export default function Configurations() {
     if (!companyId) return;
 
     const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
+    const data: Record<string, any> = Object.fromEntries(formData.entries());
 
     // Handle role permissions specially
     if (activeTab === "permissions") {
@@ -182,6 +170,20 @@ export default function Configurations() {
     { id: "permissions", name: "Permissões", icon: ShieldCheck },
     { id: "security", name: "Segurança", icon: Shield },
   ];
+
+if (!canManage) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
+        <p className="text-gray-500 max-w-md">
+          Esta página é restrita a usuários autorizados. Entre em contato com o administrador para solicitar acesso.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

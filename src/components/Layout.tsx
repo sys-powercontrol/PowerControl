@@ -107,6 +107,8 @@ export default function Layout() {
       requiresCompany: true,
       submenu: [
         { name: "Produtos", path: "/Produtos", permission: 'products.view' },
+        { name: "Categorias", path: "/Categorias", permission: 'products.view' },
+        { name: "Marcas", path: "/Marcas", permission: 'products.view' },
         { name: "Serviços", path: "/Servicos", permission: 'products.view' },
         { name: "Ajustes de Estoque", path: "/AjustesEstoque", permission: 'inventory.manage' },
         { name: "Histórico de Estoque", path: "/HistoricoEstoque", icon: History, permission: 'inventory.manage' },

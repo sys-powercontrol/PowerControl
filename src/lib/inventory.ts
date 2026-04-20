@@ -1,10 +1,11 @@
 import { api } from "./api";
-import { InventoryMovement } from "../types";
+import { InventoryMovement, User, SaleItem, Sale } from "../types";
 import { serverTimestamp, runTransaction, doc, collection } from "firebase/firestore";
 import { db } from "./firebase";
 
-const cleanObject = (obj: any) => {
-  const newObj = { ...obj };
+const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const newObj = { ...(obj as Record<string, unknown>) };
   Object.keys(newObj).forEach(key => {
     if (newObj[key] === undefined) {
       delete newObj[key];
@@ -14,8 +15,8 @@ const cleanObject = (obj: any) => {
 };
 
 export const inventory = {
-  async recordMovement(data: Omit<InventoryMovement, "id" | "timestamp" | "user_id" | "user_name" | "previous_stock" | "current_stock">, userContext?: any) {
-    const user = userContext || api.getCurrentUser();
+  async recordMovement(data: Omit<InventoryMovement, "id" | "timestamp" | "user_id" | "user_name" | "previous_stock" | "current_stock">, userContext?: User) {
+    const user = userContext || await api.get<User>("me");
     if (!user) throw new Error("Usuário não autenticado");
 
     return runTransaction(db, async (transaction) => {
@@ -39,26 +40,27 @@ export const inventory = {
 
       // 4. Record movement
       const movementRef = doc(collection(db, "inventory_movements"));
-      const movement: any = cleanObject({
+      const movement = cleanObject({
         ...data,
         previous_stock,
         current_stock,
         user_id: user.id,
         user_name: user.full_name || user.email || "Sistema",
         timestamp: serverTimestamp()
-      });
+      }) as Record<string, unknown>;
 
       transaction.set(movementRef, movement);
       return { id: movementRef.id, ...movement };
     });
   },
 
-  async processSale(saleData: any, items: any[], userContext?: any) {
-    const user = userContext || api.getCurrentUser();
+  async processSale(saleData: Partial<Sale> & Record<string, unknown>, items: SaleItem[], userContext?: User) {
+    const user = userContext || await api.get<User>("me");
     if (!user) throw new Error("Usuário não autenticado");
 
     return runTransaction(db, async (transaction) => {
       // 1. Get company settings
+      if (!user.company_id) throw new Error("Usuário sem empresa vinculada");
       const companyRef = doc(db, "companies", user.company_id);
       const companyDoc = await transaction.get(companyRef);
       const companyData = companyDoc.data() || {};
@@ -72,7 +74,7 @@ export const inventory = {
 
       if (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado" && (saleData.cashier_id || saleData.bank_account_id)) {
         const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
-        const accountId = saleData.bank_account_id || saleData.cashier_id;
+        const accountId = (saleData.bank_account_id || saleData.cashier_id) as string;
         accountRef = doc(db, collectionName, accountId);
         accountDoc = await transaction.get(accountRef);
         if (!accountDoc.exists()) throw new Error(`Conta de destino (${collectionName}) não encontrada.`);
@@ -168,7 +170,7 @@ export const inventory = {
 
           // Record movement
           const movementRef = doc(collection(db, "inventory_movements"));
-          const movement: any = {
+          const movement = {
             product_id: item.id,
             product_name: item.name,
             company_id: user.company_id,
@@ -193,7 +195,8 @@ export const inventory = {
         user_name: user.full_name || user.email || "Sistema",
         company_id: user.company_id, // ensure company_id comes from context
         created_at: serverTimestamp()
-      });
+      }) as Record<string, unknown>;
+      
       transaction.set(saleRef, finalSaleData);
 
       // 5. Create financial record if "A Prazo" or "Fiado"
@@ -244,11 +247,13 @@ export const inventory = {
     });
   },
 
-  async processPurchase(purchaseData: any, items: any[], userContext?: any) {
-    const user = userContext || api.getCurrentUser();
+  async processPurchase(purchaseData: Record<string, unknown>, items: SaleItem[], userContext?: User) {
+    const user = userContext || await api.get<User>("me");
     if (!user) throw new Error("Usuário não autenticado");
 
     return runTransaction(db, async (transaction) => {
+      if (!user.company_id) throw new Error("Usuário sem empresa vinculada");
+        
       // 1. Read all products and accounts FIRST
       const productDocs = new Map();
       let accountDoc = null;
@@ -256,7 +261,7 @@ export const inventory = {
 
       if (purchaseData.payment_status !== "Pendente" && (purchaseData.bank_account_id || purchaseData.cashier_id)) {
         const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
-        const accountId = purchaseData.bank_account_id || purchaseData.cashier_id;
+        const accountId = (purchaseData.bank_account_id || purchaseData.cashier_id) as string;
         accountRef = doc(db, collectionName, accountId);
         accountDoc = await transaction.get(accountRef);
         if (!accountDoc.exists()) throw new Error(`Conta de origem (${collectionName}) não encontrada.`);
@@ -290,7 +295,7 @@ export const inventory = {
 
         // Record movement
         const movementRef = doc(collection(db, "inventory_movements"));
-        const movement: any = {
+        const movement = {
           product_id: item.id,
           product_name: item.name,
           company_id: user.company_id,
@@ -314,7 +319,8 @@ export const inventory = {
         user_name: user.full_name || user.email || "Sistema",
         company_id: user.company_id,
         created_at: serverTimestamp()
-      });
+      }) as Record<string, unknown>;
+      
       transaction.set(purchaseRef, finalPurchaseData);
 
       // 4. Create financial record if "Pendente"
@@ -332,10 +338,11 @@ export const inventory = {
           created_at: serverTimestamp()
         });
       } else if (accountDoc && accountRef) {
+        const amountValue = Number(purchaseData.total) || 0;
         // Update balance for immediate payments
         const accountData = accountDoc.data();
         const currentBalance = accountData.balance || 0;
-        const newBalance = currentBalance - (purchaseData.total || 0);
+        const newBalance = currentBalance - amountValue;
 
         if (isNaN(newBalance)) {
           throw new Error("Erro ao calcular novo saldo: valor inválido.");
@@ -351,7 +358,7 @@ export const inventory = {
           company_id: user.company_id,
           type: "Saída",
           description: `Compra #${purchaseRef.id.substr(0, 8).toUpperCase()}`,
-          amount: purchaseData.total,
+          amount: amountValue,
           from_account_type: purchaseData.bank_account_id ? 'Banco' : 'Caixa',
           from_account_id: purchaseData.bank_account_id || purchaseData.cashier_id,
           from_account_name: accountData.name || "Conta Desconhecida",

@@ -36,13 +36,24 @@ import { Link } from "react-router-dom";
 
 const COLORS = ['#2563EB', '#10B981', '#F59E0B', '#8B5CF6'];
 
+const StatCard = ({ title, value, icon: Icon, color, subtitle }: any) => (
+  <div className={`p-6 rounded-2xl bg-gradient-to-br ${color} text-white shadow-lg`}>
+    <div className="flex justify-between items-start mb-4">
+      <div className="p-3 bg-white/20 rounded-xl">
+        <Icon size={24} className="text-white" />
+      </div>
+    </div>
+    <h3 className="text-sm font-medium opacity-80">{title}</h3>
+    <p className="text-3xl font-bold mt-1">{value}</p>
+    <p className="text-xs mt-2 opacity-70">{subtitle}</p>
+  </div>
+);
+
 export default function Dashboard() {
   const { user, hasPermission } = useAuth();
   const currentCompanyId = api.getCompanyId();
 
-  if (!hasPermission('dashboard.view')) {
-    return <SellerDashboard />;
-  }
+
 
   const { data: salesData = [] } = useQuery({ 
     queryKey: ["sales", currentCompanyId], 
@@ -137,18 +148,11 @@ export default function Dashboard() {
     };
   });
 
-  const StatCard = ({ title, value, icon: Icon, color, subtitle }: any) => (
-    <div className={`p-6 rounded-2xl bg-gradient-to-br ${color} text-white shadow-lg`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2 bg-white/20 rounded-lg">
-          <Icon size={24} />
-        </div>
-      </div>
-      <h3 className="text-sm font-medium opacity-80">{title}</h3>
-      <p className="text-3xl font-bold mt-1">{value}</p>
-      <p className="text-xs mt-2 opacity-70">{subtitle}</p>
-    </div>
-  );
+
+
+  if (!hasPermission('dashboard.view')) {
+    return <SellerDashboard />;
+  }
 
   return (
     <div className="space-y-8">

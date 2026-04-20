@@ -32,22 +32,7 @@ export default function Clients() {
 
   const canView = hasPermission('sales.view');
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Users size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar os clientes. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const currentCompanyId = api.getCompanyId();
 
@@ -99,8 +84,8 @@ export default function Clients() {
         state: data.uf
       });
       toast.success("Endereço encontrado!");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao buscar CEP");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao buscar CEP");
     } finally {
       setIsSearchingCEP(false);
     }
@@ -131,6 +116,23 @@ export default function Clients() {
       });
     }
   };
+
+if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Users size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar os clientes. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

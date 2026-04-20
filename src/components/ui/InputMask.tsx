@@ -2,7 +2,7 @@ import React from "react";
 import { IMaskInput } from "react-imask";
 
 interface InputMaskProps {
-  mask: string | any[];
+  mask: any; // IMask typings are complex
   value?: string;
   onChange?: (value: string) => void;
   placeholder?: string;

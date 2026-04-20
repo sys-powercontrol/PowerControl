@@ -29,22 +29,7 @@ export default function Purchases() {
 
   const canManage = hasPermission('inventory.manage');
 
-  if (!canManage) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Truck size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para realizar compras. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const currentCompanyId = user?.company_id || api.getCompanyId();
 
@@ -99,7 +84,7 @@ export default function Purchases() {
     p.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const total = useMemo(() => cart.reduce((acc, item) => acc + (item.cost * item.quantity), 0), [cart]);
+  const total = useMemo(() => cart.reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0), [cart]);
 
   const addToCart = (product: any) => {
     setCart(prev => {
@@ -107,7 +92,7 @@ export default function Purchases() {
       if (existing) {
         return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, cost: product.cost || 0, quantity: 1 }];
     });
   };
 
@@ -196,6 +181,23 @@ export default function Purchases() {
     }
   });
 
+if (!canManage) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Truck size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para realizar compras. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-6">
@@ -276,7 +278,7 @@ export default function Purchases() {
                         type="number" 
                         step="0.01"
                         className="w-20 px-2 py-0.5 text-xs border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500"
-                        value={item.cost}
+                        value={item.cost ?? 0}
                         onChange={(e) => updateCost(item.id, parseFloat(e.target.value) || 0)}
                       />
                     </div>

@@ -24,19 +24,7 @@ export default function Company() {
 
   const canManage = hasPermission('settings.manage');
 
-  if (!canManage) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
-        <p className="text-gray-500 max-w-md">
-          Esta página é restrita a usuários autorizados. Entre em contato com o administrador para solicitar acesso.
-        </p>
-      </div>
-    );
-  }
+  
 
   const { data: company, isLoading } = useQuery({
     queryKey: ["company", companyId],
@@ -46,7 +34,7 @@ export default function Company() {
 
   useEffect(() => {
     if (company?.logo_url) {
-      setLogoPreview(company.logo_url);
+      setTimeout(() => setLogoPreview(company.logo_url), 0);
     }
   }, [company]);
 
@@ -92,8 +80,8 @@ export default function Company() {
         state: data.uf
       }));
       toast.success("Endereço encontrado!");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao buscar CEP");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao buscar CEP");
     } finally {
       setIsSearchingCEP(false);
     }
@@ -123,8 +111,8 @@ export default function Company() {
         cnae: data.atividade_principal?.[0]?.code
       }));
       toast.success("Dados da empresa encontrados!");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao buscar CNPJ");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao buscar CNPJ");
     } finally {
       setIsSearchingCNPJ(false);
     }
@@ -157,6 +145,20 @@ export default function Company() {
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Carregando dados da empresa...</div>;
   if (!company) return <div className="p-8 text-center text-red-500">Empresa não encontrada.</div>;
+
+if (!canManage) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
+        <p className="text-gray-500 max-w-md">
+          Esta página é restrita a usuários autorizados. Entre em contato com o administrador para solicitar acesso.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">

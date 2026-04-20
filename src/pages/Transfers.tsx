@@ -24,22 +24,7 @@ export default function Transfers() {
 
   const canManage = hasPermission('finance.manage');
 
-  if (!canManage) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar as transferências. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [movementType, setMovementType] = useState("Transferência");
@@ -145,6 +130,23 @@ export default function Transfers() {
     m.from_account_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.to_account_name?.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a: any, b: any) => new Date(b.movement_date).getTime() - new Date(a.movement_date).getTime());
+
+if (!canManage) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar as transferências. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

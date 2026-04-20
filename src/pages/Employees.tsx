@@ -30,19 +30,7 @@ export default function Employees() {
 
   const canManage = hasPermission('employees.manage');
 
-  if (!canManage) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
-        <p className="text-gray-500 max-w-md">
-          Esta página é restrita a usuários autorizados. Entre em contato com o administrador para solicitar acesso.
-        </p>
-      </div>
-    );
-  }
+  
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
@@ -125,6 +113,20 @@ export default function Employees() {
       setIsUnlinking(false);
     }
   };
+
+if (!canManage) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
+        <p className="text-gray-500 max-w-md">
+          Esta página é restrita a usuários autorizados. Entre em contato com o administrador para solicitar acesso.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

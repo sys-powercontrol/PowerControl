@@ -164,9 +164,12 @@ async function emitFocusNFe(config: FiscalConfig, data: FiscalInvoiceData) {
       protocol: response.data.protocolo,
       access_key: response.data.chave_nfe
     };
-  } catch (error: any) {
-    console.error("FocusNFe Error:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.mensagem || "Erro ao comunicar com FocusNFe");
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("FocusNFe Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.mensagem || "Erro ao comunicar com FocusNFe", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao comunicar com FocusNFe", { cause: err });
   }
 }
 
@@ -239,9 +242,12 @@ async function emitWebmaniaBR(config: FiscalConfig, data: FiscalInvoiceData) {
       protocol: response.data.uuid,
       access_key: response.data.chave
     };
-  } catch (error: any) {
-    console.error("WebmaniaBR Error:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.error || "Erro ao comunicar com WebmaniaBR");
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("WebmaniaBR Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.error || "Erro ao comunicar com WebmaniaBR", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao comunicar com WebmaniaBR", { cause: err });
   }
 }
 
@@ -273,9 +279,12 @@ async function checkWebmaniaBRStatus(config: FiscalConfig, uuid: string) {
       pdf_url: response.data.danfe,
       error_message: response.data.motivo
     };
-  } catch (error: any) {
-    console.error("WebmaniaBR Status Error:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.error || "Erro ao consultar status na WebmaniaBR");
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("WebmaniaBR Status Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.error || "Erro ao consultar status na WebmaniaBR", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao consultar status na WebmaniaBR", { cause: err });
   }
 }
 
@@ -300,9 +309,12 @@ async function cancelWebmaniaBR(config: FiscalConfig, uuid: string, reason: stri
       status: response.data.status === "success" ? "cancelado" : "erro",
       message: response.data.error || response.data.status
     };
-  } catch (error: any) {
-    console.error("WebmaniaBR Cancel Error:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.error || "Erro ao cancelar na WebmaniaBR");
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("WebmaniaBR Cancel Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.error || "Erro ao cancelar na WebmaniaBR", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao cancelar na WebmaniaBR", { cause: err });
   }
 }
 
@@ -326,9 +338,12 @@ async function checkFocusNFeStatus(config: FiscalConfig, reference: string, type
       pdf_url: response.data.caminho_danfe,
       error_message: response.data.mensagem_sefaz
     };
-  } catch (error: any) {
-    console.error("FocusNFe Status Error:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.mensagem || "Erro ao consultar status");
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("FocusNFe Status Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.mensagem || "Erro ao consultar status", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao consultar status", { cause: err });
   }
 }
 
@@ -350,8 +365,11 @@ async function cancelFocusNFe(config: FiscalConfig, reference: string, reason: s
       status: response.data.status,
       message: response.data.mensagem
     };
-  } catch (error: any) {
-    console.error("FocusNFe Cancel Error:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.mensagem || "Erro ao cancelar nota");
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("FocusNFe Cancel Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.mensagem || "Erro ao cancelar nota", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao cancelar nota", { cause: err });
   }
 }

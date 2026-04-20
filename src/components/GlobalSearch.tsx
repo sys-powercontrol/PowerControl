@@ -58,15 +58,17 @@ export default function GlobalSearch() {
   // Focus input when modal opens
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-      setSelectedIndex(0);
+      setTimeout(() => {
+        inputRef.current?.focus();
+        setSelectedIndex(0);
+      }, 100);
     }
   }, [isOpen]);
 
   // Search logic
   useEffect(() => {
     if (query.length < 2) {
-      setResults([]);
+      setTimeout(() => setResults([]), 0);
       return;
     }
 
@@ -82,34 +84,34 @@ export default function GlobalSearch() {
         const searchLower = query.toLowerCase();
 
         const productResults: SearchResult[] = products
-          .filter((p: any) => p.name?.toLowerCase().includes(searchLower))
+          .filter((p: { name?: string, id: string, stock_quantity: number, sale_price: number }) => p.name?.toLowerCase().includes(searchLower))
           .slice(0, 3)
-          .map((p: any) => ({
+          .map((p: { name?: string, id: string, stock_quantity: number, sale_price: number }) => ({
             id: p.id,
-            title: p.name,
+            title: p.name || 'Sem nome',
             subtitle: `Estoque: ${p.stock_quantity} | R$ ${p.sale_price}`,
             type: 'product',
             path: '/Produtos'
           }));
 
         const clientResults: SearchResult[] = clients
-          .filter((c: any) => c.name?.toLowerCase().includes(searchLower) || c.document?.includes(query))
+          .filter((c: { name?: string, document?: string, id: string, email?: string, phone?: string }) => c.name?.toLowerCase().includes(searchLower) || c.document?.includes(query))
           .slice(0, 3)
-          .map((c: any) => ({
+          .map((c: { name?: string, document?: string, id: string, email?: string, phone?: string }) => ({
             id: c.id,
-            title: c.name,
+            title: c.name || 'Sem nome',
             subtitle: c.email || c.phone,
             type: 'client',
             path: '/Clientes'
           }));
 
         const saleResults: SearchResult[] = sales
-          .filter((s: any) => 
+          .filter((s: { id: string, client_name?: string, total: number }) => 
             s.id.toLowerCase().includes(searchLower) || 
             s.client_name?.toLowerCase().includes(searchLower)
           )
           .slice(0, 3)
-          .map((s: any) => ({
+          .map((s: { id: string, client_name?: string, total: number }) => ({
             id: s.id,
             title: `Venda #${s.id.substring(0, 8).toUpperCase()}`,
             subtitle: `${s.client_name} | R$ ${s.total}`,

@@ -1,3 +1,14 @@
+const escapeHtml = (unsafe: any): string => {
+  if (unsafe === null || unsafe === undefined) return '';
+  if (typeof unsafe !== 'string') unsafe = String(unsafe);
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 export const printReceipt = (sale: any, company: any) => {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -7,8 +18,8 @@ export const printReceipt = (sale: any, company: any) => {
 
   const itemsHtml = sale.items.map((item: any) => `
     <tr>
-      <td style="padding: 4px 0;">${item.name}</td>
-      <td style="text-align: center; padding: 4px 0;">${item.quantity}</td>
+      <td style="padding: 4px 0;">${escapeHtml(item.name)}</td>
+      <td style="text-align: center; padding: 4px 0;">${escapeHtml(item.quantity)}</td>
       <td style="text-align: right; padding: 4px 0;">R$ ${item.price.toLocaleString()}</td>
       <td style="text-align: right; padding: 4px 0;">R$ ${(item.price * item.quantity).toLocaleString()}</td>
     </tr>
@@ -18,7 +29,7 @@ export const printReceipt = (sale: any, company: any) => {
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Recibo de Venda - ${sale.id}</title>
+        <title>Recibo de Venda - ${escapeHtml(sale.id)}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
           body { 
@@ -46,16 +57,16 @@ export const printReceipt = (sale: any, company: any) => {
       </head>
       <body>
         <div class="header">
-          <div class="company-name">${company?.name || 'PowerControl'}</div>
-          <div>CNPJ: ${company?.cnpj || '00.000.000/0000-00'}</div>
-          <div>${company?.address || ''}</div>
-          <div>${company?.phone || ''}</div>
+          <div class="company-name">${escapeHtml(company?.name || 'PowerControl')}</div>
+          <div>CNPJ: ${escapeHtml(company?.cnpj || '00.000.000/0000-00')}</div>
+          <div>${escapeHtml(company?.address || '')}</div>
+          <div>${escapeHtml(company?.phone || '')}</div>
         </div>
         <div class="details">
-          <div><strong>PEDIDO:</strong> #${sale.id.substr(0, 8).toUpperCase()}</div>
-          <div><strong>DATA:</strong> ${new Date(sale.sale_date).toLocaleString()}</div>
-          <div><strong>CLIENTE:</strong> ${sale.client_name}</div>
-          <div><strong>VENDEDOR:</strong> ${sale.seller_name || 'Balcão'}</div>
+          <div><strong>PEDIDO:</strong> #${escapeHtml(sale.id).substr(0, 8).toUpperCase()}</div>
+          <div><strong>DATA:</strong> ${escapeHtml(new Date(sale.sale_date).toLocaleString())}</div>
+          <div><strong>CLIENTE:</strong> ${escapeHtml(sale.client_name)}</div>
+          <div><strong>VENDEDOR:</strong> ${escapeHtml(sale.seller_name || 'Balcão')}</div>
         </div>
         <table>
           <thead>
@@ -74,7 +85,7 @@ export const printReceipt = (sale: any, company: any) => {
           <div>Subtotal: R$ ${sale.subtotal.toLocaleString()}</div>
           <div>Desconto: - R$ ${sale.discount.toLocaleString()}</div>
           <div class="total-row">TOTAL: R$ ${sale.total.toLocaleString()}</div>
-          <div style="margin-top: 4px;">PAGAMENTO: ${sale.payment_method}</div>
+          <div style="margin-top: 4px;">PAGAMENTO: ${escapeHtml(sale.payment_method)}</div>
         </div>
         <div class="footer">
           Obrigado pela preferência!<br/>
@@ -103,8 +114,8 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
 
   const itemsHtml = purchase.items.map((item: any) => `
     <tr>
-      <td style="padding: 4px 0;">${item.name}</td>
-      <td style="text-align: center; padding: 4px 0;">${item.quantity}</td>
+      <td style="padding: 4px 0;">${escapeHtml(item.name)}</td>
+      <td style="text-align: center; padding: 4px 0;">${escapeHtml(item.quantity)}</td>
       <td style="text-align: right; padding: 4px 0;">R$ ${item.cost.toLocaleString()}</td>
       <td style="text-align: right; padding: 4px 0;">R$ ${(item.cost * item.quantity).toLocaleString()}</td>
     </tr>
@@ -114,7 +125,7 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Recibo de Compra - ${purchase.purchase_number}</title>
+        <title>Recibo de Compra - ${escapeHtml(purchase.purchase_number)}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
           body { 
@@ -142,14 +153,14 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
       </head>
       <body>
         <div class="header">
-          <div class="company-name">${company?.name || 'PowerControl'}</div>
-          <div>CNPJ: ${company?.cnpj || '00.000.000/0000-00'}</div>
+          <div class="company-name">${escapeHtml(company?.name || 'PowerControl')}</div>
+          <div>CNPJ: ${escapeHtml(company?.cnpj || '00.000.000/0000-00')}</div>
         </div>
         <div class="details">
-          <div><strong>COMPRA:</strong> #${purchase.purchase_number}</div>
-          <div><strong>DATA:</strong> ${new Date(purchase.purchase_date).toLocaleString()}</div>
-          <div><strong>FORNECEDOR:</strong> ${purchase.supplier_name}</div>
-          <div><strong>STATUS:</strong> ${purchase.status || 'Concluída'}</div>
+          <div><strong>COMPRA:</strong> #${escapeHtml(purchase.purchase_number)}</div>
+          <div><strong>DATA:</strong> ${escapeHtml(new Date(purchase.purchase_date).toLocaleString())}</div>
+          <div><strong>FORNECEDOR:</strong> ${escapeHtml(purchase.supplier_name)}</div>
+          <div><strong>STATUS:</strong> ${escapeHtml(purchase.status || 'Concluída')}</div>
         </div>
         <table>
           <thead>
@@ -166,7 +177,7 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
         </table>
         <div class="totals">
           <div class="total-row">TOTAL: R$ ${purchase.total.toLocaleString()}</div>
-          <div style="margin-top: 4px;">PAGAMENTO: ${purchase.payment_status}</div>
+          <div style="margin-top: 4px;">PAGAMENTO: ${escapeHtml(purchase.payment_status)}</div>
         </div>
         <div class="footer">
           Entrada de Estoque - Sistema PowerControl

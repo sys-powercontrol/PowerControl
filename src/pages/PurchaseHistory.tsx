@@ -11,7 +11,9 @@ import {
   XCircle,
   Printer,
   AlertTriangle,
-  Shield
+  Shield,
+  Trash2,
+  Pencil
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -26,22 +28,7 @@ export default function PurchaseHistory() {
 
   const canView = hasPermission('inventory.manage');
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <Shield size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para visualizar o histórico de compras. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -77,14 +64,30 @@ export default function PurchaseHistory() {
     purchase_date: "Data"
   };
 
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [purchaseToDelete, setPurchaseToDelete] = useState<string | null>(null);
+  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [purchaseToEdit, setPurchaseToEdit] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ supplier_name: "", status: "", payment_status: "" });
+
   const cancelPurchaseMutation = useMutation({
-    mutationFn: (id: string) => api.put("purchases", id, { status: "Cancelada" }),
+    mutationFn: async (id: string) => {
+      const dbPurchase = purchasesData.find((p: any) => p.id === id);
+      if (dbPurchase && dbPurchase.status !== "Cancelada") {
+         const { reversePurchasePayment } = await import("../lib/finance");
+         await reversePurchasePayment(dbPurchase);
+         // Note: idealmente revertemos o stock, mas vamos focar na reversão do financeiro como solicitado
+         await api.put("purchases", id, { status: "Cancelada" });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
       toast.success("Compra cancelada com sucesso!");
       setIsDetailsModalOpen(false);
       setIsCancelModalOpen(false);
@@ -92,10 +95,75 @@ export default function PurchaseHistory() {
     }
   });
 
+  const deletePurchaseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const dbPurchase = purchasesData.find((p: any) => p.id === id);
+      if (dbPurchase && dbPurchase.status !== "Cancelada") {
+         const { reversePurchasePayment } = await import("../lib/finance");
+         await reversePurchasePayment(dbPurchase);
+      }
+      return api.delete("purchases", id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      toast.success("Compra excluída com sucesso!");
+      setIsDetailsModalOpen(false);
+      setIsDeleteModalOpen(false);
+      setPurchaseToDelete(null);
+    }
+  });
+
+  const editPurchaseMutation = useMutation({
+    mutationFn: (data: { id: string, updates: any }) => api.put("purchases", data.id, data.updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      toast.success("Compra atualizada com sucesso!");
+      setIsEditModalOpen(false);
+      setPurchaseToEdit(null);
+    }
+  });
+
   const handleCancelClick = (id: string) => {
     setPurchaseToCancel(id);
     setIsCancelModalOpen(true);
   };
+
+  const handleDeleteClick = (id: string) => {
+    setPurchaseToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleEditClick = (purchase: any) => {
+    setPurchaseToEdit(purchase);
+    setEditForm({
+      supplier_name: purchase.supplier_name,
+      status: purchase.status,
+      payment_status: purchase.payment_status
+    });
+    setIsEditModalOpen(true);
+  };
+
+if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <Shield size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para visualizar o histórico de compras. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -174,15 +242,35 @@ export default function PurchaseHistory() {
                     <button 
                       onClick={() => { setSelectedPurchase(p); setIsDetailsModalOpen(true); }}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Ver Detalhes"
                     >
                       <Eye size={18} />
                     </button>
-                    {p.status !== "Cancelada" && (
+                    {(user?.role === 'admin' || user?.role === 'master') && (
+                      <button 
+                        onClick={() => handleEditClick(p)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Editar Compra"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                    )}
+                    {p.status !== "Cancelada" && (user?.role === 'admin' || user?.role === 'master') && (
                       <button 
                         onClick={() => handleCancelClick(p.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Cancelar Compra"
                       >
                         <XCircle size={18} />
+                      </button>
+                    )}
+                    {(user?.role === 'admin' || user?.role === 'master') && (
+                      <button 
+                        onClick={() => handleDeleteClick(p.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Excluir Compra"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     )}
                   </td>
@@ -284,7 +372,7 @@ export default function PurchaseHistory() {
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-wrap justify-end gap-3">
               <button 
                 onClick={() => setIsDetailsModalOpen(false)}
                 className="px-6 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors"
@@ -297,14 +385,90 @@ export default function PurchaseHistory() {
               >
                 <Printer size={18} /> Imprimir
               </button>
-              {selectedPurchase.status !== "Cancelada" && (
+              {(user?.role === 'admin' || user?.role === 'master') && (
                 <button 
-                  onClick={() => handleCancelClick(selectedPurchase.id)}
-                  className="px-6 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
+                  onClick={() => { setIsDetailsModalOpen(false); handleEditClick(selectedPurchase); }}
+                  className="px-6 py-2 bg-white text-blue-600 border border-blue-200 rounded-xl font-bold hover:bg-blue-50 transition-colors flex items-center gap-2"
+                >
+                  <Pencil size={18} /> Editar
+                </button>
+              )}
+              {selectedPurchase.status !== "Cancelada" && (user?.role === 'admin' || user?.role === 'master') && (
+                <button 
+                  onClick={() => { setIsDetailsModalOpen(false); handleCancelClick(selectedPurchase.id); }}
+                  className="px-6 py-2 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-100 transition-colors"
                 >
                   <XCircle size={18} /> Cancelar Compra
                 </button>
               )}
+              {(user?.role === 'admin' || user?.role === 'master') && (
+                <button 
+                  onClick={() => { setIsDetailsModalOpen(false); handleDeleteClick(selectedPurchase.id); }}
+                  className="px-6 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 size={18} /> Excluir
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)} />
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-xl font-bold">Editar Compra</h2>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Fornecedor</label>
+                <input 
+                  type="text" 
+                  value={editForm.supplier_name}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, supplier_name: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Status da Compra</label>
+                <select 
+                  value={editForm.status}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Concluída">Concluída</option>
+                  <option value="Cancelada">Cancelada</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Status do Pagamento</label>
+                <select 
+                  value={editForm.payment_status}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, payment_status: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Pago">Pago</option>
+                  <option value="Pendente">Pendente</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+               <button 
+                 onClick={() => setIsEditModalOpen(false)}
+                 className="px-6 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 onClick={() => editPurchaseMutation.mutate({ id: purchaseToEdit.id, updates: editForm })}
+                 className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+               >
+                 Salvar
+               </button>
             </div>
           </div>
         </div>
@@ -315,9 +479,19 @@ export default function PurchaseHistory() {
         onClose={() => setIsCancelModalOpen(false)}
         onConfirm={() => purchaseToCancel && cancelPurchaseMutation.mutate(purchaseToCancel)}
         title="Cancelar Compra"
-        message="Tem certeza que deseja cancelar esta compra? Esta ação irá reverter o estoque dos produtos e anular os lançamentos financeiros. Esta ação não pode ser desfeita."
+        message="Tem certeza que deseja cancelar esta compra? Esta ação irá estornar o caixa financeiro desta movimentação se houver. (Atenção: Estoque não é revertido no cancelamento direto, faça manual se necessário)."
         confirmText="Sim, Cancelar"
         isLoading={cancelPurchaseMutation.isPending}
+      />
+
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => purchaseToDelete && deletePurchaseMutation.mutate(purchaseToDelete)}
+        title="Excluir Compra"
+        message="Tem certeza que deseja EXCLUIR DEFINITIVAMENTE esta compra do histórico? O valor pago financeiro associado será estornado. Esta ação não poderá ser desfeita."
+        confirmText="Sim, Excluir"
+        isLoading={deletePurchaseMutation.isPending}
       />
     </div>
   );

@@ -21,6 +21,34 @@ import {
 } from "recharts";
 import { Link } from "react-router-dom";
 
+const StatCard = ({ title, value, icon: Icon, color, subtitle, progress }: any) => (
+    <div className={`p-6 rounded-2xl bg-gradient-to-br ${color} text-white shadow-lg`}>
+      <div className="flex justify-between items-start mb-4">
+        <div className="p-2 bg-white/20 rounded-lg">
+          <Icon size={24} />
+        </div>
+      </div>
+      <h3 className="text-sm font-medium opacity-80">{title}</h3>
+      <p className="text-3xl font-bold mt-1">{value}</p>
+      {progress !== undefined ? (
+        <div className="mt-4 space-y-1">
+          <div className="flex justify-between text-[10px] opacity-80">
+            <span>Progresso da Meta</span>
+            <span>{Math.min(100, Math.round(progress))}%</span>
+          </div>
+          <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-white transition-all duration-500" 
+              style={{ width: `${Math.min(100, progress)}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs mt-2 opacity-70">{subtitle}</p>
+      )}
+    </div>
+  );
+
 export default function SellerDashboard() {
   const { user } = useAuth();
   const currentCompanyId = api.getCompanyId();
@@ -90,33 +118,7 @@ export default function SellerDashboard() {
     });
   }, [sellerSales]);
 
-  const StatCard = ({ title, value, icon: Icon, color, subtitle, progress }: any) => (
-    <div className={`p-6 rounded-2xl bg-gradient-to-br ${color} text-white shadow-lg`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2 bg-white/20 rounded-lg">
-          <Icon size={24} />
-        </div>
-      </div>
-      <h3 className="text-sm font-medium opacity-80">{title}</h3>
-      <p className="text-3xl font-bold mt-1">{value}</p>
-      {progress !== undefined ? (
-        <div className="mt-4 space-y-1">
-          <div className="flex justify-between text-[10px] opacity-80">
-            <span>Progresso da Meta</span>
-            <span>{Math.min(100, Math.round(progress))}%</span>
-          </div>
-          <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-white transition-all duration-500" 
-              style={{ width: `${Math.min(100, progress)}%` }}
-            />
-          </div>
-        </div>
-      ) : (
-        <p className="text-xs mt-2 opacity-70">{subtitle}</p>
-      )}
-    </div>
-  );
+
 
   if (!currentSeller && !isLoadingSellers) {
     return (

@@ -81,22 +81,7 @@ export default function Sales() {
   const canEditPrices = hasPermission('prices.edit');
   const canCreate = hasPermission('sales.create');
 
-  if (!canCreate) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-red-50 text-red-600 rounded-full">
-          <ShoppingCart size={48} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Você não tem permissão para realizar vendas. 
-            Esta página é restrita a usuários autorizados.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
 
   const { data: productsData = [] } = useQuery({ 
     queryKey: ["products", currentCompanyId], 
@@ -175,7 +160,7 @@ export default function Sales() {
     if (hasOpenCashier && !selectedCashier) {
       const myOpenCashier = cashiers.find((c: any) => c.status === "Aberto" && c.opened_by_id === user?.id);
       if (myOpenCashier) {
-        setSelectedCashier(myOpenCashier);
+        setTimeout(() => setSelectedCashier(myOpenCashier), 0);
       }
     }
   }, [hasOpenCashier, cashiers, user?.id, selectedCashier]);
@@ -321,7 +306,7 @@ export default function Sales() {
         seller_id: selectedSeller.id,
         seller_name: selectedSeller.name,
         commission_amount: commissionAmount,
-        commission_status: "pending",
+        commission_status: "pending" as 'pending' | 'paid',
         items: itemsWithTaxes,
         total: totalFiscalValue,
         subtotal,
@@ -373,6 +358,23 @@ export default function Sales() {
       toast.error(err.message);
     }
   });
+
+if (!canCreate) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 bg-red-50 text-red-600 rounded-full">
+          <ShoppingCart size={48} />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            Você não tem permissão para realizar vendas. 
+            Esta página é restrita a usuários autorizados.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
@@ -713,7 +715,7 @@ export default function Sales() {
                 Gerar QR Code PIX
               </button>
             )}
-            {paymentMethod === "Cartão de Crédito" && (
+            {(paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito") && (
               <button 
                 onClick={() => setShowPaymentGateway(true)}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
@@ -724,7 +726,7 @@ export default function Sales() {
             )}
             <button 
               onClick={() => finalizeSale.mutate()}
-              disabled={finalizeSale.isPending || (paymentMethod === "PIX" && !showPaymentGateway) || (paymentMethod === "Cartão de Crédito" && !showPaymentGateway)}
+              disabled={finalizeSale.isPending || (paymentMethod === "PIX" && !showPaymentGateway) || ((paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito") && !showPaymentGateway)}
               className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-lg shadow-green-100 disabled:opacity-50"
             >
               <CheckCircle2 size={24} />

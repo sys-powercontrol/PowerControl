@@ -61,11 +61,11 @@ export const externalApi = {
         throw new Error(response.data.message || "CNPJ não encontrado");
       }
       return response.data;
-    } catch (error: any) {
-      if (error.response?.status === 429) {
-        throw new Error("Limite de requisições excedido. Tente novamente em um minuto.");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        throw new Error("Limite de requisições excedido. Tente novamente em um minuto.", { cause: err });
       }
-      throw new Error("Erro ao consultar CNPJ. Verifique sua conexão ou tente novamente mais tarde.");
+      throw new Error("Erro ao consultar CNPJ. Verifique sua conexão ou tente novamente mais tarde.", { cause: err });
     }
   }
 };
