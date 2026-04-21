@@ -18,7 +18,8 @@ import {
   Lock,
   History,
   CalendarClock,
-  Trash2
+  Trash2,
+  RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculateNextDueDate, Frequency } from "../lib/finance";
@@ -38,10 +39,12 @@ export default function AccountsPayable() {
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isEditDateModalOpen, setIsEditDateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isReverseModalOpen, setIsReverseModalOpen] = useState(false);
   const [newDueDate, setNewDueDate] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const [accountToReverse, setAccountToReverse] = useState<string | null>(null);
 
   const currentCompanyId = api.getCompanyId();
 
@@ -210,22 +213,63 @@ export default function AccountsPayable() {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete("accountsPayable", id),
+    mutationFn: async (id: string) => {
+      const dbAccount = accounts.find((a: any) => a.id === id);
+      if (dbAccount && dbAccount.status === "Pago") {
+        throw new Error("Não é possível excluir uma conta que já foi paga. Estorne primeiro.");
+      }
+      return api.delete("accountsPayable", id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       toast.success("Conta excluída com sucesso.");
+    }
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const dbAccount = accounts.find((a: any) => a.id === id);
+      if (!dbAccount) throw new Error("Conta não encontrada");
+      
+      const { reverseAccountPayment } = await import("../lib/finance");
+      await reverseAccountPayment(dbAccount);
+      
+      return api.put("accountsPayable", id, {
+        status: dbAccount.due_date >= getTodayBR() ? "Pendente" : "Atrasado",
+        payment_date: null,
+        bank_account_id: null,
+        cashier_id: null
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      toast.success("Estorno concluído! A fatura voltou a ficar pendente/atrasada.");
+      setIsReverseModalOpen(false);
+      setAccountToReverse(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Erro ao estornar a conta.");
     }
   });
 
   const extendDateMutation = useMutation({
     mutationFn: (data: { id: string, newDate: string, oldDate: string }) => {
       const dbAccount = accounts.find((a: any) => a.id === data.id);
+      if (dbAccount && (dbAccount.status === 'Recebido' || dbAccount.status === 'Pago')) {
+          throw new Error('Não é possível modificar parâmetros de uma conta que já foi finalizada. Estorne primeiro.');
+      }
       const historyRecord = {
         old_date: data.oldDate,
         new_date: data.newDate,
         changed_at: new Date().toISOString(),
-        changed_by: user?.id,
-        user_name: user?.name
+        changed_by: user?.id || null,
+        user_name: user?.full_name || "Usuário não identificado"
       };
       
       const updatedHistory = dbAccount.due_date_history ? [...dbAccount.due_date_history, historyRecord] : [historyRecord];
@@ -245,6 +289,11 @@ export default function AccountsPayable() {
   });
 
   const handleDelete = (id: string) => {
+    const acc = accounts.find((a: any) => a.id === id);
+    if (acc && acc.status === "Pago") {
+      toast.warning("Por favor, clique no botão Estornar antes de excluir este registro de fatura.");
+      return;
+    }
     setAccountToDelete(id);
     setIsDeleteModalOpen(true);
   };
@@ -255,6 +304,11 @@ export default function AccountsPayable() {
       setIsDeleteModalOpen(false);
       setAccountToDelete(null);
     }
+  };
+
+  const handleReverse = (id: string) => {
+    setAccountToReverse(id);
+    setIsReverseModalOpen(true);
   };
 
   const handleEditDate = (id: string, currentDate: string) => {
@@ -440,15 +494,26 @@ if (!canView) {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                {acc.status === "Pago" && (user?.role === 'admin' || user?.role === 'master') && (
+                  <button 
+                    onClick={() => handleReverse(acc.id)}
+                    className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all font-bold"
+                    title="Estornar Pagamento"
+                  >
+                    <RotateCcw size={20} />
+                  </button>
+                )}
                 {acc.status !== "Pago" && (
                   <>
-                    <button 
-                      onClick={() => handleEditDate(acc.id, acc.due_date)}
-                      className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all font-bold"
-                      title="Alterar Vencimento"
-                    >
-                      <CalendarClock size={20} />
-                    </button>
+                    {(user?.role === 'admin' || user?.role === 'master') && (
+                      <button 
+                        onClick={() => handleEditDate(acc.id, acc.due_date)}
+                        className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all font-bold"
+                        title="Alterar Vencimento"
+                      >
+                        <CalendarClock size={20} />
+                      </button>
+                    )}
                     <button 
                       onClick={() => handlePay(acc.id)}
                       className="p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all font-bold"
@@ -642,6 +707,33 @@ if (!canView) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Confirmar Estorno */}
+      {isReverseModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setIsReverseModalOpen(false); setAccountToReverse(null); }} />
+          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6">
+            <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto">
+              <RotateCcw size={40} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-gray-900">Estornar Pagamento?</h2>
+              <p className="text-gray-500">
+                O valor será devolvido ao caixa/banco correspondente e a fatura voltará para a lista de cobranças pendentes.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => { setIsReverseModalOpen(false); setAccountToReverse(null); }} className="flex-1 py-3 text-gray-500 font-bold bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+              <button 
+                onClick={() => accountToReverse && reverseMutation.mutate(accountToReverse)} 
+                disabled={reverseMutation.isPending}
+                className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-200"
+              >
+                {reverseMutation.isPending ? "Processando..." : "Estornar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

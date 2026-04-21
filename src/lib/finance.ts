@@ -43,6 +43,9 @@ export async function processMovement(data: any) {
       const docSnap = await transaction.get(fromAccountRef);
       if (!docSnap.exists()) throw new Error("Conta de origem não encontrada");
       fromAccountData = docSnap.data();
+      if (collectionName === "cashiers" && fromAccountData.status === "Fechado") {
+        throw new Error("Transação negada. O Caixa selecionado já está Fechado e não permite novas movimentações.");
+      }
     }
 
     if (data.type === "Transferência" || data.type === "Entrada") {
@@ -52,6 +55,9 @@ export async function processMovement(data: any) {
       const docSnap = await transaction.get(toAccountRef);
       if (!docSnap.exists()) throw new Error("Conta de destino não encontrada");
       toAccountData = docSnap.data();
+      if (collectionName === "cashiers" && toAccountData.status === "Fechado") {
+        throw new Error("Transação negada. O Caixa selecionado já está Fechado e não permite novas movimentações.");
+      }
     }
 
     // Update balances
@@ -93,6 +99,9 @@ export async function processAccountPayment(accountId: string, accountData: any,
     const docSnap = await transaction.get(paymentAccountRef);
     if (!docSnap.exists()) throw new Error("Conta de pagamento não encontrada");
     const paymentAccountData = docSnap.data();
+    if (collectionName === "cashiers" && paymentAccountData.status === "Fechado") {
+      throw new Error("Transação negada. O Caixa selecionado já está Fechado.");
+    }
 
     // Update balance
     transaction.update(paymentAccountRef, {
@@ -138,6 +147,9 @@ export async function processAccountReceipt(accountId: string, accountData: any,
     const docSnap = await transaction.get(receiptAccountRef);
     if (!docSnap.exists()) throw new Error("Conta de recebimento não encontrada");
     const receiptAccountData = docSnap.data();
+    if (collectionName === "cashiers" && receiptAccountData.status === "Fechado") {
+      throw new Error("Transação negada. O Caixa selecionado já está Fechado.");
+    }
 
     // Update balance
     transaction.update(receiptAccountRef, {
@@ -185,9 +197,12 @@ export async function reverseAccountReceipt(accountData: any) {
     const collectionName = accountData.bank_account_id ? "bankAccounts" : "cashiers";
     const receiptAccountRef = doc(db, collectionName, accountId);
     const docSnap = await transaction.get(receiptAccountRef);
-    if (!docSnap.exists()) return { success: true }; 
+    if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema."); 
 
     const receiptAccountData = docSnap.data();
+    if (collectionName === "cashiers" && receiptAccountData.status === "Fechado") {
+      throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
+    }
 
     // Deduct balance
     const currentBalance = receiptAccountData.balance || 0;
@@ -225,9 +240,12 @@ export async function reverseSalePayment(saleData: any) {
     const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
     const receiptAccountRef = doc(db, collectionName, accountId);
     const docSnap = await transaction.get(receiptAccountRef);
-    if (!docSnap.exists()) return { success: true };
+    if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema.");
 
     const receiptAccountData = docSnap.data();
+    if (collectionName === "cashiers" && receiptAccountData.status === "Fechado") {
+      throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
+    }
 
     // Deduct balance
     const currentBalance = receiptAccountData.balance || 0;
@@ -253,6 +271,49 @@ export async function reverseSalePayment(saleData: any) {
   });
 }
 
+export async function reverseAccountPayment(accountData: any) {
+  return runTransaction(db, async (transaction) => {
+    const amount = parseFloat(accountData.amount);
+    if (isNaN(amount) || !amount) return { success: true };
+
+    const accountId = accountData.bank_account_id || accountData.cashier_id;
+    if (!accountId) return { success: true }; 
+
+    const collectionName = accountData.bank_account_id ? "bankAccounts" : "cashiers";
+    const paymentAccountRef = doc(db, collectionName, accountId);
+    const docSnap = await transaction.get(paymentAccountRef);
+    if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema."); 
+
+    const paymentAccountData = docSnap.data();
+    if (collectionName === "cashiers" && paymentAccountData.status === "Fechado") {
+      throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
+    }
+
+    // Add back balance
+    const currentBalance = paymentAccountData.balance || 0;
+    transaction.update(paymentAccountRef, {
+      balance: currentBalance + amount
+    });
+
+    // Create reversal movement record
+    const movementRef = doc(collection(db, "movements"));
+    transaction.set(movementRef, {
+      company_id: accountData.company_id,
+      type: "Entrada",
+      description: `Estorno de Exclusão: ${accountData.description || 'Conta a Pagar'}`,
+      amount: amount,
+      to_account_type: accountData.bank_account_id ? 'Banco' : 'Caixa',
+      to_account_id: accountId,
+      to_account_name: paymentAccountData.name || "Conta Desconhecida",
+      category: "Estorno",
+      movement_date: new Date().toISOString(),
+      created_at: serverTimestamp()
+    });
+
+    return { success: true };
+  });
+}
+
 export async function reversePurchasePayment(purchaseData: any) {
   return runTransaction(db, async (transaction) => {
     const amount = parseFloat(purchaseData.total);
@@ -264,9 +325,12 @@ export async function reversePurchasePayment(purchaseData: any) {
     const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
     const paymentAccountRef = doc(db, collectionName, accountId);
     const docSnap = await transaction.get(paymentAccountRef);
-    if (!docSnap.exists()) return { success: true };
+    if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema.");
 
     const paymentAccountData = docSnap.data();
+    if (collectionName === "cashiers" && paymentAccountData.status === "Fechado") {
+      throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
+    }
 
     // Add back balance
     const currentBalance = paymentAccountData.balance || 0;

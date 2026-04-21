@@ -1,49 +1,40 @@
-# Especificação de Funcionalidades a Finalizar (Spec.md)
+# Especificação Técnica de Implementação (Pendências)
 
-Com base na análise descrita em `analytics/error.md`, este documento especifica tecnicamente e estritamente **apenas o que falta ser terminado** no sistema.
+Com base no documento de planejamento (`analytics/report.md`), esta é a relação restrita *apenas ao que falta implementar* para tornar seguro e íntegro o fluxo financeiro de contas. Os tópicos estão estruturados por domínios.
 
 ---
 
-## 1. Expansão do Fluxo de Suporte (Leitura e Réplica)
-*   **Page:** `src/pages/Support.tsx`
-*   **Component:** Card de Ticket (Listagem), Novo Modal de Detalhes do Chamado (`TicketDetailsModal`)
-*   **Behavior:** 
-    *   Transformar o selo "Resposta disponível" em uma ação clicável.
-    *   Abrir um modal/interface onde o usuário consiga ler integralmente as `internal_notes` elaboradas pela equipe técnica.
-    *   Implementar campo de chat/interação para o usuário enviar uma réplica, impedindo que o fluxo morra logo na listagem inicial.
+### 1. Central de Transações do Financeiro
+**Arquivo de Referência:** `src/lib/finance.ts`
 
-## 2. Dinamismo da Base de Conhecimento (Fim do Mock Local)
-*   **Page:** `src/pages/KnowledgeBase.tsx`
-*   **Component:** Listagem de Artigos (`categories`), Roteador de Conteúdo (`ArticleViewer`)
-*   **Behavior:** 
-    *   Excluir os dados simulados e estáticos (`const categories`) diretamente injetados no código-fonte.
-    *   Desenvolver o carregamento dessas informações por meio de uma coleção real do Firestore.
-    *   Criar estado e renderização do artigo (possivelmente suportando Markdown) para que o usuário clique no treinamento listado e leia o seu conteúdo textual na interface correspondente.
+#### Componente/Funções Alvo:
+- `reverseAccountPayment`, `reverseAccountReceipt`, `reversePurchasePayment`, `reverseSalePayment`.
 
-## 3. Destravamento da Fila Fiscal WebmaniaBR
-*   **Page:** `src/pages/Configurations.tsx`
-*   **Component:** Aba `Integração Fiscal` (Select do campo `fiscal_provider`)
-*   **Behavior:** 
-    *   Remover a trava HTML `disabled` da `<option value="WebmaniaBR">` sinalizada no front-end como "(Em breve)".
-    *   Garantir a total liberação na seleção pela interface para que os lojistas possuam autonomia em utilizar esse provedor perfeitamente integrado no backend (em `fiscalApi.ts`).
+#### Behavior (Comportamento de Negócio) Faltante:
+- **Proteção contra "Orphaned Writes" (Retornos Silenciosos):** Remover a linha que realiza saída silenciosa em falha (`if (!docSnap.exists()) return { success: true };`). Implementar um bloqueio absoluto com `throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema.")`.
+- **Trava D0 para Caixas Fechados:** Se o `collectionName` for `"cashiers"`, injetar uma checagem validando a propriedade `status` do documento resgatado (`docSnap.data()`). Caso aponte `"Fechado"`, a função deve bloquear o estorno utilizando `throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.")`.
 
-## 4. Cobertura Offline-First Transversal (Service Worker)
-*   **Page:** `src/sw.ts`
-*   **Component:** Escopo IndexedDB (`openDB`), Lógica de Sync Offline
-*   **Behavior:** 
-    *   Aproveitar o mecanismo resiliente estabelecido na *Issue 05* para transcender os limites atuais puramente voltados para transações de Balcão (Vendas/Sales).
-    *   Registrar manipuladores (handlers/tags no SyncManager) e armazéns no IDB para as filas locais de: *Novos Cadastros de Clientes*, *Lançamentos de Contas a Pagar* e *Notas de Compra*, dotando o PDV off-grid não só com o terminal, mas com cadastros essenciais de ERP.
+---
 
-## 5. Algoritmo PIX Dinâmico no PDV
-*   **Page:** `src/pages/Sales.tsx`, `src/pages/Configurations.tsx`
-*   **Component:** Modal do PDV (`CheckoutModal`), Componente Emissor (`QRCodeManager`)
-*   **Behavior:** 
-    *   No estado vigente o lojista consegue armazenar a chave PIX, porém seu PDV não tira proveito real disso.
-    *   Furar a dependência estática por meio de uma rotina ou biblioteca capaz de aglutinar a string PIX do Lojista + Soma do Checkout ("Valor do Carrinho") gerando fisicamente via tela o **QR Code (BR Code / Copia e Cola) validado**. Integrar esse display diretamente na etapa final do caixa.
+### 2. Painéis Modulares de Contas a Receber e a Pagar
+**Arquivos de Referência:** `src/pages/AccountsReceivable.tsx` e `src/pages/AccountsPayable.tsx`
 
-## 6. Desacoplamento da Gestão de Webhooks
-*   **Page:** `src/pages/Configurations.tsx`
-*   **Component:** Aba `Notificações`
-*   **Behavior:** 
-    *   Substituir a invocação de `import.meta.env.VITE_SUPPORT_WEBHOOK_URL` existente nos serviços.
-    *   Adicionar campo de URL Customizada gerida via banco, expondo ao administrador (Master e respectivos Tenants) um input para inserir livremente o seu ponto de acesso para Slack/Discord sem dependência rígida de *commits* ou ambiente global do projeto.
+#### A) Componente: Ações da Grade (Row Actions)
+- **Behavior (Botão Estornar):** Inserir um botão específico de Estorno (ícone sugerido: `RotateCcw`, talvez na cor laranja ou cinza-alerta), visível na listagem **apenas** quando a conta assumir status de `"Recebido"` ou `"Pago"`. Ao acionar, solicitar confirmação via UI.
+- **Behavior (Mutation de Estorno):** Criar a rotina responsável pelo clique. O que ela deve fazer:
+  1. Identificar o registro na base de dados e travar alterações simultâneas.
+  2. Acionar `reverseAccountReceipt(dbAccount)` ou `reverseAccountPayment(dbAccount)` importado da lib `finance`.
+  3. Emitir payload de alteração de estado (via requisição PUT) convertendo o `status` retroativamente para `"Pendente"` (ou `"Atrasado"` dinamicamente).
+  4. Apagar (definir como `null`) as chaves originárias da baixa: `payment_date`/`receipt_date`, `bank_account_id` e `cashier_id`.
+
+#### B) Componente: Botão Excluir (`Trash2`)
+- **Behavior (Bloqueio Condicional):** Refatorar o fluxo do evento atual. A exclusão de faturas e duplicatas pagas/recebidas deve ser severamente dificultada. 
+  - **Fluxo Sugerido:** Se a UI detectar o status `"Recebido"`/`"Pago"`, o clique na Lixeira deve abrir modal avisando que a mesma **não pode ser apagada** em estado liquidado; a orientação recomendada na UI deve ser: "Por favor, clique no botão Estornar antes de excluir este registro de fatura.". Se continuarem desejando apagar e o estorno não puder ser feito por ser caixa travado, o título ficará apenas para fins de registro histórico incontornável.
+
+#### C) Componente: Validação da Mutation de Editar Data
+- **Behavior (Prevenção de Injeção em Alteração de Data):** Como hoje o código apenas oculta o botão dependendo do status, injetar proteção técnica final dentro das mutations de backend das páginas (`extendDateMutation`). Faltou inserir uma checagem que verifique explicitamente: `if (dbAccount.status === 'Recebido' || dbAccount.status === 'Pago') throw new Error('Não é possível modificar parâmetros de uma conta que já foi finalizada. Estorne primeiro.')`.
+
+---
+
+### Observações
+> Todo e qualquer ajuste futuro mencionado nestas faturas financeiras deve seguir irrestritamente esta especificação. Isso vai isolar o módulo financeiro e preservar todo o histórico bancário da aplicação e garantir a concordância perante auditorias de sistemas.

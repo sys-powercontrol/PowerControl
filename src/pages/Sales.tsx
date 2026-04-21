@@ -465,7 +465,7 @@ if (!canCreate) {
             >
               <option value="">Selecione um cliente...</option>
               {clients.map((c: any) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>

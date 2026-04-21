@@ -30,8 +30,8 @@ export default function SalesHistory() {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
-  const canView = hasPermission('sales.view');
-  const canDelete = hasPermission('sales.delete');
+  const canView = hasPermission('sales.view') || user?.role === 'master';
+  const canDelete = hasPermission('sales.delete') || user?.role === 'master' || user?.role === 'admin';
 
   
 

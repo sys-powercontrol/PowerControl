@@ -17,7 +17,8 @@ import {
   Repeat,
   History,
   CalendarClock,
-  Trash2
+  Trash2,
+  RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculateNextDueDate, Frequency } from "../lib/finance";
@@ -37,10 +38,12 @@ export default function AccountsReceivable() {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const [isEditDateModalOpen, setIsEditDateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isReverseModalOpen, setIsReverseModalOpen] = useState(false);
   const [newDueDate, setNewDueDate] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const [accountToReverse, setAccountToReverse] = useState<string | null>(null);
 
   const currentCompanyId = api.getCompanyId();
 
@@ -110,7 +113,7 @@ export default function AccountsReceivable() {
 
   const filteredAccounts = accountsWithDynamicStatus.filter((acc: any) => {
     if (activeTab === "Pendentes") return acc.status === "Pendente";
-    if (activeTab === "Recebidas") return acc.status === "Pago";
+    if (activeTab === "Recebidas") return acc.status === "Recebido";
     if (activeTab === "Atrasadas") return acc.status === "Atrasado";
     return true;
   });
@@ -194,9 +197,8 @@ export default function AccountsReceivable() {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const dbAccount = accounts.find((a: any) => a.id === id);
-      if (dbAccount && dbAccount.status === "Recebido" && (dbAccount.bank_account_id || dbAccount.cashier_id)) {
-        const { reverseAccountReceipt } = await import("../lib/finance");
-        await reverseAccountReceipt(dbAccount);
+      if (dbAccount && dbAccount.status === "Recebido") {
+        throw new Error("Não é possível excluir uma conta que já foi finalizada. Estorne primeiro.");
       }
       return api.delete("accountsReceivable", id);
     },
@@ -209,15 +211,47 @@ export default function AccountsReceivable() {
     }
   });
 
+  const reverseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const dbAccount = accounts.find((a: any) => a.id === id);
+      if (!dbAccount) throw new Error("Conta não encontrada");
+      
+      const { reverseAccountReceipt } = await import("../lib/finance");
+      await reverseAccountReceipt(dbAccount);
+      
+      return api.put("accountsReceivable", id, {
+        status: dbAccount.due_date >= getTodayBR() ? "Pendente" : "Atrasado",
+        receipt_date: null,
+        bank_account_id: null,
+        cashier_id: null
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      toast.success("Estorno concluído! A fatura voltou a ficar pendente/atrasada.");
+      setIsReverseModalOpen(false);
+      setAccountToReverse(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Erro ao estornar a conta.");
+    }
+  });
+
   const extendDateMutation = useMutation({
     mutationFn: (data: { id: string, newDate: string, oldDate: string }) => {
       const dbAccount = accounts.find((a: any) => a.id === data.id);
+      if (dbAccount && (dbAccount.status === 'Recebido' || dbAccount.status === 'Pago')) {
+          throw new Error('Não é possível modificar parâmetros de uma conta que já foi finalizada. Estorne primeiro.');
+      }
       const historyRecord = {
         old_date: data.oldDate,
         new_date: data.newDate,
         changed_at: new Date().toISOString(),
-        changed_by: user?.id,
-        user_name: user?.name
+        changed_by: user?.id || null,
+        user_name: user?.full_name || "Usuário não identificado"
       };
       
       const updatedHistory = dbAccount.due_date_history ? [...dbAccount.due_date_history, historyRecord] : [historyRecord];
@@ -237,6 +271,11 @@ export default function AccountsReceivable() {
   });
 
   const handleDelete = (id: string) => {
+    const acc = accounts.find((a: any) => a.id === id);
+    if (acc && acc.status === "Recebido") {
+      toast.warning("Por favor, clique no botão Estornar antes de excluir este registro de fatura.");
+      return;
+    }
     setAccountToDelete(id);
     setIsDeleteModalOpen(true);
   };
@@ -247,6 +286,11 @@ export default function AccountsReceivable() {
       setIsDeleteModalOpen(false);
       setAccountToDelete(null);
     }
+  };
+
+  const handleReverse = (id: string) => {
+    setAccountToReverse(id);
+    setIsReverseModalOpen(true);
   };
 
   const handleEditDate = (id: string, currentDate: string) => {
@@ -364,7 +408,7 @@ if (!canView) {
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-green-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Recebido (Mês)</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
-            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Pago").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Recebido").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-orange-500">
@@ -401,7 +445,7 @@ if (!canView) {
         ) : filteredAccounts.map((acc: any) => (
           <div key={acc.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-xl ${acc.status === "Pago" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
+              <div className={`p-3 rounded-xl ${acc.status === "Recebido" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
                 <TrendingUp size={24} />
               </div>
               <div>
@@ -425,22 +469,33 @@ if (!canView) {
               <div className="text-right">
                 <p className="text-lg font-bold text-gray-900">R$ {acc.amount?.toLocaleString()}</p>
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                  acc.status === "Pago" ? "bg-green-100 text-green-700" : 
+                  acc.status === "Recebido" ? "bg-green-100 text-green-700" : 
                   acc.status === "Atrasado" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
                 }`}>
                   {acc.status}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {acc.status !== "Pago" && (
+                {acc.status === "Recebido" && (user?.role === 'admin' || user?.role === 'master') && (
+                  <button 
+                    onClick={() => handleReverse(acc.id)}
+                    className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all"
+                    title="Estornar Recebimento"
+                  >
+                    <RotateCcw size={20} />
+                  </button>
+                )}
+                {acc.status !== "Recebido" && (
                   <>
-                    <button 
-                      onClick={() => handleEditDate(acc.id, acc.due_date)}
-                      className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all"
-                      title="Alterar Vencimento"
-                    >
-                      <CalendarClock size={20} />
-                    </button>
+                    {(user?.role === 'admin' || user?.role === 'master') && (
+                      <button 
+                        onClick={() => handleEditDate(acc.id, acc.due_date)}
+                        className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all"
+                        title="Alterar Vencimento"
+                      >
+                        <CalendarClock size={20} />
+                      </button>
+                    )}
                     <button 
                       onClick={() => handleReceive(acc.id)}
                       className="p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all"
@@ -632,6 +687,34 @@ if (!canView) {
                 className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
               >
                 {deleteMutation.isPending ? "Excluindo..." : "Excluir Conta"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Estorno */}
+      {isReverseModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setIsReverseModalOpen(false); setAccountToReverse(null); }} />
+          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6">
+            <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto">
+              <RotateCcw size={40} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-gray-900">Estornar Recebimento?</h2>
+              <p className="text-gray-500">
+                O valor será retirado do caixa/banco correspondente e a fatura voltará para a lista de cobranças pendentes.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => { setIsReverseModalOpen(false); setAccountToReverse(null); }} className="flex-1 py-3 text-gray-500 font-bold bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+              <button 
+                onClick={() => accountToReverse && reverseMutation.mutate(accountToReverse)} 
+                disabled={reverseMutation.isPending}
+                className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-200"
+              >
+                {reverseMutation.isPending ? "Processando..." : "Estornar"}
               </button>
             </div>
           </div>
