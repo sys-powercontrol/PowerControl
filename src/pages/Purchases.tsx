@@ -176,8 +176,59 @@ export default function Purchases() {
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       toast.success("Compra registrada com sucesso!");
     },
-    onError: (err: any) => {
-      toast.error(err.message);
+    onError: async (err: any, variables, context) => {
+      console.warn("Falha ao salvar compra online, acionando offline fallback", err);
+      if (!navigator.onLine || err.message?.includes('offline') || err.message?.includes('Failed to fetch')) {
+         
+         const fiscalOperation: FiscalOperation = {
+           type: 'purchase',
+           origin_state: selectedSupplier.address_state || 'SP',
+           dest_state: company?.state || 'SP',
+           is_consumer: false,
+           is_contributor: true,
+           regime: company?.regime_tributario === "3" ? 'normal' : 'simples',
+           finality: 'revenda'
+         };
+
+         const itemsWithTaxes = cart.map(item => {
+           const cfop = fiscal.getCFOP(fiscalOperation, 'product');
+           const taxes = fiscal.calculateTaxes(item.cost * item.quantity, {
+             icms_rate: item.icms_rate || 0,
+             ipi_rate: item.ipi_rate || 0,
+             pis_rate: item.pis_rate || 0,
+             cofins_rate: item.cofins_rate || 0,
+             iss_rate: 0,
+             ncm: item.ncm,
+             cest: item.cest
+           }, fiscalOperation);
+           return { ...item, cfop, taxes };
+         });
+
+         const totalTaxes = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_taxes, 0);
+
+         const purchaseDataOffline = {
+           company_id: user?.company_id,
+           supplier_id: selectedSupplier.id,
+           supplier_name: selectedSupplier.name,
+           items: itemsWithTaxes,
+           total,
+           total_taxes: totalTaxes,
+           payment_status: paymentStatus,
+           ...(paymentStatus === "Pendente" ? { due_date: dueDate } : {}),
+           ...(selectedAccount?.type === 'bank' ? { bank_account_id: selectedAccount.id } : {}),
+           ...(selectedAccount?.type === 'cashier' ? { cashier_id: selectedAccount.id } : {}),
+           status: "Concluída",
+           purchase_date: new Date().toISOString()
+         };
+
+         const { offlineStore } = await import('../lib/offlineStore');
+         await offlineStore.savePurchase(purchaseDataOffline, itemsWithTaxes);
+         
+         setCart([]);
+         setSelectedSupplier(null);
+      } else {
+         toast.error(err.message);
+      }
     }
   });
 

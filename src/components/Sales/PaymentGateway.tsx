@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../lib/api";
+import { generatePixPayload } from "../../lib/pixUtils";
 import { 
   QrCode, 
   X, 
@@ -26,6 +29,13 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>(method === "PIX" ? "pix" : "card");
+
+  const companyId = api.getCompanyId();
+  const { data: companyData = {} } = useQuery({ 
+    queryKey: ["company", companyId], 
+    queryFn: () => api.get("companies", companyId as string),
+    enabled: !!companyId
+  });
 
   // Card form state
   const [cardData, setCardData] = useState({
@@ -57,18 +67,33 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
         // Fallback for demo/manual confirmation without backend
         setPaymentId("mock_" + Date.now());
         if (activeTab === "pix") {
-          setQrCode(`00020101021226580014br.gov.bcb.pix0136mock-pix-key-for-test-12345678905204000053039865405${amount.toFixed(2)}5802BR5913SUA EMPRESA6008BRASILIA62070503***6304MOCK`);
+          const pixKey = companyData.pix_key || "00000000000"; // fallback
+          const payload = generatePixPayload(
+             pixKey,
+             amount,
+             companyData.name?.substring(0, 25) || "EMPRESA PDV",
+             companyData.city?.substring(0, 15) || "BRASILIA",
+             "PDV" + Date.now().toString().slice(-4)
+          );
+          setQrCode(payload);
         }
         setStatus("PENDING");
       } finally {
         if (isMounted) setLoading(false);
       }
     };
+    
+    // Only run when we have company data to ensure dynamic PIX falls back gracefully
+    if (activeTab === 'pix' && !companyData.id && companyId) {
+       // Wait for company data to resolve query
+       return;
+    }
+    
     createPayment();
     return () => {
       isMounted = false;
     };
-  }, [activeTab, amount]);
+  }, [activeTab, amount, companyData, companyId]);
 
   const handleManualConfirmation = () => {
     setStatus("CONFIRMED");

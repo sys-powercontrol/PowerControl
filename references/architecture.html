@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerControl ERP - Documento de Arquitetura de Software</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .mermaid { display: flex; justify-content: center; background-color: white; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); margin-bottom: 2rem; }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: { primaryColor: '#eff6ff', primaryBorderColor: '#3b82f6', primaryTextColor: '#1e3a8a', fontFamily: 'Inter' } });
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased p-6 md:p-12">
+
+    <div class="max-w-6xl mx-auto space-y-12">
+        
+        <!-- HEADER -->
+        <header class="border-b border-slate-200 pb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-black text-slate-900 tracking-tight">Arquitetura de Sistemas</h1>
+                    <h2 class="text-2xl font-semibold text-blue-600 mt-2">PowerControl ERP & PDV</h2>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm font-semibold text-slate-500 uppercase tracking-widest">Documento Técnico</p>
+                    <p class="text-sm text-slate-400 mt-1">Versão 1.0 - PWA/Serverless</p>
+                </div>
+            </div>
+            <p class="mt-6 text-lg text-slate-600 max-w-3xl leading-relaxed">
+                Elaborado com base nos requisitos do PRD para garantir um ecossistema <strong>Multi-Tenant</strong>, estruturado em topologia <strong>Serverless (BaaS)</strong> e projetado com foco absoluto na resiliência operacional através da arquitetura <strong>Offline-First (PWA)</strong>.
+            </p>
+        </header>
+
+        <!-- 1. VISÃO GERAL -->
+        <section class="space-y-6">
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm">1</span>
+                Visão Geral (C4 Model - Context)
+            </h3>
+            <p class="text-slate-600 leading-relaxed">
+                O PowerControl atua como a espinha dorsal de micro e médias operações de varejo. Ele isola as complexidades fiscais e financeiras num front-end web reativo que se acopla ao Firebase (Backend-as-a-Service) e se intercomunica com Provedores Fiscais (WebmaniaBR/FocusNFe), ViaCEP e Webhooks para suporte.
+            </p>
+            <div class="mermaid">
+                flowchart TD
+                    Lojista([Lojista / Caixa]) -->|Acessa App via Web/PWA| App[PowerControl SPA/PWA]
+                    App -->|Reads/Writes Realtime| Firestore[(Cloud Firestore)]
+                    App -->|Autenticação| Auth[Firebase Auth]
+                    App -->|CEP Lookup| ViaCEP[API ViaCEP]
+                    App -->|Emissão NF-e/NFC-e| Fiscal[WebmaniaBR / FocusNFe]
+                    App -->|Notificações| Webhook[Support Webhooks]
+            </div>
+        </section>
+
+        <!-- 2. DIAGRAMA DE CONTAINERS -->
+        <section class="space-y-6">
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm">2</span>
+                Componentes e Topologia (PWA & Estado)
+            </h3>
+            <p class="text-slate-600 leading-relaxed">
+                A aplicação não depende de um backend intermediário (Node.js/Python) na nuvem. Toda a regra de negócio segura reside nas integrações diretas <code>Client -> BaaS</code> devidamente bloqueadas por Security Rules. O estado remoto é perfeitamente espelhado com o <strong>TanStack Query</strong>.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-blue-800 mb-2">Camada de Apresentação (UI)</h4>
+                    <ul class="list-disc pl-5 text-sm text-slate-600 space-y-1">
+                        <li><strong>React 18</strong> com Vite e TypeScript.</li>
+                        <li><strong>Tailwind CSS</strong> e Lucide Icons (Design System).</li>
+                        <li><strong>React Router DOM</strong> para navegação client-side.</li>
+                        <li><strong>Sonner</strong> para notificações tostadas.</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-teal-800 mb-2">Camada de Estado & Cache</h4>
+                    <ul class="list-disc pl-5 text-sm text-slate-600 space-y-1">
+                        <li><strong>TanStack Query</strong> para cache e sincronia com backend.</li>
+                        <li><strong>Zustand/Context API</strong> para estado global volátil (Auth, Caixas).</li>
+                        <li><strong>IndexedDB (idb)</strong> para base estruturada offline.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="mermaid">
+                architecture-beta
+                    group UX(Camada de Experiência)
+                    service React(React.js UI) in UX
+                    service State(TanStack Query) in UX
+                    
+                    group PWA(Camada Offline-First)
+                    service SW(Service Worker) in PWA
+                    db IDB(IndexedDB) in PWA
+                    
+                    group BaaS(Camada de Dados Cloud)
+                    db Firestore(Cloud Firestore) in BaaS
+                    service Security(Security Rules) in BaaS
+                    
+                    React:R --> L:State
+                    State:B --> T:SW
+                    SW:L --> R:IDB
+                    SW:R --> L:Firestore
+                    Security:T --> B:Firestore
+            </div>
+        </section>
+
+        <!-- 3. FLUXO OFFLINE-FIRST -->
+        <section class="space-y-6">
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm">3</span>
+                Mecanismo Transversal Offline-First
+            </h3>
+            <p class="text-slate-600 leading-relaxed">
+                Este é o diferencial de alta tolerância a falhas do ERP. O <strong>Service Worker</strong> monitora os disparos das requisições. Se houver falha de rede ou timeout na camada do Firebase SDK, o erro é contido pelo wrapper da API que salva a "Payload" na fila respectiva do IndexedDB.
+            </p>
+            <div class="bg-blue-50 border border-blue-100 p-6 rounded-xl">
+                <h4 class="font-bold text-blue-900 mb-4">Pipeline de Sincronização Assíncrona</h4>
+                <ol class="list-decimal pl-5 text-sm text-blue-800 space-y-3">
+                    <li>A API Mutator tenta enviar (ex: <code>Venda</code>, <code>Cliente</code>, <code>Compra de Estoque</code>).</li>
+                    <li>Em erro ou estado explicitly <code>!navigator.onLine</code>, aciona a <code>offlineStore.ts</code>.</li>
+                    <li>Guarda no IndexedDB e emite <code>sync.register('sync-[dominio]')</code> para a Thread principal do SO/Navegador.</li>
+                    <li>Quando a conexão é restabelecida, o Service Worker dispara o evento <code>sync</code> em Background.</li>
+                    <li>Itera sobre os itens pendentes do IDB, aplica contra o Banco de dados real de forma idêntica e expurga o item local (Max retries: 3).</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- 4. INTEGRIDADE CONTÁBIL E FINANCEIRA -->
+        <section class="space-y-6">
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm">4</span>
+                Design de Integridade Isolada (Transactions & Locks)
+            </h3>
+            <p class="text-slate-600 leading-relaxed">
+                Para evitar concorrência e corrupção contábil entre Caixas físicos, Contas a Pagar/Receber e o Inventário, a arquitetura lança mão de <strong>Firestore Transactions</strong> na camada da API (<code>finance.ts</code>, <code>inventory.ts</code>).
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Card 1 -->
+                <div class="flex gap-4 bg-white p-5 rounded-xl border border-slate-200">
+                    <div class="text-amber-500">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900">ACID Compliance Simulado</h4>
+                        <p class="text-sm text-slate-500 mt-1">Ao registrar uma venda, o estoque e a conta bancária são atualizados numa única <code>runTransaction</code>. Se o caixa cair ou o estoque esgotar milissegundos antes, tudo sofre rollback.</p>
+                    </div>
+                </div>
+                <!-- Card 2 -->
+                <div class="flex gap-4 bg-white p-5 rounded-xl border border-slate-200">
+                    <div class="text-emerald-500">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900">Anti-Orphaned Writes</h4>
+                        <p class="text-sm text-slate-500 mt-1">Estornos bancários atirando exceções caso a fonte pagadora "desapareça" do DB. Bloqueadores explícitos de reversão para fluxos atribuídos a "Turnos de Caixa Fechados".</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. SEGURANÇA MICRO-TENANT -->
+        <section class="space-y-6">
+            <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm">5</span>
+                Segurança Multi-Tenant (Firebase Rules)
+            </h3>
+            <p class="text-slate-600 leading-relaxed">
+                Toda entidade é amarrada por <code>company_id</code>. Não dependemos do Frontend para não vazar dados. O Firebase Security Rules implementa a lógica Attribute-Based Access Control (ABAC):
+            </p>
+            <div class="bg-gray-900 text-gray-300 p-6 rounded-xl font-mono text-sm overflow-x-auto shadow-lg shadow-gray-200">
+<pre><code>// Pseudocódigo da Arquitetura do backend Security Rule
+
+function belongsToTenant() {
+    return resource.data.company_id == request.auth.token.company_id;
+}
+
+function hasPermission(module) {
+    let tenant = get(/databases/$(database)/documents/companies/$(request.auth.token.company_id));
+    return tenant.data.role_permissions[request.auth.token.role].hasAny([module]);
+}
+
+match /sales/{sale} {
+    allow read, write: if belongsToTenant() && hasPermission('sales.manage');
+}
+</code></pre>
+            </div>
+        </section>
+
+        <footer class="mt-16 border-t border-slate-200 pt-8 text-center">
+            <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">PowerControl Software Architecture</p>
+            <p class="text-xs text-slate-400 mt-2">© 2026 Sys.PowerControl - Confidencial e Proprietário.</p>
+        </footer>
+
+    </div>
+
+</body>
+</html>

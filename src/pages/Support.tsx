@@ -14,7 +14,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  History
+  History,
+  Send
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatBR } from "../lib/dateUtils";
@@ -23,6 +24,8 @@ export default function Support() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [tickets, setTickets] = useState<any[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -64,6 +67,45 @@ export default function Support() {
       toast.error("Erro ao abrir chamado: " + error.message);
     }
   });
+
+  const replyMutation = useMutation({
+    mutationFn: async ({ id, text }: { id: string, text: string }) => {
+      const ticket = tickets.find(t => t.id === id);
+      if(!ticket) throw new Error("Aconteceu algum problema e não conseguimos resgatar o ID deste chamado.");
+      
+      const newReply = {
+        author: 'user',
+        author_name: user?.full_name || 'Usuário',
+        text: text,
+        created_at: new Date().toISOString()
+      };
+
+      const updatedReplies = ticket.replies ? [...ticket.replies, newReply] : [newReply];
+
+      return api.put("support_tickets", id, {
+        replies: updatedReplies,
+        status: "OPEN", // Voltar para open pra forçar os analistas a olharem
+        updated_at: new Date().toISOString()
+      });
+    },
+    onSuccess: () => {
+      toast.success("Resposta enviada com sucesso!");
+      setReplyText("");
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao enviar resposta: " + error.message);
+    }
+  });
+
+  // Keep modal data synced
+  useEffect(() => {
+    if (selectedTicket) {
+      const updatedTicket = tickets.find(t => t.id === selectedTicket.id);
+      if (updatedTicket) {
+        setSelectedTicket(updatedTicket);
+      }
+    }
+  }, [tickets, selectedTicket?.id]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -154,19 +196,23 @@ export default function Support() {
               </h2>
               <div className="space-y-4">
                 {tickets.map((ticket) => (
-                  <div key={ticket.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+                  <div 
+                    key={ticket.id} 
+                    onClick={() => setSelectedTicket(ticket)}
+                    className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2 cursor-pointer hover:bg-white hover:border-blue-200 transition-all hover:shadow-md hover:shadow-blue-50 group"
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-400 uppercase">#{ticket.id.substr(0, 8).toUpperCase()}</span>
+                      <span className="text-xs font-bold text-gray-400 uppercase group-hover:text-blue-500 transition-colors">#{ticket.id.substr(0, 8).toUpperCase()}</span>
                       {getStatusBadge(ticket.status)}
                     </div>
-                    <h3 className="font-bold text-gray-900">{ticket.subject}</h3>
+                    <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{ticket.subject}</h3>
                     <p className="text-sm text-gray-500 line-clamp-2">{ticket.message}</p>
                     <div className="flex items-center justify-between pt-2 border-t border-gray-200/50">
                       <span className="text-[10px] text-gray-400 font-medium">
                         Aberto em {formatBR(ticket.created_at, "dd/MM/yyyy HH:mm")}
                       </span>
                       {ticket.internal_notes && (
-                        <span className="text-[10px] text-blue-600 font-bold italic">Resposta disponível</span>
+                        <span className="text-[10px] text-blue-600 font-bold italic">Visualizar Resposta</span>
                       )}
                     </div>
                   </div>
@@ -212,6 +258,98 @@ export default function Support() {
       <div className="text-center py-8 border-t border-gray-100">
         <p className="text-sm text-gray-400">© 2026 PowerControl. Todos os direitos reservados.</p>
       </div>
+
+      {/* Ticket Details Modal */}
+      {selectedTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedTicket(null)} />
+          <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex flex-col gap-2 shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold text-gray-900">{selectedTicket.subject}</h2>
+                  {getStatusBadge(selectedTicket.status)}
+                </div>
+                <button onClick={() => setSelectedTicket(null)} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+              </div>
+              <p className="text-xs font-bold text-gray-400 uppercase">Ticket #{selectedTicket.id}</p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              
+              {/* Opener initial message */}
+              <div className="flex flex-col items-start gap-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase ml-2">Você - {formatBR(selectedTicket.created_at, "dd/MM/yyyy HH:mm")}</span>
+                <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-tl-sm text-sm text-gray-800 max-w-[85%] whitespace-pre-wrap">
+                  {selectedTicket.message}
+                </div>
+              </div>
+
+              {/* Specialist Original Answer (Legacy notes format handling) */}
+              {selectedTicket.internal_notes && (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] font-bold text-blue-400 uppercase mr-2">Suporte Técnico</span>
+                  <div className="bg-blue-600 px-4 py-3 rounded-2xl rounded-tr-sm text-sm text-white max-w-[85%] whitespace-pre-wrap shadow-md shadow-blue-100">
+                    {selectedTicket.internal_notes}
+                  </div>
+                </div>
+              )}
+
+              {/* Replies Iterator */}
+              {selectedTicket.replies?.map((reply: any, index: number) => (
+                <div key={index} className={`flex flex-col gap-1 ${reply.author === 'user' ? 'items-start' : 'items-end'}`}>
+                   <span className={`text-[10px] font-bold uppercase ${reply.author === 'user' ? 'text-gray-400 ml-2' : 'text-blue-400 mr-2'}`}>
+                     {reply.author === 'user' ? 'Você' : 'Suporte Técnico'} - {formatBR(reply.created_at, "dd/MM/yyyy HH:mm")}
+                   </span>
+                   <div className={`px-4 py-3 rounded-2xl text-sm max-w-[85%] whitespace-pre-wrap ${
+                     reply.author === 'user' 
+                      ? 'bg-gray-100 text-gray-800 rounded-tl-sm' 
+                      : 'bg-blue-600 text-white rounded-tr-sm shadow-md shadow-blue-100'
+                   }`}>
+                     {reply.text}
+                   </div>
+                </div>
+              ))}
+
+              {selectedTicket.status === 'CLOSED' && (
+                <div className="text-center py-4 text-sm text-gray-400 font-medium">
+                  Este chamado foi encerrado e não aceita mais mensagens.
+                </div>
+              )}
+
+            </div>
+
+            {selectedTicket.status !== 'CLOSED' && (
+              <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center gap-2 rounded-b-3xl">
+                 <input 
+                   type="text" 
+                   value={replyText}
+                   onChange={e => setReplyText(e.target.value)}
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter' && replyText.trim() && !replyMutation.isPending) {
+                       replyMutation.mutate({ id: selectedTicket.id, text: replyText.trim() });
+                     }
+                   }}
+                   placeholder="Digite uma nova mensagem ou resposta ao operador..."
+                   className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                 />
+                 <button 
+                  onClick={() => {
+                    if (replyText.trim() && !replyMutation.isPending) {
+                      replyMutation.mutate({ id: selectedTicket.id, text: replyText.trim() });
+                    }
+                  }}
+                  disabled={!replyText.trim() || replyMutation.isPending}
+                  className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+                 >
+                   <Send size={20} />
+                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

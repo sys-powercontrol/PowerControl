@@ -187,11 +187,30 @@ export default function AccountsPayable() {
         if (sup) supplier_id = sup.id;
     }
 
-    createMutation.mutate({
+    const accountData = {
        ...data,
        supplier: supplier_name,
        supplier_name: supplier_name,
-       supplier_id: supplier_id
+       supplier_id: supplier_id,
+       company_id: user?.company_id,
+       amount: parseFloat(data.amount as string),
+       status: "Pendente",
+       is_recurring: data.is_recurring === "on"
+    };
+
+    api.post("accountsPayable", accountData).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      toast.success("Conta cadastrada!");
+      setIsModalOpen(false);
+    }).catch(async (error) => {
+      console.warn("Falha ao salvar CP online, acionando offline fallback", error);
+      if (!navigator.onLine || error.message?.includes('offline') || error.message?.includes('Failed to fetch')) {
+         const { offlineStore } = await import('../lib/offlineStore');
+         await offlineStore.saveAccountPayable(accountData);
+         setIsModalOpen(false);
+      } else {
+         toast.error("Erro ao cadastrar: " + error.message);
+      }
     });
   };
 

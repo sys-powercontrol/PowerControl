@@ -113,6 +113,15 @@ export default function Clients() {
         queryClient.invalidateQueries({ queryKey: ["clients"] });
         toast.success("Cliente cadastrado!");
         setIsModalOpen(false);
+      }).catch(async (error) => {
+        console.warn("Falha ao salvar cliente online, caindo para modo offline...", error);
+        if (!navigator.onLine || error.message?.includes('offline') || error.message?.includes('Failed to fetch')) {
+           const { offlineStore } = await import('../lib/offlineStore');
+           await offlineStore.saveClient(clientData);
+           setIsModalOpen(false);
+        } else {
+           toast.error("Erro ao cadastrar cliente: " + error.message);
+        }
       });
     }
   };

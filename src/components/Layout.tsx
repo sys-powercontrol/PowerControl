@@ -389,7 +389,7 @@ export default function Layout() {
               <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-500">✕</button>
             </div>
             <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-              {menuItems.map(item => (
+              {filteredMenuItems.map(item => (
                 <div key={item.name}>
                   {item.submenu ? (
                     <div>

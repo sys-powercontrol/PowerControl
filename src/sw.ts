@@ -2,6 +2,7 @@
 import { precacheAndRoute } from 'workbox-precaching';
 import { openDB } from 'idb';
 import { inventory } from './lib/inventory';
+import { api } from './lib/api';
 import { SaleItem, User } from './types';
 
 declare let self: ServiceWorkerGlobalScope;
@@ -23,7 +24,10 @@ interface PendingSale {
 precacheAndRoute(self.__WB_MANIFEST || []);
 
 const DB_NAME = "powercontrol_offline_db";
-const STORE_NAME = "sales";
+const STORE_SALES = "sales";
+const STORE_CLIENTS = "clients";
+const STORE_ACCOUNTS_PAYABLE = "accounts_payable";
+const STORE_PURCHASES = "purchases";
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -36,13 +40,25 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('sync', ((event: SyncEvent) => {
   if (event.tag === 'sync-sales') {
     event.waitUntil(syncSales());
+  } else if (event.tag === 'sync-clients') {
+    event.waitUntil(syncGenericEntities(STORE_CLIENTS, async (entity) => {
+      await api.post("clients", entity.data);
+    }));
+  } else if (event.tag === 'sync-accounts-payable') {
+    event.waitUntil(syncGenericEntities(STORE_ACCOUNTS_PAYABLE, async (entity) => {
+      await api.post("accountsPayable", entity.data);
+    }));
+  } else if (event.tag === 'sync-purchases') {
+    event.waitUntil(syncGenericEntities(STORE_PURCHASES, async (entity) => {
+      await inventory.processPurchase(entity.data, entity.items || [], entity.userContext);
+    }));
   }
 }) as EventListener);
 
 async function syncSales() {
   try {
-    const db = await openDB(DB_NAME, 1);
-    const pendingSales: PendingSale[] = await db.getAll(STORE_NAME);
+    const db = await openDB(DB_NAME, 2);
+    const pendingSales: PendingSale[] = await db.getAll(STORE_SALES);
 
     if (pendingSales.length === 0) return;
 
@@ -55,7 +71,7 @@ async function syncSales() {
     for (const sale of pendingSales) {
       try {
         await inventory.processSale(sale.saleData, sale.items, sale.userContext);
-        await db.delete(STORE_NAME, sale.id);
+        await db.delete(STORE_SALES, sale.id);
         syncedCount++;
       } catch (error: unknown) {
         if (error instanceof Error) {
@@ -67,11 +83,11 @@ async function syncSales() {
         
         if (retries >= MAX_RETRIES) {
           console.error(`Venda ${sale.id} atingiu limite de tentativas e será abandonada.`);
-          await db.delete(STORE_NAME, sale.id);
+          await db.delete(STORE_SALES, sale.id);
           abandonedCount++;
         } else {
           sale.retryCount = retries;
-          await db.put(STORE_NAME, sale);
+          await db.put(STORE_SALES, sale);
           failedCount++;
         }
       }
@@ -102,8 +118,58 @@ async function syncSales() {
   }
 }
 
+async function syncGenericEntities(storeName: string, processFunction: (entity: any) => Promise<void>) {
+  try {
+    const db = await openDB(DB_NAME, 2);
+    const pendingEntities = await db.getAll(storeName);
+
+    if (pendingEntities.length === 0) return;
+
+    let syncedCount = 0;
+    let failedCount = 0;
+    let abandonedCount = 0;
+    const MAX_RETRIES = 3;
+
+    for (const entity of pendingEntities) {
+      try {
+        await processFunction(entity);
+        await db.delete(storeName, entity.id);
+        syncedCount++;
+      } catch (error: unknown) {
+        console.error(`Erro ao sincronizar no SW (${storeName}):`, error);
+        
+        let retries = entity.retryCount || 0;
+        retries++;
+        
+        if (retries >= MAX_RETRIES) {
+          console.error(`Entidade ${entity.id} atingiu limite de tentativas e será abandonada.`);
+          await db.delete(storeName, entity.id);
+          abandonedCount++;
+        } else {
+          entity.retryCount = retries;
+          await db.put(storeName, entity);
+          failedCount++;
+        }
+      }
+    }
+
+    // Optional: we can post back to client here if we want generic notifications
+  } catch (err: unknown) {
+    console.error(`Erro geral no sync SW (${storeName}):`, err);
+  }
+}
+
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CHECK_SYNC') {
     syncSales();
+    syncGenericEntities(STORE_CLIENTS, async (entity) => {
+      await api.post("clients", entity.data);
+    });
+    syncGenericEntities(STORE_ACCOUNTS_PAYABLE, async (entity) => {
+      await api.post("accountsPayable", entity.data);
+    });
+    syncGenericEntities(STORE_PURCHASES, async (entity) => {
+      await inventory.processPurchase(entity.data, entity.items || [], entity.userContext);
+    });
   }
 });

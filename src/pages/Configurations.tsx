@@ -382,7 +382,7 @@ if (!canManage) {
                       <label className="text-sm font-bold text-gray-700">Provedor Fiscal</label>
                       <select name="fiscal_provider" defaultValue={company.fiscal_provider || "FocusNFe"} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="FocusNFe">FocusNFe</option>
-                        <option value="WebmaniaBR" disabled>WebmaniaBR (Em breve)</option>
+                        <option value="WebmaniaBR">WebmaniaBR</option>
                       </select>
                     </div>
                     <div className="space-y-2">
