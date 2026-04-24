@@ -24,7 +24,8 @@ export default function Support() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [tickets, setTickets] = useState<any[]>([]);
-  const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const selectedTicket = selectedTicketId ? tickets.find(t => t.id === selectedTicketId) : null;
   const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
@@ -96,16 +97,6 @@ export default function Support() {
       toast.error("Erro ao enviar resposta: " + error.message);
     }
   });
-
-  // Keep modal data synced
-  useEffect(() => {
-    if (selectedTicket) {
-      const updatedTicket = tickets.find(t => t.id === selectedTicket.id);
-      if (updatedTicket) {
-        setSelectedTicket(updatedTicket);
-      }
-    }
-  }, [tickets, selectedTicket?.id]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -198,7 +189,7 @@ export default function Support() {
                 {tickets.map((ticket) => (
                   <div 
                     key={ticket.id} 
-                    onClick={() => setSelectedTicket(ticket)}
+                    onClick={() => setSelectedTicketId(ticket.id)}
                     className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2 cursor-pointer hover:bg-white hover:border-blue-200 transition-all hover:shadow-md hover:shadow-blue-50 group"
                   >
                     <div className="flex items-center justify-between">
@@ -262,7 +253,7 @@ export default function Support() {
       {/* Ticket Details Modal */}
       {selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedTicket(null)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedTicketId(null)} />
           <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-gray-100 flex flex-col gap-2 shrink-0">
               <div className="flex items-center justify-between">
@@ -270,7 +261,7 @@ export default function Support() {
                   <h2 className="text-xl font-bold text-gray-900">{selectedTicket.subject}</h2>
                   {getStatusBadge(selectedTicket.status)}
                 </div>
-                <button onClick={() => setSelectedTicket(null)} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+                <button onClick={() => setSelectedTicketId(null)} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
               </div>
               <p className="text-xs font-bold text-gray-400 uppercase">Ticket #{selectedTicket.id}</p>
             </div>

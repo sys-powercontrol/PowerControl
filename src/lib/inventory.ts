@@ -16,7 +16,7 @@ const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
 
 export const inventory = {
   async recordMovement(data: Omit<InventoryMovement, "id" | "timestamp" | "user_id" | "user_name" | "previous_stock" | "current_stock">, userContext?: User) {
-    const user = userContext || await api.get<User>("me");
+    const user = userContext || (await api.get<User>("me")) as User;
     if (!user) throw new Error("Usuário não autenticado");
 
     return runTransaction(db, async (transaction) => {
@@ -55,7 +55,7 @@ export const inventory = {
   },
 
   async processSale(saleData: Partial<Sale> & Record<string, unknown>, items: SaleItem[], userContext?: User) {
-    const user = userContext || await api.get<User>("me");
+    const user = userContext || (await api.get<User>("me")) as User;
     if (!user) throw new Error("Usuário não autenticado");
 
     return runTransaction(db, async (transaction) => {
@@ -248,7 +248,7 @@ export const inventory = {
   },
 
   async processPurchase(purchaseData: Record<string, unknown>, items: SaleItem[], userContext?: User) {
-    const user = userContext || await api.get<User>("me");
+    const user = userContext || (await api.get<User>("me")) as User;
     if (!user) throw new Error("Usuário não autenticado");
 
     return runTransaction(db, async (transaction) => {

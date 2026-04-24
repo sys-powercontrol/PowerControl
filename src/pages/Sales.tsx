@@ -228,7 +228,8 @@ export default function Sales() {
   const finalizeSale = useMutation({
     mutationFn: async () => {
       if (!selectedClient) throw new Error("Selecione um cliente");
-      if (!selectedCashier) throw new Error("Selecione um caixa");
+      if ((paymentMethod === "Dinheiro" || paymentMethod === "Misto") && !selectedCashier) throw new Error("Selecione um caixa");
+      if ((paymentMethod === "PIX" || paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito" || paymentMethod === "Boleto") && !selectedBankAccount) throw new Error("Selecione uma conta bancária");
       if (!selectedSeller) throw new Error("Selecione um vendedor");
       if (cart.length === 0) throw new Error("Carrinho vazio");
 
@@ -281,19 +282,8 @@ export default function Sales() {
       
       const commissionAmount = (totalFiscalValue * (selectedSeller.commission_rate || 0)) / 100;
 
-      if (paymentMethod === "Dinheiro" && !selectedCashier) {
-        toast.error("Nenhum caixa aberto selecionado.");
-        return;
-      }
-
-      if ((paymentMethod === "PIX" || paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito" || paymentMethod === "Boleto") && !selectedBankAccount) {
-        toast.error("Nenhuma conta bancária selecionada.");
-        return;
-      }
-
       if (isNaN(totalFiscalValue) || totalFiscalValue < 0) {
-        toast.error("Valor total da venda inválido.");
-        return;
+        throw new Error("Valor total da venda inválido.");
       }
 
       const saleData = {
@@ -301,7 +291,7 @@ export default function Sales() {
         client_id: selectedClient.id,
         client_name: selectedClient.name,
         client_document: selectedClient.document || "",
-        ...(paymentMethod === "Dinheiro" ? { cashier_id: selectedCashier.id } : {}),
+        ...(paymentMethod === "Dinheiro" || paymentMethod === "Misto" ? { cashier_id: selectedCashier?.id } : {}),
         ...((paymentMethod === "PIX" || paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito" || paymentMethod === "Boleto") ? { bank_account_id: selectedBankAccount?.id } : {}),
         seller_id: selectedSeller.id,
         seller_name: selectedSeller.name,

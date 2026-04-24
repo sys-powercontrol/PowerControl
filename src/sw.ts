@@ -153,9 +153,30 @@ async function syncGenericEntities(storeName: string, processFunction: (entity: 
       }
     }
 
-    // Optional: we can post back to client here if we want generic notifications
+    const allClients = await self.clients.matchAll({ type: 'window' });
+    for (const client of allClients) {
+      if (syncedCount > 0 || failedCount > 0 || abandonedCount > 0) {
+        client.postMessage({ 
+          type: 'SYNC_COMPLETED',
+          payload: {
+            synced: syncedCount,
+            failed: failedCount,
+            abandoned: abandonedCount
+          }
+        });
+      }
+    }
   } catch (err: unknown) {
     console.error(`Erro geral no sync SW (${storeName}):`, err);
+    if (err instanceof Error) {
+      const allClients = await self.clients.matchAll({ type: 'window' });
+      for (const client of allClients) {
+        client.postMessage({ 
+          type: 'SYNC_ERROR',
+          payload: { error: err.message }
+        });
+      }
+    }
   }
 }
 

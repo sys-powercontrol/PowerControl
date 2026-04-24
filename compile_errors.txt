@@ -1,0 +1,64 @@
+src/App.tsx(80,13): error TS2304: Cannot find name 'toast'.
+src/App.tsx(83,13): error TS2304: Cannot find name 'toast'.
+src/App.tsx(86,13): error TS2304: Cannot find name 'toast'.
+src/App.tsx(89,11): error TS2304: Cannot find name 'toast'.
+src/lib/inventory.ts(47,23): error TS2339: Property 'id' does not exist on type 'User | User[]'.
+  Property 'id' does not exist on type 'User[]'.
+src/lib/inventory.ts(48,25): error TS2339: Property 'full_name' does not exist on type 'User | User[]'.
+  Property 'full_name' does not exist on type 'User[]'.
+src/lib/inventory.ts(48,43): error TS2339: Property 'email' does not exist on type 'User | User[]'.
+  Property 'email' does not exist on type 'User[]'.
+src/lib/inventory.ts(63,17): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(64,52): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(143,32): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(150,29): error TS2339: Property 'id' does not exist on type 'User | User[]'.
+  Property 'id' does not exist on type 'User[]'.
+src/lib/inventory.ts(151,31): error TS2339: Property 'full_name' does not exist on type 'User | User[]'.
+  Property 'full_name' does not exist on type 'User[]'.
+src/lib/inventory.ts(151,49): error TS2339: Property 'email' does not exist on type 'User | User[]'.
+  Property 'email' does not exist on type 'User[]'.
+src/lib/inventory.ts(176,30): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(182,27): error TS2339: Property 'id' does not exist on type 'User | User[]'.
+  Property 'id' does not exist on type 'User[]'.
+src/lib/inventory.ts(183,29): error TS2339: Property 'full_name' does not exist on type 'User | User[]'.
+  Property 'full_name' does not exist on type 'User[]'.
+src/lib/inventory.ts(183,47): error TS2339: Property 'email' does not exist on type 'User | User[]'.
+  Property 'email' does not exist on type 'User[]'.
+src/lib/inventory.ts(194,23): error TS2339: Property 'id' does not exist on type 'User | User[]'.
+  Property 'id' does not exist on type 'User[]'.
+src/lib/inventory.ts(195,25): error TS2339: Property 'full_name' does not exist on type 'User | User[]'.
+  Property 'full_name' does not exist on type 'User[]'.
+src/lib/inventory.ts(195,43): error TS2339: Property 'email' does not exist on type 'User | User[]'.
+  Property 'email' does not exist on type 'User[]'.
+src/lib/inventory.ts(196,26): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(206,28): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(233,28): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(255,17): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(301,28): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(307,25): error TS2339: Property 'id' does not exist on type 'User | User[]'.
+  Property 'id' does not exist on type 'User[]'.
+src/lib/inventory.ts(308,27): error TS2339: Property 'full_name' does not exist on type 'User | User[]'.
+  Property 'full_name' does not exist on type 'User[]'.
+src/lib/inventory.ts(308,45): error TS2339: Property 'email' does not exist on type 'User | User[]'.
+  Property 'email' does not exist on type 'User[]'.
+src/lib/inventory.ts(318,23): error TS2339: Property 'id' does not exist on type 'User | User[]'.
+  Property 'id' does not exist on type 'User[]'.
+src/lib/inventory.ts(319,25): error TS2339: Property 'full_name' does not exist on type 'User | User[]'.
+  Property 'full_name' does not exist on type 'User[]'.
+src/lib/inventory.ts(319,43): error TS2339: Property 'email' does not exist on type 'User | User[]'.
+  Property 'email' does not exist on type 'User[]'.
+src/lib/inventory.ts(320,26): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(330,28): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.
+src/lib/inventory.ts(358,28): error TS2339: Property 'company_id' does not exist on type 'User | User[]'.
+  Property 'company_id' does not exist on type 'User[]'.

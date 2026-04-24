@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { calculateDiff } from "../lib/utils/diff";
+import { fiscalApi } from "../services/fiscalApi";
 import { useAuth } from "../lib/auth";
 import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, PermissionId } from "../lib/permissions";
 import { 
@@ -117,7 +118,7 @@ export default function Configurations() {
     });
   };
 
-  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!companyId) return;
 
@@ -156,6 +157,21 @@ export default function Configurations() {
       data.allow_negative_stock = allowNegativeStock;
       if (user?.role === 'master') {
         data.disable_product_images = disableImages;
+      }
+    }
+
+    if (activeTab === "fiscal") {
+      try {
+        setIsSaving(true);
+        await fiscalApi.ping({
+          provider: data.fiscal_provider as "FocusNFe" | "WebmaniaBR",
+          environment: data.fiscal_environment as "sandbox" | "production",
+          token: data.fiscal_token as string
+        });
+      } catch (err: any) {
+        toast.error(`Falha na validação do provedor fiscal: ${err.message}`);
+        setIsSaving(false);
+        return;
       }
     }
 

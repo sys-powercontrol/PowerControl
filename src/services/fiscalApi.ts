@@ -38,6 +38,48 @@ export const fiscalApi = {
     throw new Error("Provedor fiscal não suportado");
   },
 
+  ping: async (config: FiscalConfig) => {
+    try {
+      if (config.provider === "FocusNFe") {
+        const baseUrl = FOCUSNFE_URLS[config.environment];
+        // Minimal request to check auth
+        await axios.get(`${baseUrl}/nfe?limit=1`, {
+          headers: { Authorization: `Basic ${btoa(config.token + ":")}` }
+        });
+        return true;
+      }
+      if (config.provider === "WebmaniaBR") {
+        const baseUrl = WEBMANIABR_URLS[config.environment];
+        const [ck, cs, at, ats] = config.token.split(":");
+        if (!ck || !cs || !at || !ats) {
+          throw new Error("Formato de token WebmaniaBR inválido. Use CK:CS:AT:ATS");
+        }
+        // Minimal request to check auth
+        await axios.get(`${baseUrl}/consulta/?uuid=test`, {
+          headers: {
+            "X-Consumer-Key": ck,
+            "X-Consumer-Secret": cs,
+            "X-AccessToken": at,
+            "X-AccessToken-Secret": ats
+          }
+        });
+        return true;
+      }
+      return false;
+    } catch (e) {
+      if (axios.isAxiosError(e)) {
+         if (e.response?.status === 401 || e.response?.status === 403) {
+            throw new Error("Credenciais inválidas (Não Autorizado)", { cause: e });
+         }
+      }
+      // If it's a 404 or something on our dummy UUID, it means auth passed!
+      if (axios.isAxiosError(e) && e.response?.status === 404) {
+         return true;
+      }
+      throw new Error(e instanceof Error ? e.message : "Erro na validação do token", { cause: e });
+    }
+  },
+
   checkStatus: async (config: FiscalConfig, reference: string, type: "NFe" | "NFCe") => {
     if (config.provider === "FocusNFe") {
       return checkFocusNFeStatus(config, reference, type);

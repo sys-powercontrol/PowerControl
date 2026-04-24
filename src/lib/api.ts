@@ -35,7 +35,7 @@ export const api = {
     if (snapshot.empty) return null;
     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as User;
   },
-  get: async <T = unknown>(entityPath: string, paramsOrId?: Record<string, unknown> | string): Promise<T | T[]> => {
+  get: async <T = any>(entityPath: string, paramsOrId?: Record<string, any> | string): Promise<T | T[]> => {
     if (entityPath === "me") {
       const user = auth.currentUser;
       if (!user) throw new Error("Not authenticated");
@@ -148,8 +148,8 @@ export const api = {
       }) as T[];
     }
   },
-  post: async <T = unknown>(entity: string, data: Partial<T> | Record<string, unknown>): Promise<T> => {
-    const payload = cleanObject({ ...data }) as Record<string, unknown>;
+  post: async <T = any>(entity: string, data: Partial<T> | Record<string, any>): Promise<T> => {
+    const payload = cleanObject({ ...data }) as Record<string, any>;
     
     if (!payload.company_id && currentCompanyId && entity !== "companies" && entity !== "users") {
       payload.company_id = currentCompanyId;
@@ -163,9 +163,9 @@ export const api = {
     await setDoc(newDocRef, payload);
     return { id: newDocRef.id, ...payload } as T;
   },
-  put: async <T = unknown>(entity: string, id: string, data: Partial<T> | Record<string, unknown>): Promise<T> => {
+  put: async <T = any>(entity: string, id: string, data: Partial<T> | Record<string, any>): Promise<T> => {
     const docRef = doc(db, entity, id);
-    const payload = cleanObject(data) as Record<string, unknown>;
+    const payload = cleanObject(data) as Record<string, any>;
     await updateDoc(docRef, payload);
     return { id, ...payload } as T;
   },
@@ -174,7 +174,7 @@ export const api = {
     await deleteDoc(docRef);
     return true;
   },
-  subscribe: <T = unknown>(entityPath: string, params: Record<string, unknown> | null, callback: (data: T[]) => void) => {
+  subscribe: <T = any>(entityPath: string, params: Record<string, any> | null, callback: (data: T[]) => void) => {
     let q: Query<DocumentData> = collection(db, entityPath);
     const conditions: QueryConstraint[] = [];
 
