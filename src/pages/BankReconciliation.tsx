@@ -2,14 +2,13 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   FileText, 
   Building2, 
-  Search, 
   ArrowRightLeft,
   Shield,
   CheckCircle2,
-  AlertCircle,
   Upload,
   Plus
 } from "lucide-react";
@@ -83,7 +82,7 @@ if (!canManage) {
                   >
                     <p className="font-bold text-gray-900">{acc.name}</p>
                     <p className="text-xs text-gray-500">{acc.bank_name}</p>
-                    <p className="text-sm font-bold text-blue-600 mt-2">R$ {acc.balance?.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-blue-600 mt-2">{formatCurrency(acc.balance || 0)}</p>
                   </button>
                 ))
               )}

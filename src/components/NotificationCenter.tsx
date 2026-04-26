@@ -2,16 +2,15 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   Bell, 
   AlertTriangle, 
-  Clock, 
   XCircle, 
   CheckCircle2,
   Info,
   ChevronRight,
-  Trash2,
-  ExternalLink
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router-dom";
@@ -110,7 +109,7 @@ export default function NotificationCenter() {
       list.push({
         id: `payable-${a.id}`,
         title: "Conta a Pagar Hoje",
-        message: `Vencimento de R$ ${a.amount.toLocaleString()} para "${a.description}".`,
+        message: `Vencimento de ${formatCurrency(a.amount)} para "${a.description}".`,
         type: 'error',
         link: "/ContasPagar",
         date: new Date().toISOString()
@@ -121,7 +120,7 @@ export default function NotificationCenter() {
       list.push({
         id: `receivable-${a.id}`,
         title: "Conta a Receber Hoje",
-        message: `Expectativa de R$ ${a.amount.toLocaleString()} de "${a.client_name || a.description}".`,
+        message: `Expectativa de ${formatCurrency(a.amount)} de "${a.client_name || a.description}".`,
         type: 'info',
         link: "/ContasReceber",
         date: new Date().toISOString()

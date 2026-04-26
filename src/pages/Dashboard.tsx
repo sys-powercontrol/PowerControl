@@ -2,11 +2,11 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatCurrency } from "../lib/currencyUtils";
 import { formatBR, getNowBR } from "../lib/dateUtils";
 import SellerDashboard from "./SellerDashboard";
 import { 
   TrendingUp, 
-  Package, 
   Users, 
   CreditCard,
   AlertTriangle,
@@ -25,16 +25,9 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell
+  ResponsiveContainer
 } from "recharts";
 import { Link } from "react-router-dom";
-
-const COLORS = ['#2563EB', '#10B981', '#F59E0B', '#8B5CF6'];
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }: any) => (
   <div className={`p-6 rounded-2xl bg-gradient-to-br ${color} text-white shadow-lg`}>
@@ -65,11 +58,7 @@ export default function Dashboard() {
     queryFn: () => api.get("products"),
     enabled: !!user
   });
-  const { data: clientsData = [] } = useQuery({ 
-    queryKey: ["clients", currentCompanyId], 
-    queryFn: () => api.get("clients"),
-    enabled: !!user
-  });
+  
   const { data: cashiersData = [] } = useQuery({ 
     queryKey: ["cashiers", currentCompanyId], 
     queryFn: () => api.get("cashiers"),
@@ -100,11 +89,6 @@ export default function Dashboard() {
     if (!currentCompanyId) return productsData;
     return productsData.filter((item: any) => item.company_id === currentCompanyId);
   }, [productsData, currentCompanyId]);
-
-  const clients = useMemo(() => {
-    if (!currentCompanyId) return clientsData;
-    return clientsData.filter((item: any) => item.company_id === currentCompanyId);
-  }, [clientsData, currentCompanyId]);
 
   const cashiers = useMemo(() => {
     if (!currentCompanyId) return cashiersData;
@@ -178,28 +162,28 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Vendas do Mês" 
-          value={`R$ ${totalSalesMonth.toLocaleString()}`} 
+          value={formatCurrency(totalSalesMonth)} 
           icon={TrendingUp} 
           color="from-green-500 to-green-600"
           subtitle={`${sales.length} vendas realizadas`}
         />
         <StatCard 
           title="Compras do Mês" 
-          value={`R$ ${totalPurchases.toLocaleString()}`} 
+          value={formatCurrency(totalPurchases)} 
           icon={ShoppingCart} 
           color="from-orange-500 to-orange-600"
           subtitle={`${purchases.length} entradas de estoque`}
         />
         <StatCard 
           title="A Receber" 
-          value={`R$ ${totalReceivable.toLocaleString()}`} 
+          value={formatCurrency(totalReceivable)} 
           icon={ArrowUpRight} 
           color="from-blue-500 to-blue-600"
           subtitle="Contas pendentes"
         />
         <StatCard 
           title="A Pagar" 
-          value={`R$ ${totalPayable.toLocaleString()}`} 
+          value={formatCurrency(totalPayable)} 
           icon={ArrowDownLeft} 
           color="from-red-500 to-red-600"
           subtitle="Compromissos pendentes"
@@ -322,7 +306,7 @@ export default function Dashboard() {
                 <tr key={sale.id} className="text-sm">
                   <td className="py-4 font-medium text-gray-900">#{sale.sale_number || "001"}</td>
                   <td className="py-4 text-gray-600">{sale.client_name || "Consumidor Final"}</td>
-                  <td className="py-4 font-bold text-green-600">R$ {sale.total?.toLocaleString()}</td>
+                  <td className="py-4 font-bold text-green-600">{formatCurrency(sale.total || 0)}</td>
                   <td className="py-4">
                     <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase">
                       {sale.status || "Concluída"}

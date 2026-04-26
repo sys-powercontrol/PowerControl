@@ -1,3 +1,5 @@
+import { formatCurrency } from '../currencyUtils';
+
 const escapeHtml = (unsafe: any): string => {
   if (unsafe === null || unsafe === undefined) return '';
   if (typeof unsafe !== 'string') unsafe = String(unsafe);
@@ -20,8 +22,8 @@ export const printReceipt = (sale: any, company: any) => {
     <tr>
       <td style="padding: 4px 0;">${escapeHtml(item.name)}</td>
       <td style="text-align: center; padding: 4px 0;">${escapeHtml(item.quantity)}</td>
-      <td style="text-align: right; padding: 4px 0;">R$ ${item.price.toLocaleString()}</td>
-      <td style="text-align: right; padding: 4px 0;">R$ ${(item.price * item.quantity).toLocaleString()}</td>
+      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.price)}</td>
+      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.price * item.quantity)}</td>
     </tr>
   `).join('');
 
@@ -82,9 +84,9 @@ export const printReceipt = (sale: any, company: any) => {
           </tbody>
         </table>
         <div class="totals">
-          <div>Subtotal: R$ ${sale.subtotal.toLocaleString()}</div>
-          <div>Desconto: - R$ ${sale.discount.toLocaleString()}</div>
-          <div class="total-row">TOTAL: R$ ${sale.total.toLocaleString()}</div>
+          <div>Subtotal: ${formatCurrency(sale.subtotal)}</div>
+          <div>Desconto: - ${formatCurrency(sale.discount)}</div>
+          <div class="total-row">TOTAL: ${formatCurrency(sale.total)}</div>
           <div style="margin-top: 4px;">PAGAMENTO: ${escapeHtml(sale.payment_method)}</div>
         </div>
         <div class="footer">
@@ -116,8 +118,8 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
     <tr>
       <td style="padding: 4px 0;">${escapeHtml(item.name)}</td>
       <td style="text-align: center; padding: 4px 0;">${escapeHtml(item.quantity)}</td>
-      <td style="text-align: right; padding: 4px 0;">R$ ${item.cost.toLocaleString()}</td>
-      <td style="text-align: right; padding: 4px 0;">R$ ${(item.cost * item.quantity).toLocaleString()}</td>
+      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.cost)}</td>
+      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.cost * item.quantity)}</td>
     </tr>
   `).join('');
 
@@ -176,7 +178,7 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
           </tbody>
         </table>
         <div class="totals">
-          <div class="total-row">TOTAL: R$ ${purchase.total.toLocaleString()}</div>
+          <div class="total-row">TOTAL: ${formatCurrency(purchase.total)}</div>
           <div style="margin-top: 4px;">PAGAMENTO: ${escapeHtml(purchase.payment_status)}</div>
         </div>
         <div class="footer">

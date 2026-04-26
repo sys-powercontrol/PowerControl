@@ -4,20 +4,20 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR, getTodayBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   TrendingUp, 
   Plus, 
-  Search, 
   Calendar,
   User,
   CheckCircle2,
-  Building2,
   Shield,
   Lock,
   Repeat,
   History,
   CalendarClock,
   Trash2,
+  Edit,
   RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,12 +44,13 @@ export default function AccountsReceivable() {
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
   const [accountToReverse, setAccountToReverse] = useState<string | null>(null);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
 
   const currentCompanyId = api.getCompanyId();
 
   const { data: accountsData = [], isLoading } = useQuery({ 
     queryKey: ["accountsReceivable", currentCompanyId], 
-    queryFn: () => api.get("accountsReceivable", { _orderBy: "due_date", _orderDir: "asc" }),
+    queryFn: () => api.get("accountsReceivable", { _orderBy: "due_date", _orderDir: "desc" }),
     enabled: !!user
   });
 
@@ -174,7 +175,46 @@ export default function AccountsReceivable() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    createMutation.mutate(data);
+    
+    let newStatus = editingAccount ? editingAccount.status : "Pendente";
+    const statusFromForm = data.status as string;
+    
+    // If user manually changed status in edit form
+    if (statusFromForm && statusFromForm !== newStatus) {
+      newStatus = statusFromForm;
+    }
+
+    const accountData = {
+      ...data,
+      company_id: user?.company_id,
+      amount: parseFloat(data.amount as string),
+      status: newStatus,
+      is_recurring: data.is_recurring === "on"
+    };
+
+    const mutationPromise = editingAccount
+      ? api.put("accountsReceivable", editingAccount.id, accountData)
+      : api.post("accountsReceivable", accountData);
+
+    mutationPromise.then(async () => {
+      // HANDLE FINANCIAL RESTORATION IF REOPENED
+      if (editingAccount && editingAccount.status === "Recebido" && (newStatus === "Pendente" || newStatus === "Atrasado")) {
+        const { reverseAccountReceipt } = await import("../lib/finance");
+        await reverseAccountReceipt(editingAccount);
+        toast.info("A conta foi reaberta e o saldo estornado.");
+      }
+      queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
+      toast.success(editingAccount ? "Conta atualizada!" : "Conta cadastrada!");
+      setIsModalOpen(false);
+      setEditingAccount(null);
+    }).catch((error) => {
+      toast.error("Erro ao salvar: " + error.message);
+    });
+  };
+
+  const handleEdit = (acc: any) => {
+    setEditingAccount(acc);
+    setIsModalOpen(true);
   };
 
   const handleReceive = (id: string) => {
@@ -243,9 +283,7 @@ export default function AccountsReceivable() {
   const extendDateMutation = useMutation({
     mutationFn: (data: { id: string, newDate: string, oldDate: string }) => {
       const dbAccount = accounts.find((a: any) => a.id === data.id);
-      if (dbAccount && (dbAccount.status === 'Recebido' || dbAccount.status === 'Pago')) {
-          throw new Error('Não é possível modificar parâmetros de uma conta que já foi finalizada. Estorne primeiro.');
-      }
+      
       const historyRecord = {
         old_date: data.oldDate,
         new_date: data.newDate,
@@ -402,13 +440,13 @@ if (!canView) {
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-blue-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Pendente</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">
-            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+            {formatCurrency(accountsWithDynamicStatus.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0))}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-green-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Recebido (Mês)</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
-            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Recebido").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+            {formatCurrency(accountsWithDynamicStatus.filter((a: any) => a.status === "Recebido").reduce((acc: number, a: any) => acc + (a.amount || 0), 0))}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-orange-500">
@@ -467,7 +505,7 @@ if (!canView) {
             
             <div className="flex items-center justify-between md:justify-end gap-6">
               <div className="text-right">
-                <p className="text-lg font-bold text-gray-900">R$ {acc.amount?.toLocaleString()}</p>
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(acc.amount || 0)}</p>
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                   acc.status === "Recebido" ? "bg-green-100 text-green-700" : 
                   acc.status === "Atrasado" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
@@ -477,24 +515,42 @@ if (!canView) {
               </div>
               <div className="flex items-center gap-2">
                 {acc.status === "Recebido" && (user?.role === 'admin' || user?.role === 'master') && (
-                  <button 
-                    onClick={() => handleReverse(acc.id)}
-                    className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all"
-                    title="Estornar Recebimento"
-                  >
-                    <RotateCcw size={20} />
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => handleEdit(acc)}
+                      className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
+                      title="Editar Conta"
+                    >
+                      <Edit size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleReverse(acc.id)}
+                      className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all"
+                      title="Estornar Recebimento"
+                    >
+                      <RotateCcw size={20} />
+                    </button>
+                  </>
                 )}
                 {acc.status !== "Recebido" && (
                   <>
                     {(user?.role === 'admin' || user?.role === 'master') && (
-                      <button 
-                        onClick={() => handleEditDate(acc.id, acc.due_date)}
-                        className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all"
-                        title="Alterar Vencimento"
-                      >
-                        <CalendarClock size={20} />
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => handleEdit(acc)}
+                          className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
+                          title="Editar Conta"
+                        >
+                          <Edit size={20} />
+                        </button>
+                        <button 
+                          onClick={() => handleEditDate(acc.id, acc.due_date)}
+                          className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all"
+                          title="Alterar Vencimento"
+                        >
+                          <CalendarClock size={20} />
+                        </button>
+                      </>
                     )}
                     <button 
                       onClick={() => handleReceive(acc.id)}
@@ -540,12 +596,12 @@ if (!canView) {
                   <option value="">Selecione uma conta...</option>
                   <optgroup label="Contas Bancárias">
                     {bankAccounts.map((a: any) => (
-                      <option key={`bank:${a.id}`} value={`bank:${a.id}`}>{a.name} (R$ {a.balance?.toLocaleString()})</option>
+                      <option key={`bank:${a.id}`} value={`bank:${a.id}`}>{a.name} ({formatCurrency(a.balance || 0)})</option>
                     ))}
                   </optgroup>
                   <optgroup label="Caixas">
                     {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
-                      <option key={`cashier:${c.id}`} value={`cashier:${c.id}`}>{c.name} (R$ {c.balance?.toLocaleString()})</option>
+                      <option key={`cashier:${c.id}`} value={`cashier:${c.id}`}>{c.name} ({formatCurrency(c.balance || 0)})</option>
                     ))}
                   </optgroup>
                 </select>
@@ -613,27 +669,27 @@ if (!canView) {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
           <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-xl font-bold">Nova Conta a Receber</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <h2 className="text-xl font-bold">{editingAccount ? "Editar Conta" : "Nova Conta a Receber"}</h2>
+              <button onClick={() => { setIsModalOpen(false); setEditingAccount(null); }} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">Descrição *</label>
-                <input name="description" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500" />
+                <input name="description" required defaultValue={editingAccount?.description} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">Valor (R$) *</label>
-                  <input name="amount" type="number" step="0.01" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500" />
+                  <input name="amount" type="number" step="0.01" required defaultValue={editingAccount?.amount} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">Vencimento *</label>
-                  <input name="due_date" type="date" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500" />
+                  <input name="due_date" type="date" required defaultValue={editingAccount?.due_date} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">Cliente</label>
-                <select name="client_name" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500">
+                <select name="client_name" defaultValue={editingAccount?.client_name || ""} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500">
                   <option value="">Selecione um cliente...</option>
                   {clients.map((c: any) => (
                     <option key={c.id} value={c.name}>{c.name}</option>
@@ -642,22 +698,39 @@ if (!canView) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2 p-2">
-                  <input type="checkbox" name="is_recurring" id="is_recurring" className="w-4 h-4 text-green-600 rounded focus:ring-green-500" />
+                  <input type="checkbox" name="is_recurring" id="is_recurring" defaultChecked={editingAccount?.is_recurring} className="w-4 h-4 text-green-600 rounded focus:ring-green-500" />
                   <label htmlFor="is_recurring" className="text-sm font-bold text-gray-700">Recorrente?</label>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500">Frequência</label>
-                  <select name="frequency" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm">
+                  <select name="frequency" defaultValue={editingAccount?.frequency || "MONTHLY"} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm">
                     <option value="MONTHLY">Mensal</option>
                     <option value="WEEKLY">Semanal</option>
                     <option value="YEARLY">Anual</option>
                   </select>
                 </div>
               </div>
+              {editingAccount && (
+                <div className="px-1 py-1">
+                  <label className="text-sm font-bold text-gray-700">Status</label>
+                  <select 
+                    name="status" 
+                    defaultValue={editingAccount.status}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="Pendente">Pendente</option>
+                    <option value="Recebido">Recebido</option>
+                    <option value="Atrasado">Atrasado</option>
+                  </select>
+                  {editingAccount.status === "Recebido" && (
+                    <p className="text-[10px] text-orange-600 font-bold mt-1 ml-1">Nota: Mudar para Pendente irá estornar o valor do caixa/banco automaticamente.</p>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingAccount(null); }} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
                 <button type="submit" disabled={createMutation.isPending} className="px-8 py-2 bg-green-600 text-white rounded-xl font-bold">
-                  {createMutation.isPending ? "Cadastrando..." : "Cadastrar"}
+                  {editingAccount ? "Salvar Alterações" : "Cadastrar"}
                 </button>
               </div>
             </form>

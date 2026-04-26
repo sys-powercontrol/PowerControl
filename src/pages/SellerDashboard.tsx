@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   TrendingUp, 
   ShoppingCart, 
@@ -148,28 +149,28 @@ export default function SellerDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Vendas Hoje" 
-          value={`R$ ${metrics.totalToday.toLocaleString()}`} 
+          value={formatCurrency(metrics.totalToday)} 
           icon={ShoppingCart} 
           color="from-blue-500 to-blue-600"
           subtitle={`${metrics.countToday} vendas realizadas hoje`}
         />
         <StatCard 
           title="Vendas no Mês" 
-          value={`R$ ${metrics.totalMonth.toLocaleString()}`} 
+          value={formatCurrency(metrics.totalMonth)} 
           icon={TrendingUp} 
           color="from-green-500 to-green-600"
           subtitle={`${metrics.countMonth} vendas no mês`}
         />
         <StatCard 
           title="Minhas Comissões" 
-          value={`R$ ${metrics.totalCommissions.toLocaleString()}`} 
+          value={formatCurrency(metrics.totalCommissions)} 
           icon={DollarSign} 
           color="from-purple-500 to-purple-600"
           subtitle={`Baseado em ${currentSeller?.commission_rate || 0}% de comissão`}
         />
         <StatCard 
           title="Meta Mensal" 
-          value={`R$ ${metrics.goal.toLocaleString()}`} 
+          value={formatCurrency(metrics.goal)} 
           icon={Target} 
           color="from-orange-500 to-orange-600"
           progress={metrics.goalProgress}
@@ -246,7 +247,7 @@ export default function SellerDashboard() {
                 <tr key={sale.id} className="text-sm">
                   <td className="py-4 font-medium text-gray-900">#{sale.sale_number || "001"}</td>
                   <td className="py-4 text-gray-600">{sale.client_name || "Consumidor Final"}</td>
-                  <td className="py-4 font-bold text-green-600">R$ {sale.total?.toLocaleString()}</td>
+                  <td className="py-4 font-bold text-green-600">{formatCurrency(sale.total || 0)}</td>
                   <td className="py-4 text-gray-500">{formatBR(sale.sale_date)}</td>
                 </tr>
               ))}

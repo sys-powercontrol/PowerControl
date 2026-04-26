@@ -4,7 +4,6 @@ import { api } from "../lib/api";
 import { inventory } from "../lib/inventory";
 import { fiscal, FiscalOperation } from "../lib/fiscal";
 import { 
-  ShoppingCart, 
   Plus, 
   Trash2, 
   CheckCircle2,
@@ -15,7 +14,8 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR } from "../lib/dateUtils";
-import { format, subDays } from "date-fns";
+import { formatCurrency } from "../lib/currencyUtils";
+import { subDays } from "date-fns";
 
 export default function Purchases() {
   const { user, hasPermission } = useAuth();
@@ -176,7 +176,7 @@ export default function Purchases() {
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       toast.success("Compra registrada com sucesso!");
     },
-    onError: async (err: any, variables, context) => {
+    onError: async (err: any) => {
       console.warn("Falha ao salvar compra online, acionando offline fallback", err);
       if (!navigator.onLine || err.message?.includes('offline') || err.message?.includes('Failed to fetch')) {
          
@@ -298,7 +298,7 @@ if (!canManage) {
               >
                 <div>
                   <p className="font-bold text-gray-900">{p.name}</p>
-                  <p className="text-xs text-gray-500">Custo: R$ {p.cost?.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">Custo: {formatCurrency(p.cost || 0)}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="p-1 bg-orange-100 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors">
@@ -340,7 +340,7 @@ if (!canManage) {
                       <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
                       <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 hover:bg-white rounded-md text-gray-500">+</button>
                     </div>
-                    <p className="w-24 text-right font-bold text-gray-900">R$ {(item.cost * item.quantity).toLocaleString()}</p>
+                    <p className="w-24 text-right font-bold text-gray-900">{formatCurrency(item.cost * item.quantity)}</p>
                     <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-400 hover:text-red-600">
                       <Trash2 size={18} />
                     </button>
@@ -416,7 +416,7 @@ if (!canManage) {
           <div className="pt-6 border-t border-gray-100">
             <div className="flex justify-between text-2xl font-bold text-gray-900">
               <span>Total</span>
-              <span className="text-orange-600">R$ {total.toLocaleString()}</span>
+              <span className="text-orange-600">{formatCurrency(total)}</span>
             </div>
           </div>
 

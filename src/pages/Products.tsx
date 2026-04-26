@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { formatCurrency } from "../lib/currencyUtils";
 import { inventory } from "../lib/inventory";
 import { calculateDiff } from "../lib/utils/diff";
 import { useAuth } from "../lib/auth";
@@ -475,7 +476,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-bold text-gray-900 truncate flex-1">{p.name}</h3>
-                    <span className="text-blue-600 font-bold">R$ {p.price?.toLocaleString()}</span>
+                    <span className="text-blue-600 font-bold">{formatCurrency(p.price || 0)}</span>
                   </div>
                   <div className="flex gap-2 mb-3">
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase">

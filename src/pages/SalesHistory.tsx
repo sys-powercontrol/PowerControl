@@ -2,16 +2,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   Search, 
-  Filter, 
   Eye, 
   Printer, 
-  FileText, 
   XCircle,
   ChevronDown,
   Shield,
-  Calendar,
   Trash2
 } from "lucide-react";
 import React, { useState } from "react";
@@ -194,14 +192,14 @@ if (!canView) {
             <div key={method} className="bg-white px-4 py-2 flex flex-col rounded-xl border border-gray-100 shadow-sm min-w-[130px] flex-1 max-w-[140px]">
               <span className="text-[10px] uppercase font-bold text-gray-400">{method}</span>
               <span className="text-sm font-bold text-gray-700">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount as number)}
+                {formatCurrency(amount as number)}
               </span>
             </div>
           ))}
           <div className="bg-blue-600 px-4 py-2 flex flex-col rounded-xl border border-blue-700 shadow-sm text-white min-w-[130px] flex-1 max-w-[140px]">
             <span className="text-[10px] uppercase font-bold text-blue-200">Total</span>
             <span className="text-sm font-bold">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSales)}
+              {formatCurrency(totalSales)}
             </span>
           </div>
         </div>
@@ -269,12 +267,12 @@ if (!canView) {
             summaryBlocks={[
               {
                 label: 'Total',
-                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSales),
+                value: formatCurrency(totalSales),
                 isPrimary: true
               },
               ...Object.entries(paymentMethodTotals).map(([method, amount]) => ({
                 label: method,
-                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount as number),
+                value: formatCurrency(amount as number),
                 isPrimary: false
               }))
             ]}
@@ -295,12 +293,12 @@ if (!canView) {
             summaryBlocks={[
               {
                 label: 'Total',
-                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSales),
+                value: formatCurrency(totalSales),
                 isPrimary: true
               },
               ...Object.entries(paymentMethodTotals).map(([method, amount]) => ({
                 label: method,
-                value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount as number),
+                value: formatCurrency(amount as number),
                 isPrimary: false
               }))
             ]}
@@ -340,7 +338,7 @@ if (!canView) {
 
               <div className="flex items-center justify-between md:justify-end gap-8">
                 <div className="text-right">
-                  <p className="text-xl font-bold text-gray-900">R$ {sale.total?.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-gray-900">{formatCurrency(sale.total || 0)}</p>
                   <p className="text-[10px] text-gray-400 font-bold uppercase">{sale.payment_method}</p>
                 </div>
                 <div className="flex gap-2">
@@ -442,7 +440,7 @@ if (!canView) {
                         <span className="text-gray-400 font-mono">{item.quantity}x</span>
                         <span className="font-medium text-gray-700">{item.name}</span>
                       </div>
-                      <span className="font-bold text-gray-900">R$ {(item.price * item.quantity).toLocaleString()}</span>
+                      <span className="font-bold text-gray-900">{formatCurrency((item.price || 0) * (item.quantity || 0))}</span>
                     </div>
                   ))}
                 </div>
@@ -451,15 +449,15 @@ if (!canView) {
               <div className="bg-gray-50 p-6 rounded-2xl space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Subtotal</span>
-                  <span className="font-bold text-gray-900">R$ {selectedSale.subtotal?.toLocaleString()}</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(selectedSale.subtotal || 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Desconto</span>
-                  <span className="font-bold text-red-500">- R$ {selectedSale.discount?.toLocaleString()}</span>
+                  <span className="font-bold text-red-500">- {formatCurrency(selectedSale.discount || 0)}</span>
                 </div>
                 <div className="flex justify-between text-xl pt-3 border-t border-gray-200">
                   <span className="font-bold text-gray-900">Total</span>
-                  <span className="font-black text-blue-600">R$ {selectedSale.total?.toLocaleString()}</span>
+                  <span className="font-black text-blue-600">{formatCurrency(selectedSale.total || 0)}</span>
                 </div>
               </div>
             </div>

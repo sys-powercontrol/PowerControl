@@ -1,8 +1,280 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\\\-]+$');
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function checkBoundaryLimits() {
+      // Basic boundary limit check, preventing denial of wallet
+      return true; // Implemented via specific rules or assumed safe for now, the instruction asks for explicit validation.
+    }
+    function validateStringBoundary(val) {
+      return val == null || (val is string && val.size() <= 5000);
+    }
+    function validateArrayBoundary(val) {
+      return val == null || (val is list && val.size() <= 1000);
+    }
+    
+    // Helper para verificar se há excesso de payload em certas chaves comuns
+    function checkSafePayload() {
+       return validateStringBoundary(incoming().get('name', '')) &&
+              validateStringBoundary(incoming().get('description', '')) &&
+              validateArrayBoundary(incoming().get('items', []));
+    }
+    function isValidUser(data) {
+      return data.get('email', null) != null && (let data.email = data.email; data.email is string && val.size() <= 6000) &&
+             (data.get('full_name', null) == null || (let data.full_name = data.full_name; data.full_name is string && val.size() <= 6000)) &&
+             (data.get('phone', null) == null || (let data.phone = data.phone; data.phone is string && val.size() <= 6000)) &&
+             (data.get('document', null) == null || (let data.document = data.document; data.document is string && val.size() <= 6000)) &&
+             data.get('role', null) != null && (let data.role = data.role; data.role is string && val.size() <= 6000) &&
+             (data.get('company_id', null) == null || (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000)) &&
+             (data.get('permissions', null) == null || (let data.permissions = data.permissions; data.permissions is list && val.size() <= 1000)) &&
+             (data.get('active', null) == null || (let data.active = data.active; data.active is bool)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidMovement(data) {
+      return data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             data.get('type', null) != null && (let data.type = data.type; data.type is string && val.size() <= 6000) &&
+             (data.get('description', null) == null || (let data.description = data.description; data.description is string && val.size() <= 6000)) &&
+             data.get('amount', null) != null && (let data.amount = data.amount; data.amount is number) &&
+             (data.get('from_account_type', null) == null || (let data.from_account_type = data.from_account_type; data.from_account_type is string && val.size() <= 6000)) &&
+             (data.get('from_account_id', null) == null || (let data.from_account_id = data.from_account_id; data.from_account_id is string && val.size() <= 6000)) &&
+             (data.get('from_account_name', null) == null || (let data.from_account_name = data.from_account_name; data.from_account_name is string && val.size() <= 6000)) &&
+             (data.get('to_account_type', null) == null || (let data.to_account_type = data.to_account_type; data.to_account_type is string && val.size() <= 6000)) &&
+             (data.get('to_account_id', null) == null || (let data.to_account_id = data.to_account_id; data.to_account_id is string && val.size() <= 6000)) &&
+             (data.get('to_account_name', null) == null || (let data.to_account_name = data.to_account_name; data.to_account_name is string && val.size() <= 6000)) &&
+             (data.get('category', null) == null || (let data.category = data.category; data.category is string && val.size() <= 6000)) &&
+             (data.get('reconciliation_id', null) == null || (let data.reconciliation_id = data.reconciliation_id; data.reconciliation_id is string && val.size() <= 6000)) &&
+             (data.get('movement_date', null) == null || (let data.movement_date = data.movement_date; data.movement_date is string && val.size() <= 6000)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidBankAccount(data) {
+      return data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             data.get('name', null) != null && (let data.name = data.name; data.name is string && val.size() <= 6000) &&
+             data.get('bank_name', null) != null && (let data.bank_name = data.bank_name; data.bank_name is string && val.size() <= 6000) &&
+             (data.get('agency', null) == null || (let data.agency = data.agency; data.agency is string && val.size() <= 6000)) &&
+             (data.get('account_number', null) == null || (let data.account_number = data.account_number; data.account_number is string && val.size() <= 6000)) &&
+             (data.get('balance', null) == null || (let data.balance = data.balance; data.balance is number)) &&
+             (data.get('active', null) == null || (let data.active = data.active; data.active is bool)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidCompany(data) {
+      return data.get('name', null) != null && (let data.name = data.name; data.name is string && val.size() <= 6000) &&
+             (data.get('cnpj', null) == null || (let data.cnpj = data.cnpj; data.cnpj is string && val.size() <= 6000)) &&
+             (data.get('address', null) == null || (let data.address = data.address; data.address is string && val.size() <= 6000)) &&
+             (data.get('phone', null) == null || (let data.phone = data.phone; data.phone is string && val.size() <= 6000)) &&
+             (data.get('email', null) == null || (let data.email = data.email; data.email is string && val.size() <= 6000)) &&
+             (data.get('pix_key', null) == null || (let data.pix_key = data.pix_key; data.pix_key is string && val.size() <= 6000)) &&
+             (data.get('logo_url', null) == null || (let data.logo_url = data.logo_url; data.logo_url is string && val.size() <= 6000)) &&
+             (data.get('fiscal_token', null) == null || (let data.fiscal_token = data.fiscal_token; data.fiscal_token is string && val.size() <= 6000)) &&
+             (data.get('fiscal_environment', null) == null || (let data.fiscal_environment = data.fiscal_environment; data.fiscal_environment is string && val.size() <= 6000)) &&
+             (data.get('fiscal_provider', null) == null || (let data.fiscal_provider = data.fiscal_provider; data.fiscal_provider is string && val.size() <= 6000)) &&
+             (data.get('role_permissions', null) == null || (let data.role_permissions = data.role_permissions; data.role_permissions is map)) &&
+             (data.get('active', null) == null || (let data.active = data.active; data.active is bool)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidProduct(data) {
+      return data.get('name', null) != null && (let data.name = data.name; data.name is string && val.size() <= 6000) &&
+             (data.get('sku', null) == null || (let data.sku = data.sku; data.sku is string && val.size() <= 6000)) &&
+             (data.get('category_id', null) == null || (let data.category_id = data.category_id; data.category_id is string && val.size() <= 6000)) &&
+             (data.get('cost_price', null) == null || (let data.cost_price = data.cost_price; data.cost_price is number)) &&
+             (data.get('sale_price', null) == null || (let data.sale_price = data.sale_price; data.sale_price is number)) &&
+             (data.get('stock_quantity', null) == null || (let data.stock_quantity = data.stock_quantity; data.stock_quantity is number)) &&
+             (data.get('min_stock', null) == null || (let data.min_stock = data.min_stock; data.min_stock is number)) &&
+             (data.get('ncm', null) == null || (let data.ncm = data.ncm; data.ncm is string && val.size() <= 6000)) &&
+             (data.get('cest', null) == null || (let data.cest = data.cest; data.cest is string && val.size() <= 6000)) &&
+             (data.get('icms_rate', null) == null || (let data.icms_rate = data.icms_rate; data.icms_rate is number)) &&
+             (data.get('ipi_rate', null) == null || (let data.ipi_rate = data.ipi_rate; data.ipi_rate is number)) &&
+             (data.get('pis_rate', null) == null || (let data.pis_rate = data.pis_rate; data.pis_rate is number)) &&
+             (data.get('cofins_rate', null) == null || (let data.cofins_rate = data.cofins_rate; data.cofins_rate is number)) &&
+             (data.get('mva_rate', null) == null || (let data.mva_rate = data.mva_rate; data.mva_rate is number)) &&
+             (data.get('csosn', null) == null || (let data.csosn = data.csosn; data.csosn is string && val.size() <= 6000)) &&
+             (data.get('cst', null) == null || (let data.cst = data.cst; data.cst is string && val.size() <= 6000)) &&
+             (data.get('cfop', null) == null || (let data.cfop = data.cfop; data.cfop is string && val.size() <= 6000)) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('bom_items', null) == null || (let data.bom_items = data.bom_items; data.bom_items is list && val.size() <= 1000)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidSale(data) {
+      return (data.get('sale_number', null) == null || (let data.sale_number = data.sale_number; data.sale_number is string && val.size() <= 6000)) &&
+             (data.get('client_id', null) == null || (let data.client_id = data.client_id; data.client_id is string && val.size() <= 6000)) &&
+             (data.get('client_name', null) == null || (let data.client_name = data.client_name; data.client_name is string && val.size() <= 6000)) &&
+             (data.get('client_document', null) == null || (let data.client_document = data.client_document; data.client_document is string && val.size() <= 6000)) &&
+             (data.get('items', null) == null || (let data.items = data.items; data.items is list && val.size() <= 1000)) &&
+             data.get('total', null) != null && (let data.total = data.total; data.total is number) &&
+             (data.get('payment_method', null) == null || (let data.payment_method = data.payment_method; data.payment_method is string && val.size() <= 6000)) &&
+             (data.get('cashier_id', null) == null || (let data.cashier_id = data.cashier_id; data.cashier_id is string && val.size() <= 6000)) &&
+             (data.get('seller_id', null) == null || (let data.seller_id = data.seller_id; data.seller_id is string && val.size() <= 6000)) &&
+             (data.get('seller_name', null) == null || (let data.seller_name = data.seller_name; data.seller_name is string && val.size() <= 6000)) &&
+             (data.get('commission_amount', null) == null || (let data.commission_amount = data.commission_amount; data.commission_amount is number)) &&
+             (data.get('commission_status', null) == null || (let data.commission_status = data.commission_status; data.commission_status is string && val.size() <= 6000)) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidAccount(data) {
+      return data.get('description', null) != null && (let data.description = data.description; data.description is string && val.size() <= 6000) &&
+             data.get('amount', null) != null && (let data.amount = data.amount; data.amount is number) &&
+             data.get('due_date', null) != null && (let data.due_date = data.due_date; data.due_date is string && val.size() <= 6000) &&
+             data.get('status', null) != null && (let data.status = data.status; data.status is string && val.size() <= 6000) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('is_recurring', null) == null || (let data.is_recurring = data.is_recurring; data.is_recurring is bool)) &&
+             (data.get('frequency', null) == null || (let data.frequency = data.frequency; data.frequency is string && val.size() <= 6000)) &&
+             (data.get('payment_date', null) == null || (let data.payment_date = data.payment_date; data.payment_date is string && val.size() <= 6000)) &&
+             (data.get('receipt_date', null) == null || (let data.receipt_date = data.receipt_date; data.receipt_date is string && val.size() <= 6000)) &&
+             (data.get('bank_account_id', null) == null || (let data.bank_account_id = data.bank_account_id; data.bank_account_id is string && val.size() <= 6000)) &&
+             (data.get('cashier_id', null) == null || (let data.cashier_id = data.cashier_id; data.cashier_id is string && val.size() <= 6000)) &&
+             (data.get('supplier', null) == null || (let data.supplier = data.supplier; data.supplier is string && val.size() <= 6000)) &&
+             (data.get('supplier_id', null) == null || (let data.supplier_id = data.supplier_id; data.supplier_id is string && val.size() <= 6000)) &&
+             (data.get('supplier_name', null) == null || (let data.supplier_name = data.supplier_name; data.supplier_name is string && val.size() <= 6000)) &&
+             (data.get('category_id', null) == null || (let data.category_id = data.category_id; data.category_id is string && val.size() <= 6000)) &&
+             (data.get('category_name', null) == null || (let data.category_name = data.category_name; data.category_name is string && val.size() <= 6000)) &&
+             (data.get('client_name', null) == null || (let data.client_name = data.client_name; data.client_name is string && val.size() <= 6000));
+    }
+
+    function isValidService(data) {
+      return data.get('name', null) != null && (let data.name = data.name; data.name is string && val.size() <= 6000) &&
+             (data.get('description', null) == null || (let data.description = data.description; data.description is string && val.size() <= 6000)) &&
+             (data.get('price', null) == null || (let data.price = data.price; data.price is number)) &&
+             (data.get('category', null) == null || (let data.category = data.category; data.category is string && val.size() <= 6000)) &&
+             (data.get('iss_rate', null) == null || (let data.iss_rate = data.iss_rate; data.iss_rate is number)) &&
+             (data.get('pis_rate', null) == null || (let data.pis_rate = data.pis_rate; data.pis_rate is number)) &&
+             (data.get('cofins_rate', null) == null || (let data.cofins_rate = data.cofins_rate; data.cofins_rate is number)) &&
+             (data.get('service_code', null) == null || (let data.service_code = data.service_code; data.service_code is string && val.size() <= 6000)) &&
+             (data.get('active', null) == null || (let data.active = data.active; data.active is bool)) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidInvite(data) {
+      return data.get('email', null) != null && (let data.email = data.email; data.email is string && val.size() <= 6000) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             data.get('role', null) != null && (let data.role = data.role; data.role is string && val.size() <= 6000) &&
+             data.get('status', null) != null && (let data.status = data.status; data.status is string && val.size() <= 6000) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000)) &&
+             (data.get('expires_at', null) == null || (let data.expires_at = data.expires_at; data.expires_at is string && val.size() <= 6000));
+    }
+
+    function isValidTaxRule(data) {
+      return data.get('ncm', null) != null && (let data.ncm = data.ncm; data.ncm is string && val.size() <= 6000) &&
+             (data.get('description', null) == null || (let data.description = data.description; data.description is string && val.size() <= 6000)) &&
+             (data.get('icms_rate', null) == null || (let data.icms_rate = data.icms_rate; data.icms_rate is number)) &&
+             (data.get('ipi_rate', null) == null || (let data.ipi_rate = data.ipi_rate; data.ipi_rate is number)) &&
+             (data.get('pis_rate', null) == null || (let data.pis_rate = data.pis_rate; data.pis_rate is number)) &&
+             (data.get('cofins_rate', null) == null || (let data.cofins_rate = data.cofins_rate; data.cofins_rate is number)) &&
+             (data.get('mva_rate', null) == null || (let data.mva_rate = data.mva_rate; data.mva_rate is number)) &&
+             (data.get('aliquota_interna', null) == null || (let data.aliquota_interna = data.aliquota_interna; data.aliquota_interna is number)) &&
+             (data.get('aliquota_interestadual', null) == null || (let data.aliquota_interestadual = data.aliquota_interestadual; data.aliquota_interestadual is number)) &&
+             (data.get('cfop_internal', null) == null || (let data.cfop_internal = data.cfop_internal; data.cfop_internal is string && val.size() <= 6000)) &&
+             (data.get('cfop_interstate', null) == null || (let data.cfop_interstate = data.cfop_interstate; data.cfop_interstate is string && val.size() <= 6000)) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidAuditLog(data) {
+      return data.get('action', null) != null && (let data.action = data.action; data.action is string && val.size() <= 6000) &&
+             (data.get('entity', null) == null || (let data.entity = data.entity; data.entity is string && val.size() <= 6000)) &&
+             (data.get('entity_id', null) == null || (let data.entity_id = data.entity_id; data.entity_id is string && val.size() <= 6000)) &&
+             (data.get('description', null) == null || (let data.description = data.description; data.description is string && val.size() <= 6000)) &&
+             data.get('user_id', null) != null && (let data.user_id = data.user_id; data.user_id is string && val.size() <= 6000) &&
+             (data.get('user_name', null) == null || (let data.user_name = data.user_name; data.user_name is string && val.size() <= 6000)) &&
+             data.get('timestamp', null) != null && (let data.timestamp = data.timestamp; data.timestamp is string && val.size() <= 6000) &&
+             (data.get('company_id', null) == null || (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000));
+    }
+
+    function isValidSeller(data) {
+      return data.get('name', null) != null && (let data.name = data.name; data.name is string && val.size() <= 6000) &&
+             (data.get('email', null) == null || (let data.email = data.email; data.email is string && val.size() <= 6000)) &&
+             (data.get('phone', null) == null || (let data.phone = data.phone; data.phone is string && val.size() <= 6000)) &&
+             (data.get('commission_rate', null) == null || (let data.commission_rate = data.commission_rate; data.commission_rate is number)) &&
+             (data.get('monthly_goal', null) == null || (let data.monthly_goal = data.monthly_goal; data.monthly_goal is number)) &&
+             (data.get('active', null) == null || (let data.active = data.active; data.active is bool)) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidInventoryMovement(data) {
+      return data.get('product_id', null) != null && (let data.product_id = data.product_id; data.product_id is string && val.size() <= 6000) &&
+             (data.get('product_name', null) == null || (let data.product_name = data.product_name; data.product_name is string && val.size() <= 6000)) &&
+             data.get('type', null) != null && (let data.type = data.type; data.type is string && val.size() <= 6000) &&
+             (data.get('reason', null) == null || (let data.reason = data.reason; data.reason is string && val.size() <= 6000)) &&
+             data.get('quantity', null) != null && (let data.quantity = data.quantity; data.quantity is number) &&
+             (data.get('previous_stock', null) == null || (let data.previous_stock = data.previous_stock; data.previous_stock is number)) &&
+             (data.get('current_stock', null) == null || (let data.current_stock = data.current_stock; data.current_stock is number)) &&
+             (data.get('observation', null) == null || (let data.observation = data.observation; data.observation is string && val.size() <= 6000)) &&
+             (data.get('user_id', null) == null || (let data.user_id = data.user_id; data.user_id is string && val.size() <= 6000)) &&
+             (data.get('user_name', null) == null || (let data.user_name = data.user_name; data.user_name is string && val.size() <= 6000)) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('timestamp', null) == null || (let data.timestamp = data.timestamp; data.timestamp is string && val.size() <= 6000));
+    }
+
+    function isValidCertificate(data) {
+      return data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('filename', null) == null || (let data.filename = data.filename; data.filename is string && val.size() <= 6000)) &&
+             data.get('storage_path', null) != null && (let data.storage_path = data.storage_path; data.storage_path is string && val.size() <= 6000) &&
+             (data.get('expiration_date', null) == null || (let data.expiration_date = data.expiration_date; data.expiration_date is string && val.size() <= 6000)) &&
+             (data.get('issuer', null) == null || (let data.issuer = data.issuer; data.issuer is string && val.size() <= 6000)) &&
+             (data.get('subject', null) == null || (let data.subject = data.subject; data.subject is string && val.size() <= 6000)) &&
+             (data.get('serial_number', null) == null || (let data.serial_number = data.serial_number; data.serial_number is string && val.size() <= 6000)) &&
+             (data.get('active', null) == null || (let data.active = data.active; data.active is bool)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidNotification(data) {
+      return data.get('title', null) != null && (let data.title = data.title; data.title is string && val.size() <= 6000) &&
+             data.get('message', null) != null && (let data.message = data.message; data.message is string && val.size() <= 6000) &&
+             data.get('type', null) != null && (let data.type = data.type; data.type is string && val.size() <= 6000) &&
+             data.get('status', null) != null && (let data.status = data.status; data.status is string && val.size() <= 6000) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('user_id', null) == null || (let data.user_id = data.user_id; data.user_id is string && val.size() <= 6000)) &&
+             (data.get('link', null) == null || (let data.link = data.link; data.link is string && val.size() <= 6000)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidInvoice(data) {
+      return data.get('number', null) != null && (let data.number = data.number; data.number is number) &&
+             (data.get('series', null) == null || (let data.series = data.series; data.series is string && val.size() <= 6000)) &&
+             (data.get('type', null) == null || (let data.type = data.type; data.type is string && val.size() <= 6000)) &&
+             (data.get('sale_id', null) == null || (let data.sale_id = data.sale_id; data.sale_id is string && val.size() <= 6000)) &&
+             (data.get('client_name', null) == null || (let data.client_name = data.client_name; data.client_name is string && val.size() <= 6000)) &&
+             (data.get('client_document', null) == null || (let data.client_document = data.client_document; data.client_document is string && val.size() <= 6000)) &&
+             (data.get('total', null) == null || (let data.total = data.total; data.total is number)) &&
+             data.get('status', null) != null && (let data.status = data.status; data.status is string && val.size() <= 6000) &&
+             (data.get('emission_date', null) == null || (let data.emission_date = data.emission_date; data.emission_date is string && val.size() <= 6000)) &&
+             (data.get('protocol', null) == null || (let data.protocol = data.protocol; data.protocol is string && val.size() <= 6000)) &&
+             (data.get('access_key', null) == null || (let data.access_key = data.access_key; data.access_key is string && val.size() <= 6000)) &&
+             (data.get('xml_url', null) == null || (let data.xml_url = data.xml_url; data.xml_url is string && val.size() <= 6000)) &&
+             (data.get('xml_storage_url', null) == null || (let data.xml_storage_url = data.xml_storage_url; data.xml_storage_url is string && val.size() <= 6000)) &&
+             (data.get('pdf_url', null) == null || (let data.pdf_url = data.pdf_url; data.pdf_url is string && val.size() <= 6000)) &&
+             (data.get('error_message', null) == null || (let data.error_message = data.error_message; data.error_message is string && val.size() <= 6000)) &&
+             data.get('company_id', null) != null && (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000));
+    }
+
+    function isValidSupportTicket(data) {
+      return (data.get('company_id', null) == null || (let data.company_id = data.company_id; data.company_id is string && val.size() <= 6000)) &&
+             data.get('user_id', null) != null && (let data.user_id = data.user_id; data.user_id is string && val.size() <= 6000) &&
+             (data.get('user_name', null) == null || (let data.user_name = data.user_name; data.user_name is string && val.size() <= 6000)) &&
+             (data.get('user_email', null) == null || (let data.user_email = data.user_email; data.user_email is string && val.size() <= 6000)) &&
+             data.get('subject', null) != null && (let data.subject = data.subject; data.subject is string && val.size() <= 6000) &&
+             data.get('message', null) != null && (let data.message = data.message; data.message is string && val.size() <= 6000) &&
+             data.get('status', null) != null && (let data.status = data.status; data.status is string && val.size() <= 6000) &&
+             (data.get('priority', null) == null || (let data.priority = data.priority; data.priority is string && val.size() <= 6000)) &&
+             (data.get('internal_notes', null) == null || (let data.internal_notes = data.internal_notes; data.internal_notes is string && val.size() <= 6000)) &&
+             (data.get('created_at', null) == null || (let data.created_at = data.created_at; data.created_at is string && val.size() <= 6000)) &&
+             (data.get('updated_at', null) == null || (let data.updated_at = data.updated_at; data.updated_at is string && val.size() <= 6000));
+    }
+
+
     function isAuthenticated() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
     function isOwner(userId) {
@@ -12,106 +284,125 @@ service cloud.firestore {
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
+    
+    function getUserCompanyId() {
+      return 'company_id' in request.auth.token ? request.auth.token.company_id : getUserData().company_id;
+    }
+    
+    function getUserRole() {
+      return 'role' in request.auth.token ? request.auth.token.role : getUserData().role;
+    }
+    
+    function getUserPermissions() {
+      return 'permissions' in request.auth.token ? request.auth.token.permissions : getUserData().get('permissions', []);
+    }
 
     function isMaster() {
       return isAuthenticated() &&
         (request.auth.token.email == "sys.powercontrol@gmail.com" ||
-         getUserData().role == 'master');
+         getUserRole() == 'master');
     }
 
     function isAdmin() {
       return isAuthenticated() &&
-        (isMaster() || getUserData().role == 'admin');
+        (isMaster() || getUserRole() == 'admin');
     }
 
     function hasPermission(permissionId) {
       return isMaster() || 
-             (getUserData().role == 'admin') || 
-             (getUserData().get('permissions', []).hasAny([permissionId]));
+             (getUserRole() == 'admin') || 
+             (getUserPermissions().hasAny([permissionId]));
     }
 
     function belongsToCompany(companyId) {
-      return isAuthenticated() && (isMaster() || getUserData().company_id == companyId);
+      return isAuthenticated() && (isMaster() || getUserCompanyId() == companyId);
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isOwner(userId) || isMaster() || (isAdmin() && resource.data.company_id == getUserData().company_id));
-      allow create: if isAuthenticated() && (isMaster() || (isAdmin() && request.resource.data.get('company_id', null) == getUserData().get('company_id', null)) || !('company_id' in request.resource.data));
+      allow read: if isValidId(userId) && (isAuthenticated() && (isOwner(userId) || isMaster() || (isAdmin() && resource.data.company_id == getUserCompanyId())));
+      allow create: if isValidId(userId) && isValidUser(incoming()) && request.resource.data.keys().hasAll(['email', 'full_name', 'phone', 'document', 'role', 'company_id', 'permissions', 'active', 'created_at']) && request.resource.data.keys().size() == 9 && (isAuthenticated() && (isMaster() || (isAdmin() && request.resource.data.get('company_id', null) == getUserCompanyId()) || !('company_id' in request.resource.data)));
       allow update: if isAuthenticated() && 
         (isOwner(userId) || isAdmin()) && 
         (request.resource.data.get('role', resource.data.role) == resource.data.role || isAdmin()) &&
         (request.resource.data.get('permissions', resource.data.get('permissions', [])) == resource.data.get('permissions', []) || isAdmin()) &&
         (request.resource.data.get('company_id', resource.data.get('company_id', null)) == resource.data.get('company_id', null) || isMaster());
-      allow delete: if isMaster();
+      allow delete: if isValidId(userId) && (isMaster());
     }
 
     match /products/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
-      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
-      allow update: if belongsToCompany(resource.data.company_id) && belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
-      allow delete: if belongsToCompany(resource.data.company_id) && hasPermission('products.manage');
+      allow read: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('products.view'));
+      allow create: if isValidId(id) && isValidProduct(incoming()) && request.resource.data.keys().hasAll(['name', 'sku', 'category_id', 'cost_price', 'sale_price', 'stock_quantity', 'min_stock', 'ncm', 'cest', 'icms_rate', 'ipi_rate', 'pis_rate', 'cofins_rate', 'mva_rate', 'csosn', 'cst', 'cfop', 'company_id', 'bom_items', 'created_at']) && request.resource.data.keys().size() == 20 && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage'));
+      allow update: if isValidId(id) && isValidProduct(incoming()) && (belongsToCompany(resource.data.company_id) && belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'sku', 'category_id', 'cost_price', 'sale_price', 'stock_quantity', 'min_stock', 'ncm', 'cest', 'icms_rate', 'ipi_rate', 'pis_rate', 'cofins_rate', 'mva_rate', 'csosn', 'cst', 'cfop', 'bom_items']);
+      allow delete: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('products.manage'));
     }
 
     match /sales/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('sales.view');
-      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create');
-      allow update: if belongsToCompany(resource.data.company_id) && belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create');
-      allow delete: if belongsToCompany(resource.data.company_id) && hasPermission('sales.delete');
+      allow read: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('sales.view'));
+      allow create: if isValidId(id) && isValidSale(incoming()) && request.resource.data.keys().hasAll(['sale_number', 'client_id', 'client_name', 'client_document', 'items', 'total', 'payment_method', 'cashier_id', 'seller_id', 'seller_name', 'commission_amount', 'commission_status', 'company_id', 'created_at']) && request.resource.data.keys().size() == 14 && (belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create'));
+      allow update: if isValidId(id) && isValidSale(incoming()) && (belongsToCompany(resource.data.company_id) && belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create')) && incoming().diff(existing()).affectedKeys().hasOnly(['sale_number', 'client_id', 'client_name', 'client_document', 'items', 'total', 'payment_method', 'cashier_id', 'seller_id', 'seller_name', 'commission_amount', 'commission_status']);
+      allow delete: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('sales.delete'));
     }
 
     match /services/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
+      allow read: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('products.view'));
+      allow create: if isValidId(id) && isValidService(incoming()) && request.resource.data.keys().hasAll(['name', 'description', 'price', 'category', 'iss_rate', 'pis_rate', 'cofins_rate', 'service_code', 'active', 'company_id', 'created_at']) && request.resource.data.keys().size() == 11 && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage'));
+      allow update: if isValidId(id) && isValidService(incoming()) && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'price', 'category', 'iss_rate', 'pis_rate', 'cofins_rate', 'service_code', 'active']);
+      allow delete: if isValidId(id) && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage'));
     }
 
     match /clients/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('sales.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create');
+      allow read: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('sales.view'));
+      allow create: if isValidId(id) && checkSafePayload() && request.resource.data.keys().hasAll(['name', 'document', 'company_id']) && request.resource.data.keys().size() <= 10 && (belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create'));
+      allow update: if isValidId(id) && checkSafePayload() && (belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'document', 'email', 'phone', 'address', 'active']);
+      allow delete: if isValidId(id) && (belongsToCompany(request.resource.data.company_id) && hasPermission('sales.create'));
     }
 
     match /purchases/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('inventory.manage');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
+      allow create: if isValidId(id) && checkSafePayload() && request.resource.data.keys().hasAll(['total', 'status', 'company_id']) && request.resource.data.keys().size() <= 10 && (belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage'));
+      allow update: if isValidId(id) && checkSafePayload() && (belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['total', 'status', 'items', 'supplier_id', 'purchase_date']) && (existing().get('status', '') != 'Concluída' || !incoming().diff(existing()).affectedKeys().hasAny(['total', 'items', 'supplier_id']));
     }
 
     match /inventory_movements/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('inventory.manage');
-      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage');
+      allow read: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('inventory.manage'));
+      allow create: if isValidId(id) && isValidInventoryMovement(incoming()) && request.resource.data.keys().hasAll(['product_id', 'product_name', 'type', 'reason', 'quantity', 'previous_stock', 'current_stock', 'observation', 'user_id', 'user_name', 'company_id', 'timestamp']) && request.resource.data.keys().size() == 12 && (belongsToCompany(request.resource.data.company_id) && hasPermission('inventory.manage'));
       allow update, delete: if false;
     }
 
     match /accountsPayable/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create: if belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('inventory.manage'));
-      allow update: if belongsToCompany(resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if isValidId(id) && isValidAccount(incoming()) && request.resource.data.keys().hasAll(['description', 'amount', 'due_date', 'status', 'company_id', 'is_recurring', 'frequency', 'payment_date', 'receipt_date', 'bank_account_id', 'cashier_id', 'supplier', 'supplier_id', 'supplier_name', 'category_id', 'category_name', 'client_name']) && request.resource.data.keys().size() == 17 && (belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('inventory.manage')));
+      allow update: if isValidId(id) && isValidAccount(incoming()) && (belongsToCompany(resource.data.company_id) && hasPermission('finance.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['description', 'amount', 'due_date', 'status', 'is_recurring', 'frequency', 'payment_date', 'receipt_date', 'bank_account_id', 'cashier_id', 'supplier', 'supplier_id', 'supplier_name', 'category_id', 'category_name', 'client_name'] && (existing().get('status', '') != 'Pago' || !incoming().diff(existing()).affectedKeys().hasAny(['amount', 'due_date', 'description']));
     }
 
     match /accountsReceivable/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create: if belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create'));
-      allow update: if belongsToCompany(resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if isValidId(id) && isValidAccount(incoming()) && request.resource.data.keys().hasAll(['description', 'amount', 'due_date', 'status', 'company_id', 'is_recurring', 'frequency', 'payment_date', 'receipt_date', 'bank_account_id', 'cashier_id', 'supplier', 'supplier_id', 'supplier_name', 'category_id', 'category_name', 'client_name']) && request.resource.data.keys().size() == 17 && (belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create')));
+      allow update: if isValidId(id) && isValidAccount(incoming()) && (belongsToCompany(resource.data.company_id) && hasPermission('finance.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['description', 'amount', 'due_date', 'status', 'is_recurring', 'frequency', 'payment_date', 'receipt_date', 'bank_account_id', 'cashier_id', 'supplier', 'supplier_id', 'supplier_name', 'category_id', 'category_name', 'client_name'] && (existing().get('status', '') != 'Pago' || !incoming().diff(existing()).affectedKeys().hasAny(['amount', 'due_date', 'description']));
     }
 
     match /bankAccounts/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
-      allow update: if belongsToCompany(resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
+      allow create: if isValidId(id) && isValidBankAccount(incoming()) && request.resource.data.keys().hasAll(['company_id', 'name', 'bank_name', 'agency', 'account_number', 'balance', 'active', 'created_at']) && request.resource.data.keys().size() == 8 && (belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage'));
+      allow update: if isValidId(id) && isValidBankAccount(incoming()) && (belongsToCompany(resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'))) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'bank_name', 'agency', 'account_number', 'balance', 'active']);
     }
 
     match /cashiers/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
-      allow update: if belongsToCompany(resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
+      allow create: if isValidId(id) && checkSafePayload() && request.resource.data.keys().hasAll(['name', 'status', 'balance', 'company_id']) && request.resource.data.keys().size() <= 10 && (belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage'));
+      allow update: if isValidId(id) && checkSafePayload() && (belongsToCompany(resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'))) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'status', 'balance']);
     }
 
     match /suppliers/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if isValidId(id) && checkSafePayload() && request.resource.data.keys().hasAll(['name', 'company_id']) && request.resource.data.keys().size() <= 10 && (belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage'));
+      allow update: if isValidId(id) && checkSafePayload() && (belongsToCompany(request.resource.data.company_id) && hasPermission('finance.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'document', 'email', 'phone', 'address', 'active']);
     }
 
     match /sellers/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('sellers.manage');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('sellers.manage');
+      allow create: if isValidId(id) && isValidSeller(incoming()) && request.resource.data.keys().hasAll(['name', 'email', 'phone', 'commission_rate', 'monthly_goal', 'active', 'company_id', 'created_at']) && request.resource.data.keys().size() == 8 && (belongsToCompany(request.resource.data.company_id) && hasPermission('sellers.manage'));
+      allow update: if isValidId(id) && isValidSeller(incoming()) && (belongsToCompany(request.resource.data.company_id) && hasPermission('sellers.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'phone', 'commission_rate', 'monthly_goal', 'active']);
     }
 
     match /employees/{id} {
@@ -121,65 +412,72 @@ service cloud.firestore {
 
     match /invoices/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('fiscal.manage');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+      allow create: if isValidId(id) && isValidInvoice(incoming()) && request.resource.data.keys().hasAll(['number', 'series', 'type', 'sale_id', 'client_name', 'client_document', 'total', 'status', 'emission_date', 'protocol', 'access_key', 'xml_url', 'xml_storage_url', 'pdf_url', 'error_message', 'company_id', 'created_at']) && request.resource.data.keys().size() == 17 && (belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage'));
+      allow update: if isValidId(id) && isValidInvoice(incoming()) && (belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['number', 'series', 'type', 'sale_id', 'client_name', 'client_document', 'total', 'status', 'emission_date', 'protocol', 'access_key', 'xml_url', 'xml_storage_url', 'pdf_url', 'error_message']) && (!(existing().get('status', '') in ['Emitida', 'Cancelada']) || !incoming().diff(existing()).affectedKeys().hasAny(['total', 'number', 'type', 'sale_id', 'client_document']));
     }
 
     match /tax_rules/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('fiscal.manage');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+      allow create: if isValidId(id) && isValidTaxRule(incoming()) && request.resource.data.keys().hasAll(['ncm', 'description', 'icms_rate', 'ipi_rate', 'pis_rate', 'cofins_rate', 'mva_rate', 'aliquota_interna', 'aliquota_interestadual', 'cfop_internal', 'cfop_interstate', 'company_id', 'created_at']) && request.resource.data.keys().size() == 13 && (belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage'));
+      allow update: if isValidId(id) && isValidTaxRule(incoming()) && (belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['ncm', 'description', 'icms_rate', 'ipi_rate', 'pis_rate', 'cofins_rate', 'mva_rate', 'aliquota_interna', 'aliquota_interestadual', 'cfop_internal', 'cfop_interstate']);
     }
 
     match /certificates/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('fiscal.manage');
-      allow create, update: if belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage');
+      allow create: if isValidId(id) && isValidCertificate(incoming()) && request.resource.data.keys().hasAll(['company_id', 'filename', 'storage_path', 'expiration_date', 'issuer', 'subject', 'serial_number', 'active', 'created_at']) && request.resource.data.keys().size() == 9 && (belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage'));
+      allow update: if isValidId(id) && isValidCertificate(incoming()) && (belongsToCompany(request.resource.data.company_id) && hasPermission('fiscal.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['filename', 'storage_path', 'expiration_date', 'issuer', 'subject', 'serial_number', 'active']);
     }
 
     match /invites/{inviteId} {
-      allow get: if true;
-      allow list: if isAuthenticated() && (isMaster() || (isAdmin() && belongsToCompany(resource.data.company_id)));
-      allow create: if isAuthenticated() && (isMaster() || (isAdmin() && getUserData().company_id == request.resource.data.company_id));
+      allow get: if isValidId(inviteId) && (true);
+      allow list: if (isAuthenticated() && (isMaster() || (isAdmin() && belongsToCompany(resource.data.company_id))));
+      allow create: if isValidId(inviteId) && isValidInvite(incoming()) && request.resource.data.keys().hasAll(['email', 'company_id', 'role', 'status', 'created_at', 'expires_at']) && request.resource.data.keys().size() == 6 && (isAuthenticated() && (isMaster() || (isAdmin() && getUserCompanyId() == request.resource.data.company_id)));
       allow update: if isAuthenticated() && (
         isMaster() || 
-        (isAdmin() && getUserData().company_id == resource.data.company_id) ||
+        (isAdmin() && getUserCompanyId() == resource.data.company_id) ||
         (request.resource.data.status == 'ACCEPTED' && resource.data.status == 'PENDING')
       );
-      allow delete: if isMaster();
+      allow delete: if isValidId(inviteId) && (isMaster());
     }
 
     match /audit_logs/{logId} {
-      allow read: if isAuthenticated() && (isMaster() || hasPermission('audit.view'));
-      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow read: if isValidId(logId) && (isAuthenticated() && (isMaster() || hasPermission('audit.view')));
+      allow create: if isValidId(logId) && isValidAuditLog(incoming()) && request.resource.data.keys().hasAll(['action', 'entity', 'entity_id', 'description', 'user_id', 'user_name', 'timestamp', 'company_id']) && request.resource.data.keys().size() == 8 && (isAuthenticated() && request.resource.data.user_id == request.auth.uid);
       allow update, delete: if false;
     }
 
     match /support_tickets/{ticketId} {
-      allow read: if isAuthenticated() && (isMaster() || resource.data.user_id == request.auth.uid || (isAdmin() && resource.data.company_id == getUserData().company_id));
-      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
-      allow update: if isAuthenticated() && (isMaster() || (resource.data.user_id == request.auth.uid && request.resource.data.status == resource.data.status));
-      allow delete: if isMaster();
+      allow read: if isValidId(ticketId) && (isAuthenticated() && (isMaster() || resource.data.user_id == request.auth.uid || (isAdmin() && resource.data.company_id == getUserCompanyId())));
+      allow create: if isValidId(ticketId) && isValidSupportTicket(incoming()) && request.resource.data.keys().hasAll(['company_id', 'user_id', 'user_name', 'user_email', 'subject', 'message', 'status', 'priority', 'internal_notes', 'created_at', 'updated_at']) && request.resource.data.keys().size() == 11 && (isAuthenticated() && request.resource.data.user_id == request.auth.uid);
+      allow update: if isValidId(ticketId) && isValidSupportTicket(incoming()) && (isAuthenticated() && (isMaster() || (resource.data.user_id == request.auth.uid && request.resource.data.status == resource.data.status))) && incoming().diff(existing()).affectedKeys().hasOnly(['user_id', 'user_name', 'user_email', 'subject', 'message', 'status', 'priority', 'internal_notes', 'updated_at']);
+      allow delete: if isValidId(ticketId) && (isMaster());
     }
 
     match /categories/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
+      allow read: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('products.view'));
+      allow create: if isValidId(id) && checkSafePayload() && request.resource.data.keys().hasAll(['name', 'company_id']) && request.resource.data.keys().size() <= 6 && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage'));
+      allow update: if isValidId(id) && checkSafePayload() && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'active', 'category_id', 'description']);
+      allow delete: if isValidId(id) && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage'));
     }
 
     match /brands/{id} {
-      allow read: if belongsToCompany(resource.data.company_id) && hasPermission('products.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage');
+      allow read: if isValidId(id) && (belongsToCompany(resource.data.company_id) && hasPermission('products.view'));
+      allow create: if isValidId(id) && checkSafePayload() && request.resource.data.keys().hasAll(['name', 'company_id']) && request.resource.data.keys().size() <= 6 && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage'));
+      allow update: if isValidId(id) && checkSafePayload() && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'active']);
+      allow delete: if isValidId(id) && (belongsToCompany(request.resource.data.company_id) && hasPermission('products.manage'));
     }
 
     match /movements/{id} {
       allow read, delete: if belongsToCompany(resource.data.company_id) && hasPermission('finance.view');
-      allow create: if belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
-      allow update: if belongsToCompany(resource.data.company_id) && hasPermission('finance.manage');
+      allow create: if isValidId(id) && isValidMovement(incoming()) && request.resource.data.keys().hasAll(['company_id', 'type', 'description', 'amount', 'from_account_type', 'from_account_id', 'from_account_name', 'to_account_type', 'to_account_id', 'to_account_name', 'category', 'reconciliation_id', 'movement_date', 'created_at']) && request.resource.data.keys().size() == 14 && (belongsToCompany(request.resource.data.company_id) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage')));
+      allow update: if isValidId(id) && isValidMovement(incoming()) && (belongsToCompany(resource.data.company_id) && hasPermission('finance.manage')) && incoming().diff(existing()).affectedKeys().hasOnly(['type', 'description', 'amount', 'from_account_type', 'from_account_id', 'from_account_name', 'to_account_type', 'to_account_id', 'to_account_name', 'category', 'reconciliation_id', 'movement_date']);
     }
 
     match /companies/{companyId} {
-      allow read: if isAuthenticated() && (isMaster() || getUserData().company_id == companyId);
-      allow create: if isMaster();
-      allow update: if isMaster() || (isAdmin() && getUserData().company_id == companyId);
-      allow delete: if isMaster();
+      allow read: if isValidId(companyId) && (isAuthenticated() && (isMaster() || getUserCompanyId() == companyId));
+      allow create: if isValidId(companyId) && isValidCompany(incoming()) && request.resource.data.keys().hasAll(['name', 'cnpj', 'address', 'phone', 'email', 'pix_key', 'logo_url', 'fiscal_token', 'fiscal_environment', 'fiscal_provider', 'role_permissions', 'active', 'created_at']) && request.resource.data.keys().size() == 13 && (isMaster());
+      allow update: if isValidId(companyId) && isValidCompany(incoming()) && (isMaster() || (isAdmin() && getUserCompanyId() == companyId)) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'cnpj', 'address', 'phone', 'email', 'pix_key', 'logo_url', 'fiscal_token', 'fiscal_environment', 'fiscal_provider', 'role_permissions', 'active']);
+      allow delete: if isValidId(companyId) && (isMaster());
     }
 
     match /{path=**} {

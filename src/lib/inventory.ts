@@ -66,18 +66,27 @@ export const inventory = {
       const companyData = companyDoc.data() || {};
       const allowNegativeStock = companyData.allow_negative_stock === "true" || companyData.allow_negative_stock === true;
 
-      // 2. Read all products, components, and accounts FIRST
+      // 2. Prepare records
+      const saleRef = doc(collection(db, "sales"));
+      const reconciliationId = saleRef.id;
+
+      // 3. Read all products, components, and accounts FIRST
       const productDocs = new Map();
       const componentDocs = new Map();
       let accountDoc = null;
       let accountRef = null;
 
-      if (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado" && (saleData.cashier_id || saleData.bank_account_id)) {
+      if (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado") {
+        if (!saleData.cashier_id && !saleData.bank_account_id) {
+          throw new Error("Transação imediata (paga) requer uma conta de destino (Caixa ou Banco) válida.");
+        }
         const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
         const accountId = (saleData.bank_account_id || saleData.cashier_id) as string;
         accountRef = doc(db, collectionName, accountId);
         accountDoc = await transaction.get(accountRef);
-        if (!accountDoc.exists()) throw new Error(`Conta de destino (${collectionName}) não encontrada.`);
+        if (!accountDoc.exists()) {
+          throw new Error(`Conta de destino (${collectionName}) não encontrada.`);
+        }
       }
 
       for (const item of items) {
@@ -105,7 +114,7 @@ export const inventory = {
         }
       }
 
-      // 3. Validate and perform writes
+      // 4. Validate and perform writes
       const stockUpdates = new Map(); // Track stock in memory to handle duplicate items
 
       for (const item of items) {
@@ -146,7 +155,8 @@ export const inventory = {
               quantity: totalCompQty,
               previous_stock: compPrevStock,
               current_stock: compCurrentStock,
-              reference_id: item.id, // Reference to the kit product
+              reference_id: saleRef.id,
+              reconciliation_id: reconciliationId,
               user_id: user.id,
               user_name: user.full_name || user.email || "Sistema",
               timestamp: serverTimestamp()
@@ -179,6 +189,8 @@ export const inventory = {
             quantity: item.quantity,
             previous_stock,
             current_stock,
+            reference_id: saleRef.id,
+            reconciliation_id: reconciliationId,
             user_id: user.id,
             user_name: user.full_name || user.email || "Sistema",
             timestamp: serverTimestamp()
@@ -187,19 +199,19 @@ export const inventory = {
         }
       }
 
-      // 4. Create sale record
-      const saleRef = doc(collection(db, "sales"));
+      // 5. Create sale record
       const finalSaleData = cleanObject({
         ...saleData,
+        id: reconciliationId,
         user_id: user.id,
         user_name: user.full_name || user.email || "Sistema",
-        company_id: user.company_id, // ensure company_id comes from context
+        company_id: user.company_id,
         created_at: serverTimestamp()
       }) as Record<string, unknown>;
       
       transaction.set(saleRef, finalSaleData);
 
-      // 5. Create financial record if "A Prazo" or "Fiado"
+      // 6. Create financial record if "A Prazo" or "Fiado"
       if (saleData.payment_method === "A Prazo" || saleData.payment_method === "Fiado") {
         const receivableRef = doc(collection(db, "accountsReceivable"));
         transaction.set(receivableRef, {
@@ -207,6 +219,7 @@ export const inventory = {
           client_id: saleData.client_id,
           client_name: saleData.client_name,
           sale_id: saleRef.id,
+          reconciliation_id: reconciliationId,
           description: `Venda #${saleRef.id.substr(0, 8).toUpperCase()}`,
           amount: saleData.total,
           due_date: saleData.due_date || new Date().toISOString(),
@@ -238,9 +251,12 @@ export const inventory = {
           to_account_id: saleData.bank_account_id || saleData.cashier_id,
           to_account_name: accountData.name || "Conta Desconhecida",
           category: "Vendas",
+          reconciliation_id: reconciliationId,
           movement_date: new Date().toISOString(),
           created_at: serverTimestamp()
         });
+      } else {
+        throw new Error("Transação imediata sem conta de destino processada, impossível registrar financeiro.");
       }
 
       return { id: saleRef.id, ...finalSaleData };
@@ -254,17 +270,26 @@ export const inventory = {
     return runTransaction(db, async (transaction) => {
       if (!user.company_id) throw new Error("Usuário sem empresa vinculada");
         
-      // 1. Read all products and accounts FIRST
+      // 1. Prepare records
+      const purchaseRef = doc(collection(db, "purchases"));
+      const reconciliationId = purchaseRef.id;
+
+      // 2. Read all products and accounts FIRST
       const productDocs = new Map();
       let accountDoc = null;
       let accountRef = null;
 
-      if (purchaseData.payment_status !== "Pendente" && (purchaseData.bank_account_id || purchaseData.cashier_id)) {
+      if (purchaseData.payment_status !== "Pendente") {
+        if (!purchaseData.bank_account_id && !purchaseData.cashier_id) {
+          throw new Error("Transação imediata (paga) requer uma conta de origem (Caixa ou Banco) válida.");
+        }
         const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
         const accountId = (purchaseData.bank_account_id || purchaseData.cashier_id) as string;
         accountRef = doc(db, collectionName, accountId);
         accountDoc = await transaction.get(accountRef);
-        if (!accountDoc.exists()) throw new Error(`Conta de origem (${collectionName}) não encontrada.`);
+        if (!accountDoc.exists()) {
+          throw new Error(`Conta de origem (${collectionName}) não encontrada.`);
+        }
       }
 
       for (const item of items) {
@@ -276,7 +301,7 @@ export const inventory = {
         }
       }
 
-      // 2. Perform writes
+      // 3. Perform writes
       const stockUpdates = new Map();
 
       for (const item of items) {
@@ -304,6 +329,8 @@ export const inventory = {
           quantity: item.quantity,
           previous_stock,
           current_stock,
+          reference_id: purchaseRef.id,
+          reconciliation_id: reconciliationId,
           user_id: user.id,
           user_name: user.full_name || user.email || "Sistema",
           timestamp: serverTimestamp()
@@ -311,10 +338,10 @@ export const inventory = {
         transaction.set(movementRef, movement);
       }
 
-      // 3. Create purchase record
-      const purchaseRef = doc(collection(db, "purchases"));
+      // 4. Create purchase record
       const finalPurchaseData = cleanObject({
         ...purchaseData,
+        id: reconciliationId,
         user_id: user.id,
         user_name: user.full_name || user.email || "Sistema",
         company_id: user.company_id,
@@ -323,7 +350,7 @@ export const inventory = {
       
       transaction.set(purchaseRef, finalPurchaseData);
 
-      // 4. Create financial record if "Pendente"
+      // 5. Create financial record if "Pendente"
       if (purchaseData.payment_status === "Pendente") {
         const payableRef = doc(collection(db, "accountsPayable"));
         transaction.set(payableRef, {
@@ -331,6 +358,7 @@ export const inventory = {
           supplier_id: purchaseData.supplier_id,
           supplier_name: purchaseData.supplier_name,
           purchase_id: purchaseRef.id,
+          reconciliation_id: reconciliationId,
           description: `Compra #${purchaseRef.id.substr(0, 8).toUpperCase()}`,
           amount: purchaseData.total,
           due_date: purchaseData.due_date || new Date().toISOString(),
@@ -363,9 +391,12 @@ export const inventory = {
           from_account_id: purchaseData.bank_account_id || purchaseData.cashier_id,
           from_account_name: accountData.name || "Conta Desconhecida",
           category: "Compras",
+          reconciliation_id: reconciliationId,
           movement_date: new Date().toISOString(),
           created_at: serverTimestamp()
         });
+      } else {
+        throw new Error("Transação imediata sem conta de origem processada, impossível registrar financeiro.");
       }
 
       return { id: purchaseRef.id, ...finalPurchaseData };

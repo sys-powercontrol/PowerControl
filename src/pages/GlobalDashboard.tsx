@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   TrendingUp, 
   Building2, 
   Users, 
   DollarSign,
-  ArrowUpRight,
   BarChart3,
   PieChart as PieChartIcon,
   Globe
@@ -28,8 +28,8 @@ import {
   Cell,
   Legend
 } from "recharts";
-import { subDays, format, startOfMonth, isWithinInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { subDays, startOfMonth, isWithinInterval } from "date-fns";
+
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#f43f5e'];
 
@@ -160,14 +160,14 @@ if (user?.role !== 'master') {
         />
         <StatCard 
           title="Faturamento Mensal" 
-          value={`R$ ${metrics.monthlyRevenue.toLocaleString()}`} 
+          value={formatCurrency(metrics.monthlyRevenue)} 
           icon={TrendingUp} 
           color="bg-green-50 text-green-600"
           subtitle={`${metrics.monthlySalesCount} vendas este mês`}
         />
         <StatCard 
           title="Faturamento Total" 
-          value={`R$ ${metrics.totalRevenue.toLocaleString()}`} 
+          value={formatCurrency(metrics.totalRevenue)} 
           icon={DollarSign} 
           color="bg-purple-50 text-purple-600"
           subtitle="Acumulado histórico"
@@ -208,7 +208,7 @@ if (user?.role !== 'master') {
                   axisLine={false} 
                   tickLine={false} 
                   tick={{ fill: '#94a3b8', fontSize: 12 }}
-                  tickFormatter={(value) => `R$ ${value >= 1000 ? (value/1000).toFixed(1) + 'k' : value}`}
+                  tickFormatter={(value) => formatCurrency(value)}
                 />
                 <Tooltip 
                   contentStyle={{ 
@@ -217,7 +217,7 @@ if (user?.role !== 'master') {
                     border: 'none', 
                     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' 
                   }}
-                  formatter={(value: number) => [`R$ ${value.toLocaleString()}`, 'Faturamento']}
+                  formatter={(value: number) => [formatCurrency(value), 'Faturamento']}
                 />
                 <Line 
                   type="monotone" 
@@ -260,7 +260,7 @@ if (user?.role !== 'master') {
                   ))}
                 </Pie>
                 <Tooltip 
-                  formatter={(value: number) => `R$ ${value.toLocaleString()}`}
+                  formatter={(value: number) => formatCurrency(value)}
                 />
                 <Legend verticalAlign="bottom" height={36}/>
               </PieChart>
@@ -296,7 +296,7 @@ if (user?.role !== 'master') {
                   width={150}
                 />
                 <Tooltip 
-                  formatter={(value: number) => `R$ ${value.toLocaleString()}`}
+                  formatter={(value: number) => formatCurrency(value)}
                   cursor={{ fill: '#f8fafc' }}
                 />
                 <Bar dataKey="total" fill="#3b82f6" radius={[0, 10, 10, 0]} barSize={30} />
@@ -330,7 +330,7 @@ if (user?.role !== 'master') {
                       <span className="font-bold text-gray-900">{company.name}</span>
                     </td>
                     <td className="py-4 text-right font-bold text-blue-600">
-                      R$ {company.total.toLocaleString()}
+                      {formatCurrency(company.total)}
                     </td>
                   </tr>
                 ))}

@@ -3,11 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
-  FileText, 
   Plus, 
   Search, 
-  MoreVertical, 
   Download, 
   Send,
   CheckCircle2,
@@ -355,7 +354,7 @@ if (!canManage) {
                     <p className="text-sm text-gray-600">{formatBR(invoice.emission_date)}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-sm font-bold text-gray-900">R$ {invoice.total?.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(invoice.total || 0)}</p>
                   </td>
                   <td className="px-6 py-4">
                     <NfeStatusBadge status={invoice.status as NfeStatus} />
@@ -431,7 +430,7 @@ if (!canManage) {
                   <option value="">Selecione uma venda...</option>
                   {sales.filter((s: any) => s.status === "Concluída").map((s: any) => (
                     <option key={s.id} value={s.id}>
-                      Venda #{s.sale_number} - R$ {s.total?.toLocaleString()} ({s.client_name})
+                      Venda #{s.sale_number} - {formatCurrency(s.total || 0)} ({s.client_name})
                     </option>
                   ))}
                 </select>

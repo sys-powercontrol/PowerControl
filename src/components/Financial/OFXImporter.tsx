@@ -5,19 +5,16 @@ import { useAuth } from "../../lib/auth";
 import { 
   X, 
   Upload, 
-  FileText, 
   CheckCircle2, 
-  AlertCircle, 
   ArrowUpRight, 
   ArrowDownLeft,
   ArrowRightLeft,
-  Search,
-  Plus,
   Check
 } from "lucide-react";
 import { toast } from "sonner";
 import { parse } from "ofx-js";
 import { formatBR } from "../../lib/dateUtils";
+import { formatCurrency } from "../../lib/currencyUtils";
 
 interface OFXTransaction {
   id: string;
@@ -134,7 +131,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       if (r.type === 'REGEX') {
         try {
           return new RegExp(pattern, 'i').test(memo);
-        } catch (e) {
+        } catch {
           return false;
         }
       }
@@ -523,7 +520,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                       <div className="text-right flex items-center gap-6">
                         <div className="min-w-[120px]">
                           <p className={`text-lg font-bold ${isExpense ? "text-red-600" : "text-green-600"}`}>
-                            {isExpense ? "-" : "+"} R$ {Math.abs(t.amount).toLocaleString()}
+                            {isExpense ? "-" : "+"} {formatCurrency(Math.abs(t.amount || 0))}
                           </p>
                           {match && (
                             <p className="text-[10px] text-gray-400 italic truncate max-w-[150px]">
@@ -600,7 +597,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                 <p className="text-xs font-bold text-blue-600 uppercase mb-1">Transação do Extrato</p>
                 <div className="flex justify-between items-center">
                   <p className="font-bold text-gray-900">{transactions.find(t => t.id === isManualMatching)?.memo}</p>
-                  <p className="font-bold text-blue-600">R$ {Math.abs(transactions.find(t => t.id === isManualMatching)?.amount || 0).toLocaleString()}</p>
+                  <p className="font-bold text-blue-600">{formatCurrency(Math.abs(transactions.find(t => t.id === isManualMatching)?.amount || 0))}</p>
                 </div>
               </div>
 
@@ -620,7 +617,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                           <p className="text-xs text-gray-500">Vencimento: {formatBR(e.due_date)}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-gray-900">R$ {e.amount?.toLocaleString()}</p>
+                          <p className="font-bold text-gray-900">{formatCurrency(e.amount || 0)}</p>
                           <p className="text-[10px] text-blue-600 font-bold uppercase">Selecionar</p>
                         </div>
                       </button>

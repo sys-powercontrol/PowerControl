@@ -32,6 +32,7 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import Services from "./pages/Services";
 import Sellers from "./pages/Sellers";
 import Suppliers from "./pages/Suppliers";
+import Categories from "./pages/Categories";
 import Configurations from "./pages/Configurations";
 import Fiscal from "./pages/Fiscal";
 import TaxSettings from "./pages/TaxSettings";
@@ -47,6 +48,7 @@ import Employees from "./pages/Employees";
 import { AuthProvider, useAuth } from "./lib/auth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import NotFound from "./pages/NotFound";
 import ScrollToTop from "./components/ScrollToTop";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -92,8 +94,19 @@ export default function App() {
 
       navigator.serviceWorker.addEventListener('message', handleMessage);
 
+      const handleOnline = () => {
+        navigator.serviceWorker.ready.then(registration => {
+          if (registration.active) {
+            registration.active.postMessage({ type: 'CHECK_SYNC' });
+          }
+        });
+      };
+      
+      window.addEventListener('online', handleOnline);
+
       return () => {
         navigator.serviceWorker.removeEventListener('message', handleMessage);
+        window.removeEventListener('online', handleOnline);
       };
     }
   }, []);
@@ -133,6 +146,7 @@ export default function App() {
               <Route path="ConciliacaoBancaria" element={<BankReconciliation />} />
               <Route path="Transferencias" element={<Transfers />} />
               <Route path="Fornecedores" element={<Suppliers />} />
+              <Route path="Categorias" element={<Categories />} />
               <Route path="Funcionarios" element={<Employees />} />
               <Route path="Convites" element={<Invite />} />
               <Route path="MeuPerfil" element={<Profile />} />
@@ -144,8 +158,8 @@ export default function App() {
               <Route path="Fiscal" element={<Fiscal />} />
               <Route path="Suporte" element={<Support />} />
               <Route path="BaseConhecimento" element={<KnowledgeBase />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
         <Toaster position="top-right" />

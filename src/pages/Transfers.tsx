@@ -10,13 +10,13 @@ import {
   ArrowDownLeft,
   Calendar,
   Building2,
-  CreditCard,
   Eye,
   User,
   Shield
 } from "lucide-react";
 import { toast } from "sonner";
 import { processMovement } from "../lib/finance";
+import { formatCurrency } from "../lib/currencyUtils";
 
 export default function Transfers() {
   const { user, hasPermission } = useAuth();
@@ -209,7 +209,7 @@ if (!canManage) {
                   m.type === "Entrada" ? "text-green-600" : 
                   m.type === "Saída" ? "text-red-600" : "text-blue-600"
                 }`}>
-                  {m.type === "Saída" ? "-" : "+"} R$ {m.amount?.toLocaleString()}
+                  {m.type === "Saída" ? "-" : "+"} {formatCurrency(m.amount || 0)}
                 </p>
                 <span className="text-[10px] font-bold uppercase text-gray-400">{m.type}</span>
               </div>
@@ -310,7 +310,7 @@ if (!canManage) {
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase">Valor</p>
-                  <p className="font-bold text-gray-900">R$ {selectedMovement.amount?.toLocaleString()}</p>
+                  <p className="font-bold text-gray-900">{formatCurrency(selectedMovement.amount || 0)}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase">Data/Hora</p>

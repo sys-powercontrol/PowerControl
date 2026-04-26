@@ -18,14 +18,14 @@ import {
   Info
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+
 import forge from "node-forge";
 import CryptoJS from "crypto-js";
 
 const MASTER_KEY = "powercontrol-secret-key";
 
 export default function CertificateManager() {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const currentCompanyId = api.getCompanyId();
 
@@ -33,7 +33,7 @@ export default function CertificateManager() {
   const [password, setPassword] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
-  const { data: certificates = [], isLoading } = useQuery({
+  const { data: certificates = [] } = useQuery({
     queryKey: ["certificates", currentCompanyId],
     queryFn: () => api.get("certificates", { company_id: currentCompanyId }),
     enabled: !!currentCompanyId

@@ -1,5 +1,5 @@
 import React from "react";
-import { Calculator, Percent, FileText } from "lucide-react";
+import { Percent, FileText } from "lucide-react";
 
 interface TaxRuleFormProps {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;

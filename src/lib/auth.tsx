@@ -1,13 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup,
-  User as FirebaseUser
+  signInWithPopup
 } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -35,7 +34,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const unsubscribeDocRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {

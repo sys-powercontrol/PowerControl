@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -10,10 +11,7 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   Filter,
-  Calendar,
   Package,
-  Wrench,
-  Download,
   Shield,
   BarChart3,
   Printer,
@@ -27,14 +25,11 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  BarChart,
-  Bar,
   Cell,
   PieChart,
   Pie
 } from "recharts";
-import { subDays, isAfter, format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { subDays, isAfter, parseISO } from "date-fns";
 import ExportButton from "../components/ExportButton";
 import { exportToPdf } from "../lib/utils/pdfExport";
 
@@ -59,12 +54,6 @@ export default function ProfitabilityReport() {
   const { data: accountsPayable = [], isLoading: isLoadingExpenses } = useQuery({ 
     queryKey: ["accountsPayable", currentCompanyId], 
     queryFn: () => api.get("accountsPayable"),
-    enabled: !!user
-  });
-
-  const { data: products = [] } = useQuery({ 
-    queryKey: ["products", currentCompanyId], 
-    queryFn: () => api.get("products"),
     enabled: !!user
   });
 
@@ -269,7 +258,7 @@ if (!canView) {
           </div>
           <div>
             <h3 className="text-2xl font-bold text-gray-900">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(reportData.totalRevenue)}
+              {formatCurrency(reportData.totalRevenue)}
             </h3>
             <p className="text-xs text-gray-400">Total de vendas no período</p>
           </div>
@@ -287,7 +276,7 @@ if (!canView) {
           </div>
           <div>
             <h3 className="text-2xl font-bold text-gray-900">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(reportData.grossProfit)}
+              {formatCurrency(reportData.grossProfit)}
             </h3>
             <p className="text-xs text-gray-400">Lucro Bruto (Margem de Contribuição)</p>
           </div>
@@ -305,7 +294,7 @@ if (!canView) {
           </div>
           <div>
             <h3 className={`text-2xl font-bold ${reportData.netProfit >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(reportData.netProfit)}
+              {formatCurrency(reportData.netProfit)}
             </h3>
             <p className="text-xs text-gray-400">Lucro Líquido (Pós Despesas)</p>
           </div>
@@ -320,7 +309,7 @@ if (!canView) {
           </div>
           <div>
             <h3 className="text-2xl font-bold text-gray-900">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(reportData.totalExpenses)}
+              {formatCurrency(reportData.totalExpenses)}
             </h3>
             <p className="text-xs text-gray-400">Contas pagas no período</p>
           </div>
@@ -398,7 +387,7 @@ if (!canView) {
                   <span className="text-gray-600">{cat.name}</span>
                 </div>
                 <span className="font-bold text-gray-900">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cat.profit)}
+                  {formatCurrency(cat.profit)}
                 </span>
               </div>
             ))}
@@ -434,7 +423,7 @@ if (!canView) {
                     </td>
                     <td className="px-6 py-4 text-center text-gray-500">{p.qty}</td>
                     <td className="px-6 py-4 text-right font-bold text-green-600">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.profit)}
+                      {formatCurrency(p.profit)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[10px] font-bold">

@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
+import { formatCurrency } from "../../lib/currencyUtils";
 
 interface PaymentGatewayProps {
   amount: number;
@@ -177,7 +178,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
                   <QRCodeSVG value={qrCode || ""} size={200} />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-3xl font-bold text-gray-900">R$ {amount.toLocaleString()}</div>
+                  <div className="text-3xl font-bold text-gray-900">{formatCurrency(amount)}</div>
                   <p className="text-sm text-gray-500">Escaneie o código para pagar via PIX</p>
                 </div>
                 <div className="space-y-3">
@@ -254,7 +255,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
                     ) : (
                       <CheckCircle2 size={20} />
                     )}
-                    {status === "PROCESSING" ? "Processando..." : `Pagar R$ ${amount.toLocaleString()}`}
+                    {status === "PROCESSING" ? "Processando..." : `Pagar ${formatCurrency(amount)}`}
                   </button>
                   <button 
                     type="button"

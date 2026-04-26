@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { getNowBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -11,9 +12,7 @@ import {
   Search, 
   Filter,
   ArrowRight,
-  Package,
-  Download,
-  Calendar
+  Package
 } from "lucide-react";
 import { 
   BarChart, 
@@ -25,7 +24,7 @@ import {
   ResponsiveContainer,
   Cell
 } from "recharts";
-import { subDays, isAfter, parseISO } from "date-fns";
+import { subDays, isAfter } from "date-fns";
 import ExportButton from "../components/ExportButton";
 
 export default function InventoryTurnoverReport() {
@@ -223,6 +222,16 @@ if (!canView) {
           <div>
             <p className="text-sm text-gray-500 font-medium">Taxa de Giro (30d)</p>
             <h3 className="text-2xl font-bold text-gray-900">{(stats.globalTurnoverRate * 100).toFixed(1)}%</h3>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
+            <ShoppingCart size={24} />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 font-medium">Investimento Sugerido</p>
+            <h3 className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalSuggestedValue)}</h3>
           </div>
         </div>
       </div>

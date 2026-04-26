@@ -31,7 +31,7 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDB() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, 2, {
-      upgrade(db, oldVersion, newVersion, transaction) {
+      upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_SALES)) {
           db.createObjectStore(STORE_SALES, { keyPath: "id" });
         }

@@ -6,6 +6,14 @@ let currentCompanyId: string | null = null;
 let isSystemAdminStatus = false;
 let currentUserData: User | null = null;
 
+// Race condition protection: Deferred promise for company ID
+let companyResolver: ((id: string) => void) | null = null;
+const companyPromise = new Promise<string>((resolve) => {
+  companyResolver = resolve;
+});
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
   if (!obj || typeof obj !== 'object') return obj;
   const newObj = { ...(obj as Record<string, unknown>) };
@@ -20,13 +28,22 @@ const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
 export const api = {
   setCompanyId: (id: string | null) => {
     currentCompanyId = id;
+    if (id && companyResolver) {
+      companyResolver(id);
+    }
   },
   getCompanyId: () => currentCompanyId,
+  // Helper to wait for company ID with timeout
+  waitForCompany: async (timeout = 500): Promise<string | null> => {
+    if (currentCompanyId) return currentCompanyId;
+    
+    return Promise.race([
+      companyPromise,
+      wait(timeout).then(() => null)
+    ]);
+  },
   setIsSystemAdmin: (isMaster: boolean) => {
     isSystemAdminStatus = isMaster;
-  },
-  setSessionId: (id: string | null) => {
-    // No longer used
   },
   getCurrentUser: () => currentUserData,
   findUserByEmail: async (email: string): Promise<User | null> => {
@@ -51,6 +68,9 @@ export const api = {
             await updateDoc(doc(db, "users", user.uid), { role: "master" });
             userData.role = "master";
             currentUserData.role = "master";
+          }
+          if (userData.company_id) {
+            api.setCompanyId(userData.company_id);
           }
           return currentUserData as T;
         } else {
@@ -117,12 +137,13 @@ export const api = {
       const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
 
       if (requiresIsolation) {
-        if (!currentCompanyId) {
-          console.warn(`Race condition avoided: Cannot query ${entityPath} without company_id.`);
-          return [] as T[];
+        const companyId = await api.waitForCompany(2000);
+        if (!companyId) {
+          console.warn(`Race condition avoided: Cannot query ${entityPath} without company_id. Throwing to trigger retry.`);
+          throw new Error("Pendente de company_id");
         }
-        conditions.push(where("company_id", "==", currentCompanyId));
-      } else if (isSystemAdminStatus && currentCompanyId && !(paramsOrId && paramsOrId._all) && !isCompanyEntity) {
+        conditions.push(where("company_id", "==", companyId));
+      } else if (isSystemAdminStatus && (currentCompanyId || await api.waitForCompany(500)) && !(paramsOrId && paramsOrId._all) && !isCompanyEntity) {
         conditions.push(where("company_id", "==", currentCompanyId));
       }
 
@@ -192,32 +213,52 @@ export const api = {
 
     const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
 
-    if (requiresIsolation) {
-      if (!currentCompanyId) {
+    let unsubscribe: (() => void) | null = null;
+    let isCancelled = false;
+
+    const setupSubscription = async () => {
+      const waitTime = requiresIsolation ? 2000 : (isSystemAdminStatus && !params?._all ? 500 : 0);
+      const companyId = waitTime > 0 ? await api.waitForCompany(waitTime) : currentCompanyId;
+
+      if (isCancelled) return;
+
+      if (requiresIsolation && !companyId) {
         console.warn(`Race condition avoided in subscribe: Cannot query ${entityPath} without company_id.`);
-        return () => {}; // return empty unsubscribe function
+        // Note: For subscriptions, yielding nothing is better than erroring out the whole tree, 
+        // but it might never re-subscribe. However, 2000ms is generous enough for auth initialization.
+        return;
       }
-      conditions.push(where("company_id", "==", currentCompanyId));
-    } else if (isSystemAdminStatus && currentCompanyId && !(params && params._all) && !isCompanyEntity) {
-      conditions.push(where("company_id", "==", currentCompanyId));
-    }
 
-    const queryConstraints: QueryConstraint[] = [...conditions];
-    if (params?._orderBy) {
-      queryConstraints.push(orderBy(params._orderBy as string, (params._orderDir as OrderByDirection) || "asc"));
-    }
-    if (params?._limit) {
-      queryConstraints.push(limit(params._limit as number));
-    }
+      if ((requiresIsolation || (isSystemAdminStatus && !params?._all && !isCompanyEntity)) && companyId) {
+        conditions.push(where("company_id", "==", companyId));
+      }
 
-    if (queryConstraints.length > 0) {
-      q = query(q, ...queryConstraints);
-    }
+      const queryConstraints: QueryConstraint[] = [...conditions];
+      if (params?._orderBy) {
+        queryConstraints.push(orderBy(params._orderBy as string, (params._orderDir as OrderByDirection) || "asc"));
+      }
+      if (params?._limit) {
+        queryConstraints.push(limit(params._limit as number));
+      }
 
-    return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-      const data = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({ id: doc.id, ...doc.data() }));
-      callback(data as T[]);
-    });
+      if (queryConstraints.length > 0) {
+        q = query(q, ...queryConstraints);
+      }
+
+      const unsub = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+        const data = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({ id: doc.id, ...doc.data() }));
+        callback(data as T[]);
+      });
+
+      unsubscribe = unsub;
+    };
+
+    setupSubscription();
+
+    return () => {
+      isCancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
   },
   log: async (data: Partial<AuditLog>, userContext?: User): Promise<void> => {
     const user = userContext ? userContext : auth.currentUser;

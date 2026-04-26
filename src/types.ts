@@ -55,6 +55,7 @@ export interface InventoryMovement {
   previous_stock: number;
   current_stock: number;
   reference_id?: string;
+  reconciliation_id?: string;
   observation?: string;
   user_id: string;
   user_name: string;
@@ -67,10 +68,12 @@ export interface AccountReceivable {
   client_id: string;
   client_name: string;
   sale_id: string;
+  reconciliation_id?: string;
   description: string;
   amount: number;
   due_date: string;
   status: 'Pendente' | 'Pago' | 'Atrasado' | 'Cancelado';
+  is_unmapped?: boolean;
   created_at: FirebaseTimestamp;
   receipt_date?: string;
   bank_account_id?: string;
@@ -83,6 +86,7 @@ export interface AccountPayable {
   supplier_id?: string;
   supplier_name?: string;
   purchase_id?: string;
+  reconciliation_id?: string;
   description: string;
   amount: number;
   due_date: string;

@@ -2,16 +2,16 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   Building2, 
   Plus, 
   Edit2, 
-  CreditCard, 
   Wallet,
-  ArrowUpRight,
-  ArrowDownLeft,
   Shield,
-  FileText
+  FileText,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { OFXImporter } from "../components/Financial/OFXImporter";
@@ -28,6 +28,12 @@ export default function BankAccounts() {
   const [isOFXModalOpen, setIsOFXModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
   const [selectedAccountForOFX, setSelectedAccountForOFX] = useState<any>(null);
+  const [showGlobalBalance, setShowGlobalBalance] = useState(false);
+  const [showAccountBalance, setShowAccountBalance] = useState<Record<string, boolean>>({});
+
+  const toggleAccountBalance = (id: string) => {
+    setShowAccountBalance(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const currentCompanyId = api.getCompanyId();
 
@@ -114,9 +120,20 @@ if (!canManage) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase mb-1">Saldo Total Consolidado</p>
+            <div className="flex justify-between items-center mb-1">
+              <p className="text-xs font-bold text-gray-500 uppercase">Saldo Total Consolidado</p>
+              <button 
+                onClick={() => setShowGlobalBalance(!showGlobalBalance)} 
+                className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                title={showGlobalBalance ? "Ocultar Saldo" : "Exibir Saldo"}
+              >
+                {showGlobalBalance ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             <p className="text-3xl font-bold text-blue-600">
-              R$ {accounts.reduce((acc: number, a: any) => acc + (a.balance || 0), 0).toLocaleString()}
+              {showGlobalBalance 
+                ? formatCurrency(accounts.reduce((acc: number, a: any) => acc + (a.balance || 0), 0))
+                : "R$ ••••••"}
             </p>
           </div>
           <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl">
@@ -182,8 +199,20 @@ if (!canManage) {
               </div>
 
               <div className="pt-2">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-1">Saldo em Conta</p>
-                <p className="text-2xl font-bold text-gray-900">R$ {acc.balance?.toLocaleString()}</p>
+                <div className="flex justify-between items-center mb-1">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Saldo em Conta</p>
+                  <button 
+                    onClick={() => toggleAccountBalance(acc.id)} 
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showAccountBalance[acc.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {showAccountBalance[acc.id] 
+                    ? formatCurrency(acc.balance || 0)
+                    : "R$ ••••••"}
+                </p>
               </div>
             </div>
           </div>

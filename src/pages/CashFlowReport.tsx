@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
   Calendar,
-  Filter,
   Download,
   PieChart as PieChartIcon,
   BarChart3,
@@ -37,12 +37,10 @@ import {
   endOfMonth, 
   subMonths, 
   isWithinInterval, 
-  format,
   parseISO,
   startOfDay,
   endOfDay
 } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import ExportButton from "../components/ExportButton";
 import { exportToPdf } from "../lib/utils/pdfExport";
 
@@ -173,10 +171,6 @@ export default function CashFlowReport() {
     { name: 'Despesas', value: dreData.totalOpEx },
     { name: 'Lucro', value: Math.max(0, dreData.netProfit) },
   ];
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
 
 if (!canView) {
     return (

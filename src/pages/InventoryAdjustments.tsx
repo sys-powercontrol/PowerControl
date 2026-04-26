@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { inventory } from "../lib/inventory";
 import { 
-  Package, 
   ArrowUpCircle, 
   ArrowDownCircle, 
   AlertCircle,
@@ -14,7 +13,6 @@ import {
   Info
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "motion/react";
 
 export default function InventoryAdjustments() {
   const queryClient = useQueryClient();

@@ -107,7 +107,7 @@ export default function Employees() {
       toast.success("Funcionário desvinculado!");
       setIsConfirmModalOpen(false);
       setEmployeeToUnlink(null);
-    } catch (error) {
+    } catch {
       toast.error("Erro ao desvincular funcionário.");
     } finally {
       setIsUnlinking(false);

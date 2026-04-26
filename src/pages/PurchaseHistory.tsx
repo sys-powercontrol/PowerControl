@@ -2,11 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   Truck, 
   Search, 
   Calendar,
-  ChevronRight,
   Eye,
   XCircle,
   Printer,
@@ -226,7 +226,7 @@ if (!canView) {
                 <tr key={p.id} className="text-sm group hover:bg-gray-50 transition-colors">
                   <td className="py-4 font-medium text-gray-900">#{p.purchase_number || "001"}</td>
                   <td className="py-4 text-gray-600">{p.supplier_name}</td>
-                  <td className="py-4 font-bold text-orange-600">R$ {p.total?.toLocaleString()}</td>
+                  <td className="py-4 font-bold text-orange-600">{formatCurrency(p.total || 0)}</td>
                   <td className="py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                       p.status === "Cancelada" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
@@ -346,15 +346,15 @@ if (!canView) {
                         <tr key={i} className="hover:bg-gray-50/50">
                           <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                           <td className="px-4 py-3 text-center text-gray-600">{item.quantity}</td>
-                          <td className="px-4 py-3 text-right text-gray-600">R$ {item.cost?.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right font-bold text-gray-900">R$ {(item.cost * item.quantity).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(item.cost || 0)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency((item.cost || 0) * (item.quantity || 0))}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-gray-50 border-t border-gray-100">
                       <tr>
                         <td colSpan={3} className="px-4 py-4 text-right font-bold text-gray-500 uppercase text-xs">Total da Compra</td>
-                        <td className="px-4 py-4 text-right font-bold text-orange-600 text-lg">R$ {selectedPurchase.total?.toLocaleString()}</td>
+                        <td className="px-4 py-4 text-right font-bold text-orange-600 text-lg">{formatCurrency(selectedPurchase.total || 0)}</td>
                       </tr>
                     </tfoot>
                   </table>

@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { calculateDiff } from "../lib/utils/diff";
 import { useAuth } from "../lib/auth";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   Wrench, 
   Plus, 
   Search, 
-  MoreVertical, 
   Edit, 
   Trash2,
   Clock,
@@ -187,7 +187,7 @@ export default function Services() {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 font-medium uppercase">Preço</p>
-                <p className="text-xl font-bold text-blue-600">R$ {service.price?.toLocaleString()}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(service.price || 0)}</p>
               </div>
             </div>
           </div>

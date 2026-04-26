@@ -22,9 +22,9 @@ import {
   History,
   BarChart3,
   Globe,
-  Calculator
+  Tag
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -149,6 +149,7 @@ export default function Layout() {
         { name: "Conciliação Bancária", path: "/ConciliacaoBancaria", icon: ArrowRightLeft, permission: 'finance.manage' },
         { name: "Transferências", path: "/Transferencias", icon: ArrowRightLeft, permission: 'finance.manage' },
         { name: "Fornecedores", path: "/Fornecedores", icon: Users, permission: 'finance.view' },
+        { name: "Centro de Custos", path: "/Categorias", icon: Tag, permission: 'finance.manage' },
       ]
     },
     { name: "Caixas", path: "/Caixas", icon: CreditCard, requiresCompany: true, permission: 'finance.view' },

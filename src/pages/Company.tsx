@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { storage } from "../lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Building2, Save, Upload, Phone, Mail, MapPin, Globe, QrCode, Shield, Search, Loader2 } from "lucide-react";
+import { Building2, Save, Upload, Phone, Mail, MapPin, QrCode, Shield, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
 import { InputMask } from "../components/ui/InputMask";

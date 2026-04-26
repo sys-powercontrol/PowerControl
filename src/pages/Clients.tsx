@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { 
@@ -11,8 +11,7 @@ import {
   Mail, 
   MapPin,
   ChevronRight,
-  User as UserIcon,
-  Loader2
+  User as Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";

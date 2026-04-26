@@ -1,23 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { calculateDiff } from "../lib/utils/diff";
 import { fiscalApi } from "../services/fiscalApi";
 import { useAuth } from "../lib/auth";
-import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, PermissionId } from "../lib/permissions";
+import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from "../lib/permissions";
 import { 
-  Settings, 
   Save, 
   Building2, 
   CreditCard, 
   Bell, 
   Shield, 
   Zap,
-  Smartphone,
-  Globe,
   Info,
   ShieldCheck,
-  Check,
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";

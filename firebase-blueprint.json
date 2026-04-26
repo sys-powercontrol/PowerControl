@@ -129,6 +129,10 @@
         "bank_account_id": { "type": "string" },
         "cashier_id": { "type": "string" },
         "supplier": { "type": "string" },
+        "supplier_id": { "type": "string" },
+        "supplier_name": { "type": "string" },
+        "category_id": { "type": "string" },
+        "category_name": { "type": "string" },
         "client_name": { "type": "string" }
       },
       "required": ["description", "amount", "due_date", "status", "company_id"]
@@ -318,6 +322,7 @@
         "to_account_id": { "type": "string" },
         "to_account_name": { "type": "string" },
         "category": { "type": "string" },
+        "reconciliation_id": { "type": "string", "description": "Link between financial and inventory records" },
         "movement_date": { "type": "string", "format": "date-time" },
         "created_at": { "type": "string", "format": "date-time" }
       },

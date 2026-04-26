@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -8,12 +8,10 @@ import {
   Users, 
   ShoppingCart, 
   Command,
-  ChevronRight,
   Loader2,
   ArrowRight
 } from "lucide-react";
 import { api } from "../lib/api";
-import { useAuth } from "../lib/auth";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -36,7 +34,6 @@ export default function GlobalSearch() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const navigate = useNavigate();
-  const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const currentCompanyId = api.getCompanyId();
 

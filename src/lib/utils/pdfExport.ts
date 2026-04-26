@@ -52,10 +52,6 @@ export const exportToPdf = async ({ elementId, filename, title, companyName }: E
     // Calculate aspect ratio
     const imgWidth = canvas.width;
     const imgHeight = canvas.height;
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-    
-    const finalWidth = imgWidth * ratio;
-    const finalHeight = imgHeight * ratio;
 
     // Header Power BI Style
     pdf.setFillColor(255, 255, 255);

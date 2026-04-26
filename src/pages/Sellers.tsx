@@ -6,7 +6,6 @@ import { useAuth } from "../lib/auth";
 import { 
   UserPlus, 
   Search, 
-  MoreVertical, 
   Edit, 
   Trash2,
   Mail,
@@ -110,7 +109,7 @@ export default function Sellers() {
       toast.success("Vendedor excluído!");
       setIsConfirmModalOpen(false);
       setSellerToDelete(null);
-    } catch (error) {
+    } catch {
       toast.error("Erro ao excluir vendedor.");
     } finally {
       setIsDeleting(false);

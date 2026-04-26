@@ -3,10 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
-  TrendingUp, 
-  Search, 
-  Filter,
   Calendar,
   User,
   CheckCircle2,
@@ -16,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
+
 import ExportButton from "../components/ExportButton";
 
 export default function CommissionPayouts() {
@@ -166,7 +164,7 @@ if (!canManage) {
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-blue-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Pendente (Filtro)</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">
-            R$ {totalPending.toLocaleString()}
+            {formatCurrency(totalPending)}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-green-500">
@@ -286,10 +284,10 @@ if (!canManage) {
                         <span className="text-xs font-mono text-gray-400">#{sale.id.substr(0, 8).toUpperCase()}</span>
                       </td>
                       <td className="px-6 py-4 text-right text-sm font-medium text-gray-600">
-                        R$ {sale.total?.toLocaleString()}
+                        {formatCurrency(sale.total || 0)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="text-sm font-black text-green-600">R$ {sale.commission_amount?.toLocaleString()}</span>
+                        <span className="text-sm font-black text-green-600">{formatCurrency(sale.commission_amount || 0)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button 

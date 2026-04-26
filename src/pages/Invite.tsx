@@ -18,15 +18,15 @@ import {
   Calendar
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+
+
 
 export default function Invite() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  
 
   
 

@@ -14,19 +14,18 @@ import {
   Printer,
   ChevronRight,
   Search,
-  Minus,
-  AlertCircle,
   Tag,
   Package,
   Lock,
   CreditCard
 } from "lucide-react";
 import { toast } from "sonner";
-import { QRCodeSVG } from "qrcode.react";
+
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { printReceipt } from "../lib/utils/print";
-import { format, subDays } from "date-fns";
+import { subDays } from "date-fns";
 import { PaymentGateway } from "../components/Sales/PaymentGateway";
 import { offlineStore } from "../lib/offlineStore";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
@@ -165,11 +164,7 @@ export default function Sales() {
     }
   }, [hasOpenCashier, cashiers, user?.id, selectedCashier]);
 
-  const { data: companies = [] } = useQuery({
-    queryKey: ["companies", currentCompanyId],
-    queryFn: () => api.get("companies"),
-    enabled: user?.role === 'admin' || user?.role === 'master'
-  });
+  
 
   const { data: companyData } = useQuery({ 
     queryKey: ["company", currentCompanyId], 
@@ -514,7 +509,7 @@ if (!canCreate) {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-blue-600">R$ {p.price?.toLocaleString()}</span>
+                  <span className="font-bold text-blue-600">{formatCurrency(p.price || 0)}</span>
                   <div className="p-1 bg-blue-100 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
                     <Plus size={16} />
                   </div>
@@ -554,7 +549,7 @@ if (!canCreate) {
                         <span className="text-xs text-gray-500">/ {item.unit || "un"}</span>
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-500">R$ {item.price?.toLocaleString()} / {item.unit || "un"}</p>
+                      <p className="text-xs text-gray-500">{formatCurrency(item.price || 0)} / {item.unit || "un"}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-4">
@@ -567,7 +562,7 @@ if (!canCreate) {
                         +
                       </button>
                     </div>
-                    <p className="w-24 text-right font-bold text-gray-900">R$ {(item.price * item.quantity).toLocaleString()}</p>
+                    <p className="w-24 text-right font-bold text-gray-900">{formatCurrency(item.price * item.quantity)}</p>
                     <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-400 hover:text-red-600">
                       <Trash2 size={18} />
                     </button>
@@ -598,7 +593,7 @@ if (!canCreate) {
                 >
                   <option value="">Selecione o caixa...</option>
                   {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.name} (R$ {c.balance?.toLocaleString()})</option>
+                    <option key={c.id} value={c.id}>{c.name} ({formatCurrency(c.balance || 0)})</option>
                   ))}
                 </select>
               </div>
@@ -615,7 +610,7 @@ if (!canCreate) {
                 >
                   <option value="">Selecione a conta bancária...</option>
                   {bankAccounts.map((a: any) => (
-                    <option key={a.id} value={a.id}>{a.name} (R$ {a.balance?.toLocaleString()})</option>
+                    <option key={a.id} value={a.id}>{a.name} ({formatCurrency(a.balance || 0)})</option>
                   ))}
                 </select>
               </div>
@@ -674,7 +669,7 @@ if (!canCreate) {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl">
                   <span className="text-sm font-bold text-green-700 uppercase">Troco</span>
-                  <span className="text-xl font-bold text-green-700">R$ {change.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-green-700">{formatCurrency(change)}</span>
                 </div>
               </div>
             )}
@@ -683,15 +678,15 @@ if (!canCreate) {
           <div className="pt-6 border-t border-gray-100 space-y-2">
             <div className="flex justify-between text-gray-500">
               <span>Subtotal</span>
-              <span>R$ {subtotal.toLocaleString()}</span>
+              <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-red-500">
               <span>Desconto</span>
-              <span>- R$ {discount.toLocaleString()}</span>
+              <span>- {formatCurrency(discount)}</span>
             </div>
             <div className="flex justify-between text-2xl font-bold text-gray-900 pt-2">
               <span>Total</span>
-              <span className="text-green-600">R$ {total.toLocaleString()}</span>
+              <span className="text-green-600">{formatCurrency(total)}</span>
             </div>
           </div>
 
@@ -731,7 +726,7 @@ if (!canCreate) {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-50 flex items-center justify-between gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         <div className="flex flex-col">
           <span className="text-[10px] font-bold text-gray-400 uppercase">Total</span>
-          <span className="text-xl font-black text-blue-600">R$ {total.toLocaleString()}</span>
+          <span className="text-xl font-black text-blue-600">{formatCurrency(total)}</span>
         </div>
         {activeTab === "items" ? (
           <button 
@@ -779,7 +774,7 @@ if (!canCreate) {
                 <h2 className="text-2xl font-bold">Venda Concluída!</h2>
                 <p className="text-gray-500">Venda #{lastSale?.id?.substr(0, 8).toUpperCase()}</p>
               </div>
-              <div className="text-4xl font-bold text-green-600 py-4">R$ {lastSale?.total?.toLocaleString()}</div>
+              <div className="text-4xl font-bold text-green-600 py-4">{formatCurrency(lastSale?.total || 0)}</div>
               
               <div className="bg-gray-50 p-4 rounded-2xl text-left space-y-2 text-sm">
                 <div className="flex justify-between">

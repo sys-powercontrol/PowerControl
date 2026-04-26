@@ -1,12 +1,10 @@
-import React, { useState } from "react";
+import React, {} from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { 
-  User, 
   Mail, 
   Phone, 
-  MapPin, 
   Building2, 
   Copy, 
   Camera,
@@ -29,7 +27,7 @@ export default function Profile() {
 
   const updateProfileMutation = useMutation({
     mutationFn: (data: any) => api.put("users", user?.id, data),
-    onSuccess: (updatedUser) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["me"] });
       toast.success("Perfil atualizado com sucesso!");
     },

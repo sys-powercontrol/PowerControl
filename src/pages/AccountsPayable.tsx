@@ -4,22 +4,23 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR, getTodayBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   TrendingDown, 
   Plus, 
   Search, 
-  Filter,
   Calendar,
   Building2,
   CheckCircle2,
-  AlertCircle,
   Shield,
   Repeat,
   Lock,
   History,
   CalendarClock,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  Tag,
+  Edit
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculateNextDueDate, Frequency } from "../lib/finance";
@@ -45,12 +46,18 @@ export default function AccountsPayable() {
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
   const [accountToReverse, setAccountToReverse] = useState<string | null>(null);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+  
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
 
   const currentCompanyId = api.getCompanyId();
 
   const { data: accountsData = [], isLoading } = useQuery({ 
     queryKey: ["accountsPayable", currentCompanyId], 
-    queryFn: () => api.get("accountsPayable", { _orderBy: "due_date", _orderDir: "asc" }),
+    queryFn: () => api.get("accountsPayable", { _orderBy: "due_date", _orderDir: "desc" }),
     enabled: !!user
   });
 
@@ -91,6 +98,17 @@ export default function AccountsPayable() {
     if (!currentCompanyId) return suppliersData;
     return suppliersData.filter((item: any) => item.company_id === currentCompanyId);
   }, [suppliersData, currentCompanyId]);
+
+  const { data: categoriesData = [] } = useQuery({ 
+    queryKey: ["categories", currentCompanyId], 
+    queryFn: () => api.get("categories"),
+    enabled: !!user
+  });
+
+  const categories = React.useMemo(() => {
+    if (!currentCompanyId) return categoriesData;
+    return categoriesData.filter((item: any) => item.company_id === currentCompanyId);
+  }, [categoriesData, currentCompanyId]);
 
   const hasOpenCashier = React.useMemo(() => {
     const today = getTodayBR();
@@ -176,15 +194,26 @@ export default function AccountsPayable() {
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
     
-    let supplier_name = data.supplier;
-    let supplier_id = data.supplier_id;
+    let supplier_name = data.supplier as string;
+    const supplier_id = selectedSupplierId;
     
     if (supplier_id) {
         const sup = suppliers.find((s: any) => s.id === supplier_id);
         if (sup) supplier_name = sup.name;
-    } else if (supplier_name) {
-        const sup = suppliers.find((s: any) => s.name === supplier_name);
-        if (sup) supplier_id = sup.id;
+    }
+
+    let category_name = "";
+    if (selectedCategoryId) {
+      const cat = categories.find((c: any) => c.id === selectedCategoryId);
+      if (cat) category_name = cat.name;
+    }
+
+    let newStatus = editingAccount ? editingAccount.status : "Pendente";
+    const statusFromForm = data.status as string;
+    
+    // If user manually changed status in edit form (if we add the field)
+    if (statusFromForm && statusFromForm !== newStatus) {
+      newStatus = statusFromForm;
     }
 
     const accountData = {
@@ -192,26 +221,52 @@ export default function AccountsPayable() {
        supplier: supplier_name,
        supplier_name: supplier_name,
        supplier_id: supplier_id,
+       category_id: selectedCategoryId || null,
+       category_name: category_name || null,
        company_id: user?.company_id,
        amount: parseFloat(data.amount as string),
-       status: "Pendente",
+       status: newStatus,
        is_recurring: data.is_recurring === "on"
     };
 
-    api.post("accountsPayable", accountData).then(() => {
+    const mutationPromise = editingAccount
+      ? api.put("accountsPayable", editingAccount.id, accountData)
+      : api.post("accountsPayable", accountData);
+
+    mutationPromise.then(async () => {
+      // HANDLE FINANCIAL RESTORATION IF REOPENED
+      if (editingAccount && editingAccount.status === "Pago" && (newStatus === "Pendente" || newStatus === "Atrasado")) {
+        const { reverseAccountPayment } = await import("../lib/finance");
+        await reverseAccountPayment(editingAccount);
+        toast.info("A conta foi reaberta e o saldo estornado.");
+      }
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
-      toast.success("Conta cadastrada!");
+      toast.success(editingAccount ? "Conta atualizada!" : "Conta cadastrada!");
       setIsModalOpen(false);
+      setEditingAccount(null);
     }).catch(async (error) => {
-      console.warn("Falha ao salvar CP online, acionando offline fallback", error);
+      console.warn("Falha ao salvar CP, acionando offline fallback", error);
       if (!navigator.onLine || error.message?.includes('offline') || error.message?.includes('Failed to fetch')) {
          const { offlineStore } = await import('../lib/offlineStore');
-         await offlineStore.saveAccountPayable(accountData);
-         setIsModalOpen(false);
+         if (editingAccount) {
+            toast.error("Edição offline não disponível no momento.");
+         } else {
+            await offlineStore.saveAccountPayable(accountData);
+            setIsModalOpen(false);
+         }
       } else {
-         toast.error("Erro ao cadastrar: " + error.message);
+         toast.error("Erro ao salvar: " + error.message);
       }
     });
+  };
+
+  const handleEdit = (acc: any) => {
+    setEditingAccount(acc);
+    setSupplierSearch(acc.supplier || "");
+    setSelectedSupplierId(acc.supplier_id || "");
+    setCategorySearch(acc.category_name || "");
+    setSelectedCategoryId(acc.category_id || "");
+    setIsModalOpen(true);
   };
 
   const handlePay = (id: string) => {
@@ -280,9 +335,7 @@ export default function AccountsPayable() {
   const extendDateMutation = useMutation({
     mutationFn: (data: { id: string, newDate: string, oldDate: string }) => {
       const dbAccount = accounts.find((a: any) => a.id === data.id);
-      if (dbAccount && (dbAccount.status === 'Recebido' || dbAccount.status === 'Pago')) {
-          throw new Error('Não é possível modificar parâmetros de uma conta que já foi finalizada. Estorne primeiro.');
-      }
+      
       const historyRecord = {
         old_date: data.oldDate,
         new_date: data.newDate,
@@ -424,13 +477,19 @@ if (!canView) {
               payment_date: 'Data Pagamento'
             }}
           />
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-shadow shadow-lg shadow-red-200"
-          >
-            <Plus size={20} />
-            Nova Conta
-          </button>
+            <button 
+              onClick={() => {
+                setSupplierSearch("");
+                setCategorySearch("");
+                setSelectedSupplierId("");
+                setSelectedCategoryId("");
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-shadow shadow-lg shadow-red-200"
+            >
+              <Plus size={20} />
+              Nova Conta
+            </button>
         </div>
       </div>
 
@@ -439,13 +498,13 @@ if (!canView) {
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-red-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Pendente</p>
           <p className="text-2xl font-bold text-red-600 mt-1">
-            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+            {formatCurrency(accountsWithDynamicStatus.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0))}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-green-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Pago (Mês)</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
-            R$ {accountsWithDynamicStatus.filter((a: any) => a.status === "Pago").reduce((acc: number, a: any) => acc + (a.amount || 0), 0).toLocaleString()}
+            {formatCurrency(accountsWithDynamicStatus.filter((a: any) => a.status === "Pago").reduce((acc: number, a: any) => acc + (a.amount || 0), 0))}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-orange-500">
@@ -492,6 +551,7 @@ if (!canView) {
                 </h3>
                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                   <span className="flex items-center gap-1"><Building2 size={12} /> {acc.supplier || acc.supplier_name || "Fornecedor não inf."}</span>
+                  {acc.category_name && <span className="flex items-center gap-1 text-blue-600"><Tag size={12} /> {acc.category_name}</span>}
                   <span className="flex items-center gap-1"><Calendar size={12} /> Vence em: {formatBR(acc.due_date)}</span>
                   {acc.due_date_history && acc.due_date_history.length > 0 && (
                      <span className="flex items-center gap-1 text-yellow-600" title={`${acc.due_date_history.length} alterações de data no histórico`}>
@@ -504,7 +564,7 @@ if (!canView) {
             
               <div className="flex items-center justify-between md:justify-end gap-6">
               <div className="text-right">
-                <p className="text-lg font-bold text-gray-900">R$ {acc.amount?.toLocaleString()}</p>
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(acc.amount || 0)}</p>
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                   acc.status === "Pago" ? "bg-green-100 text-green-700" : 
                   acc.status === "Atrasado" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
@@ -514,24 +574,42 @@ if (!canView) {
               </div>
               <div className="flex items-center gap-2">
                 {acc.status === "Pago" && (user?.role === 'admin' || user?.role === 'master') && (
-                  <button 
-                    onClick={() => handleReverse(acc.id)}
-                    className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all font-bold"
-                    title="Estornar Pagamento"
-                  >
-                    <RotateCcw size={20} />
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => handleEdit(acc)}
+                      className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all font-bold"
+                      title="Editar Conta"
+                    >
+                      <Edit size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleReverse(acc.id)}
+                      className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all font-bold"
+                      title="Estornar Pagamento"
+                    >
+                      <RotateCcw size={20} />
+                    </button>
+                  </>
                 )}
                 {acc.status !== "Pago" && (
                   <>
                     {(user?.role === 'admin' || user?.role === 'master') && (
-                      <button 
-                        onClick={() => handleEditDate(acc.id, acc.due_date)}
-                        className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all font-bold"
-                        title="Alterar Vencimento"
-                      >
-                        <CalendarClock size={20} />
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => handleEdit(acc)}
+                          className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all font-bold"
+                          title="Editar Conta"
+                        >
+                          <Edit size={20} />
+                        </button>
+                        <button 
+                          onClick={() => handleEditDate(acc.id, acc.due_date)}
+                          className="p-3 bg-yellow-100 text-yellow-600 rounded-xl hover:bg-yellow-200 transition-all font-bold"
+                          title="Alterar Vencimento"
+                        >
+                          <CalendarClock size={20} />
+                        </button>
+                      </>
                     )}
                     <button 
                       onClick={() => handlePay(acc.id)}
@@ -577,12 +655,12 @@ if (!canView) {
                   <option value="">Selecione uma conta...</option>
                   <optgroup label="Contas Bancárias">
                     {bankAccounts.map((a: any) => (
-                      <option key={`bank:${a.id}`} value={`bank:${a.id}`}>{a.name} (R$ {a.balance?.toLocaleString()})</option>
+                      <option key={`bank:${a.id}`} value={`bank:${a.id}`}>{a.name} ({formatCurrency(a.balance || 0)})</option>
                     ))}
                   </optgroup>
                   <optgroup label="Caixas">
                     {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
-                      <option key={`cashier:${c.id}`} value={`cashier:${c.id}`}>{c.name} (R$ {c.balance?.toLocaleString()})</option>
+                      <option key={`cashier:${c.id}`} value={`cashier:${c.id}`}>{c.name} ({formatCurrency(c.balance || 0)})</option>
                     ))}
                   </optgroup>
                 </select>
@@ -678,51 +756,155 @@ if (!canView) {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
           <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-xl font-bold">Nova Conta a Pagar</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <h2 className="text-xl font-bold">{editingAccount ? "Editar Conta" : "Nova Conta a Pagar"}</h2>
+              <button onClick={() => { setIsModalOpen(false); setEditingAccount(null); }} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">Descrição *</label>
-                <input name="description" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500" />
+                <input name="description" required defaultValue={editingAccount?.description} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">Valor (R$) *</label>
-                  <input name="amount" type="number" step="0.01" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500" />
+                  <input name="amount" type="number" step="0.01" required defaultValue={editingAccount?.amount} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">Vencimento *</label>
-                  <input name="due_date" type="date" required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500" />
+                  <input name="due_date" type="date" required defaultValue={editingAccount?.due_date} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500" />
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">Fornecedor</label>
-                <select name="supplier_id" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500">
-                  <option value="">Selecione um fornecedor...</option>
-                  {suppliers.map((s: any) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar fornecedor..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500"
+                      value={supplierSearch}
+                      onChange={(e) => {
+                        setSupplierSearch(e.target.value);
+                        if (!e.target.value) setSelectedSupplierId("");
+                      }}
+                      onFocus={() => {
+                        if (!selectedSupplierId) setSupplierSearch("");
+                      }}
+                    />
+                  </div>
+                  {supplierSearch.length > 0 && !selectedSupplierId && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                      {suppliers.filter((s: any) => 
+                        s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                        s.document?.includes(supplierSearch)
+                      ).length === 0 ? (
+                        <div className="p-4 text-center text-xs text-gray-400">Nenhum fornecedor encontrado</div>
+                      ) : (
+                        suppliers.filter((s: any) => 
+                          s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                          s.document?.includes(supplierSearch)
+                        ).map((s: any) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSupplierId(s.id);
+                              setSupplierSearch(s.name);
+                            }}
+                            className="w-full p-3 text-left hover:bg-red-50 transition-colors border-b border-gray-50 last:border-0"
+                          >
+                            <p className="text-sm font-bold text-gray-900">{s.name}</p>
+                            <p className="text-[10px] text-gray-500">{s.document || "Sem documento"}</p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">Categoria / Centro de Custos</label>
+                <div className="relative">
+                  <div className="relative">
+                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar categoria..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500"
+                      value={categorySearch}
+                      onChange={(e) => {
+                        setCategorySearch(e.target.value);
+                        if (!e.target.value) setSelectedCategoryId("");
+                      }}
+                    />
+                  </div>
+                  {categorySearch.length > 0 && !selectedCategoryId && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                      {categories.filter((c: any) => 
+                        c.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                        c.code?.includes(categorySearch)
+                      ).length === 0 ? (
+                        <div className="p-4 text-center text-xs text-gray-400">Nenhuma categoria encontrada</div>
+                      ) : (
+                        categories.filter((c: any) => 
+                          c.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                          c.code?.includes(categorySearch)
+                        ).map((c: any) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategoryId(c.id);
+                              setCategorySearch(c.name);
+                            }}
+                            className="w-full p-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0"
+                          >
+                            <p className="text-sm font-bold text-gray-900">{c.name}</p>
+                            <p className="text-[10px] text-gray-500">{c.code || "Sem código"}</p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2 p-2">
-                  <input type="checkbox" name="is_recurring" id="is_recurring" className="w-4 h-4 text-red-600 rounded focus:ring-red-500" />
+                  <input type="checkbox" name="is_recurring" id="is_recurring" defaultChecked={editingAccount?.is_recurring} className="w-4 h-4 text-red-600 rounded focus:ring-red-500" />
                   <label htmlFor="is_recurring" className="text-sm font-bold text-gray-700">Recorrente?</label>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500">Frequência</label>
-                  <select name="frequency" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-sm">
+                  <select name="frequency" defaultValue={editingAccount?.frequency || "MONTHLY"} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-sm">
                     <option value="MONTHLY">Mensal</option>
                     <option value="WEEKLY">Semanal</option>
                     <option value="YEARLY">Anual</option>
                   </select>
                 </div>
               </div>
+              {editingAccount && (
+                <div className="px-1 py-1">
+                  <label className="text-sm font-bold text-gray-700">Status</label>
+                  <select 
+                    name="status" 
+                    defaultValue={editingAccount.status}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="Pendente">Pendente</option>
+                    <option value="Pago">Pago</option>
+                    <option value="Atrasado">Atrasado</option>
+                  </select>
+                  {editingAccount.status === "Pago" && (
+                    <p className="text-[10px] text-orange-600 font-bold mt-1 ml-1">Nota: Mudar para Pendente irá estornar o valor do caixa/banco automaticamente.</p>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
+                <button type="button" onClick={() => { setIsModalOpen(false); setEditingAccount(null); }} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
                 <button type="submit" disabled={createMutation.isPending} className="px-8 py-2 bg-red-600 text-white rounded-xl font-bold">
-                  {createMutation.isPending ? "Cadastrando..." : "Cadastrar"}
+                  {editingAccount ? "Salvar Alterações" : "Cadastrar"}
                 </button>
               </div>
             </form>

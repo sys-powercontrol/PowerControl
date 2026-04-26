@@ -29,31 +29,44 @@ const STORE_CLIENTS = "clients";
 const STORE_ACCOUNTS_PAYABLE = "accounts_payable";
 const STORE_PURCHASES = "purchases";
 
-self.addEventListener('install', (event) => {
+const HEARTBEAT_INTERVAL = 60000; // 1 minute
+const BASE_BACKOFF = 2000; // 2 seconds
+
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
+  startHeartbeat();
 });
 
-self.addEventListener('sync', ((event: SyncEvent) => {
-  if (event.tag === 'sync-sales') {
-    event.waitUntil(syncSales());
-  } else if (event.tag === 'sync-clients') {
-    event.waitUntil(syncGenericEntities(STORE_CLIENTS, async (entity) => {
-      await api.post("clients", entity.data);
-    }));
-  } else if (event.tag === 'sync-accounts-payable') {
-    event.waitUntil(syncGenericEntities(STORE_ACCOUNTS_PAYABLE, async (entity) => {
-      await api.post("accountsPayable", entity.data);
-    }));
-  } else if (event.tag === 'sync-purchases') {
-    event.waitUntil(syncGenericEntities(STORE_PURCHASES, async (entity) => {
-      await inventory.processPurchase(entity.data, entity.items || [], entity.userContext);
-    }));
-  }
-}) as EventListener);
+function startHeartbeat() {
+  setInterval(async () => {
+    console.log("SW Heartbeat: Checking for pending data...");
+    await runAllSyncs();
+  }, HEARTBEAT_INTERVAL);
+}
+
+async function runAllSyncs() {
+  await syncSales();
+  await syncGenericEntities(STORE_CLIENTS, async (entity) => {
+    await api.post("clients", entity.data);
+  });
+  await syncGenericEntities(STORE_ACCOUNTS_PAYABLE, async (entity) => {
+    await api.post("accountsPayable", entity.data);
+  });
+  await syncGenericEntities(STORE_PURCHASES, async (entity) => {
+    await inventory.processPurchase(entity.data, entity.items || [], entity.userContext);
+  });
+}
+
+function shouldRetry(retryCount: number = 0, lastAttempt: number = 0): boolean {
+  if (retryCount === 0) return true;
+  const now = Date.now();
+  const waitTime = Math.min(Math.pow(2, retryCount) * BASE_BACKOFF, 3600000); // Max 1 hour
+  return now - lastAttempt >= waitTime;
+}
 
 async function syncSales() {
   try {
@@ -66,9 +79,11 @@ async function syncSales() {
     let failedCount = 0;
     let abandonedCount = 0;
 
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 10; // Increased because of exponential backoff
 
     for (const sale of pendingSales) {
+      if (!shouldRetry(sale.retryCount, (sale as any).lastAttempt)) continue;
+
       try {
         await inventory.processSale(sale.saleData, sale.items, sale.userContext);
         await db.delete(STORE_SALES, sale.id);
@@ -87,33 +102,29 @@ async function syncSales() {
           abandonedCount++;
         } else {
           sale.retryCount = retries;
+          (sale as any).lastAttempt = Date.now();
           await db.put(STORE_SALES, sale);
           failedCount++;
         }
       }
     }
 
-    const allClients = await self.clients.matchAll({ type: 'window' });
-    for (const client of allClients) {
-      client.postMessage({ 
-        type: 'SYNC_COMPLETED',
-        payload: {
-          synced: syncedCount,
-          failed: failedCount,
-          abandoned: abandonedCount
-        }
-      });
+    if (syncedCount > 0 || failedCount > 0 || abandonedCount > 0) {
+      const allClients = await self.clients.matchAll({ type: 'window' });
+      for (const client of allClients) {
+        client.postMessage({ 
+          type: 'SYNC_COMPLETED',
+          payload: {
+            synced: syncedCount,
+            failed: failedCount,
+            abandoned: abandonedCount
+          }
+        });
+      }
     }
   } catch (err: unknown) {
     if (err instanceof Error) {
       console.error("Erro geral no syncSales do SW:", err.message);
-      const allClients = await self.clients.matchAll({ type: 'window' });
-      for (const client of allClients) {
-        client.postMessage({ 
-          type: 'SYNC_ERROR',
-          payload: { error: err.message }
-        });
-      }
     }
   }
 }
@@ -128,9 +139,11 @@ async function syncGenericEntities(storeName: string, processFunction: (entity: 
     let syncedCount = 0;
     let failedCount = 0;
     let abandonedCount = 0;
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 10;
 
     for (const entity of pendingEntities) {
+      if (!shouldRetry(entity.retryCount, entity.lastAttempt)) continue;
+
       try {
         await processFunction(entity);
         await db.delete(storeName, entity.id);
@@ -147,15 +160,16 @@ async function syncGenericEntities(storeName: string, processFunction: (entity: 
           abandonedCount++;
         } else {
           entity.retryCount = retries;
+          entity.lastAttempt = Date.now();
           await db.put(storeName, entity);
           failedCount++;
         }
       }
     }
 
-    const allClients = await self.clients.matchAll({ type: 'window' });
-    for (const client of allClients) {
-      if (syncedCount > 0 || failedCount > 0 || abandonedCount > 0) {
+    if (syncedCount > 0 || failedCount > 0 || abandonedCount > 0) {
+      const allClients = await self.clients.matchAll({ type: 'window' });
+      for (const client of allClients) {
         client.postMessage({ 
           type: 'SYNC_COMPLETED',
           payload: {
@@ -168,29 +182,17 @@ async function syncGenericEntities(storeName: string, processFunction: (entity: 
     }
   } catch (err: unknown) {
     console.error(`Erro geral no sync SW (${storeName}):`, err);
-    if (err instanceof Error) {
-      const allClients = await self.clients.matchAll({ type: 'window' });
-      for (const client of allClients) {
-        client.postMessage({ 
-          type: 'SYNC_ERROR',
-          payload: { error: err.message }
-        });
-      }
-    }
   }
 }
 
+self.addEventListener('sync', ((event: SyncEvent) => {
+  if (event.tag === 'sync-sales' || event.tag === 'sync-clients' || event.tag === 'sync-accounts-payable' || event.tag === 'sync-purchases') {
+    event.waitUntil(runAllSyncs());
+  }
+}) as EventListener);
+
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CHECK_SYNC') {
-    syncSales();
-    syncGenericEntities(STORE_CLIENTS, async (entity) => {
-      await api.post("clients", entity.data);
-    });
-    syncGenericEntities(STORE_ACCOUNTS_PAYABLE, async (entity) => {
-      await api.post("accountsPayable", entity.data);
-    });
-    syncGenericEntities(STORE_PURCHASES, async (entity) => {
-      await inventory.processPurchase(entity.data, entity.items || [], entity.userContext);
-    });
+    runAllSyncs();
   }
 });

@@ -246,7 +246,7 @@ export default function KnowledgeBase() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
 
-  const { data: dbCategories = [], isLoading } = useQuery({
+  const { data: dbCategories = [] } = useQuery({
     queryKey: ["knowledge_categories"],
     queryFn: () => api.get("knowledge_categories", { _orderBy: "order", _orderDir: "asc" }),
   });

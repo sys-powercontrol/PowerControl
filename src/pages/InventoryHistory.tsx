@@ -13,8 +13,8 @@ import {
   Package
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+
+
 import ExportButton from "../components/ExportButton";
 
 export default function InventoryHistory() {
@@ -31,11 +31,7 @@ export default function InventoryHistory() {
     enabled: !!user
   });
 
-  const { data: products = [] } = useQuery({ 
-    queryKey: ["products", currentCompanyId], 
-    queryFn: () => api.get("products"),
-    enabled: !!user
-  });
+  
 
   const filteredMovements = useMemo(() => {
     let result = [...movements];

@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
-import { api } from "../lib/api";
+import React, { useState, useRef } from "react";
 import { 
   Printer, 
   Search, 
@@ -14,6 +13,7 @@ import {
 import { jsPDF } from "jspdf";
 import JsBarcode from "jsbarcode";
 import { toast } from "sonner";
+import { formatCurrency } from "../lib/currencyUtils";
 
 interface LabelPrinterProps {
   isOpen: boolean;
@@ -113,7 +113,7 @@ export default function LabelPrinter({ isOpen, onClose, products }: LabelPrinter
         margin: 0
       });
       return barcodeRef.current.toDataURL("image/png");
-    } catch (e) {
+    } catch {
       // Fallback to CODE128 if EAN13 fails (e.g. invalid checksum or length)
       try {
         JsBarcode(barcodeRef.current, value, {
@@ -176,7 +176,7 @@ export default function LabelPrinter({ isOpen, onClose, products }: LabelPrinter
       // Price
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      const priceText = `R$ ${product.price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      const priceText = formatCurrency(product.price || 0);
       doc.text(priceText, centerX, currentY + 12, { align: "center" });
 
       // Barcode

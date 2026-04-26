@@ -59,7 +59,7 @@ export default function Login() {
       });
       toast.success("Bem-vindo de volta!");
       navigate("/");
-    } catch (error) {
+    } catch {
       toast.error("E-mail ou senha incorretos.");
     } finally {
       setIsLoading(false);
@@ -74,7 +74,7 @@ export default function Login() {
         entity: 'users',
         description: `Usuário realizou login via Google`
       });
-    } catch (error) {
+    } catch {
       toast.error("Erro ao entrar com Google.");
     }
   };
@@ -87,7 +87,7 @@ export default function Login() {
     try {
       await sendPasswordResetEmail(auth, email);
       toast.success("E-mail de recuperação enviado!");
-    } catch (error) {
+    } catch {
       toast.error("Erro ao enviar e-mail de recuperação.");
     }
   };

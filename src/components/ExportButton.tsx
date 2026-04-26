@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Table as TableIcon, Download } from 'lucide-react';
+import { FileText, Table as TableIcon } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';

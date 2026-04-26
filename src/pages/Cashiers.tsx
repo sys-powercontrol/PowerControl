@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { 
   CreditCard, 
   Plus, 
@@ -10,8 +11,6 @@ import {
   Unlock, 
   Eye, 
   EyeOff,
-  TrendingUp,
-  TrendingDown,
   History
 } from "lucide-react";
 import { toast } from "sonner";
@@ -160,7 +159,7 @@ if (!canView) {
             </button>
           </div>
           <p className="text-2xl font-bold text-blue-600">
-            {showGlobalBalance ? `R$ ${cashiers.reduce((acc: number, c: any) => acc + (c.balance || 0), 0).toLocaleString()}` : "R$ ••••••"}
+            {showGlobalBalance ? formatCurrency(cashiers.reduce((acc: number, c: any) => acc + (c.balance || 0), 0)) : "R$ ••••••"}
           </p>
         </div>
       </div>
@@ -202,7 +201,7 @@ if (!canView) {
                   </button>
                 </div>
                 <p className="text-xl font-bold text-gray-900">
-                  {showBalance[c.id] ? `R$ ${c.balance?.toLocaleString()}` : "R$ ••••••"}
+                  {showBalance[c.id] ? formatCurrency(c.balance || 0) : "R$ ••••••"}
                 </p>
               </div>
 
@@ -377,7 +376,7 @@ if (!canView) {
                     </div>
                     {historyCashier.opening_balance !== undefined && (
                       <div className="text-[13px] font-bold text-blue-600 mt-2 bg-blue-50 p-2 rounded-lg inline-block">
-                        Saldo Inicial: R$ {Number(historyCashier.opening_balance).toLocaleString()}
+                        Saldo Inicial: {formatCurrency(Number(historyCashier.opening_balance))}
                       </div>
                     )}
                   </div>

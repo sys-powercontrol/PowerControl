@@ -7,9 +7,7 @@ import {
   Users, 
   Building2, 
   ShieldCheck, 
-  BadgeCheck,
   Zap,
-  Settings,
   Search,
   Edit2,
   Plus,
@@ -18,15 +16,10 @@ import {
   Phone,
   Mail,
   MapPin,
-  Globe,
   Upload,
   QrCode,
-  History,
-  Filter,
-  Calendar,
   TrendingUp,
   ArrowUpRight,
-  ArrowDownRight,
   DollarSign,
   BarChart3,
   Loader2,
@@ -42,16 +35,14 @@ import {
   Tooltip, 
   PieChart, 
   Pie, 
-  Cell,
-  BarChart,
-  Bar
+  Cell
 } from "recharts";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR } from "../lib/dateUtils";
+import { formatCurrency } from "../lib/currencyUtils";
 import { AuditLog } from "../types";
-import { format, subDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { subDays } from "date-fns";
 import { InputMask } from "../components/ui/InputMask";
 import { externalApi } from "../services/externalApi";
 
@@ -415,7 +406,7 @@ if (currentUser?.role !== 'master') {
                 </div>
               </div>
               <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">Vendas Globais</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">R$ {totalRevenue.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{formatCurrency(totalRevenue)}</p>
             </div>
 
             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
@@ -459,7 +450,7 @@ if (currentUser?.role !== 'master') {
                       axisLine={false} 
                       tickLine={false} 
                       tick={{ fill: '#94a3b8', fontSize: 12 }}
-                      tickFormatter={(value) => `R$ ${value >= 1000 ? (value/1000).toFixed(1) + 'k' : value}`}
+                      tickFormatter={(value) => `${formatCurrency(value)}`}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -468,7 +459,7 @@ if (currentUser?.role !== 'master') {
                         border: 'none', 
                         boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' 
                       }}
-                      formatter={(value: number) => [`R$ ${value.toLocaleString()}`, 'Vendas']}
+                      formatter={(value: number) => [formatCurrency(value), 'Vendas']}
                     />
                     <Line 
                       type="monotone" 
@@ -510,7 +501,7 @@ if (currentUser?.role !== 'master') {
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: number) => `R$ ${value.toLocaleString()}`}
+                      formatter={(value: number) => formatCurrency(value)}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -549,7 +540,7 @@ if (currentUser?.role !== 'master') {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {topCompanies.map((c, index) => (
+                    {topCompanies.map((c) => (
                       <tr key={c.name} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-8 py-4">
                           <div className="flex items-center gap-3">
@@ -559,7 +550,7 @@ if (currentUser?.role !== 'master') {
                             <span className="font-bold text-gray-900">{c.name}</span>
                           </div>
                         </td>
-                        <td className="px-8 py-4 font-bold text-gray-900">R$ {c.value.toLocaleString()}</td>
+                        <td className="px-8 py-4 font-bold text-gray-900">{formatCurrency(c.value)}</td>
                         <td className="px-8 py-4">
                           <div className="flex items-center gap-1 text-green-600 font-bold text-sm">
                             <ArrowUpRight size={14} />

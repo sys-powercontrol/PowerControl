@@ -13,20 +13,16 @@ import {
   Eye, 
   Download,
   Shield,
-  Crown,
   Info,
   X
 } from "lucide-react";
 import { AuditLog, Company, User } from "../types";
 import { 
-  format, 
   startOfDay, 
   endOfDay, 
   isWithinInterval, 
-  parseISO,
   subDays
 } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 export default function AuditLogs() {
   const { user: currentUser, hasPermission } = useAuth();
@@ -91,7 +87,7 @@ export default function AuditLogs() {
     if (!metadata) return null;
     try {
       return JSON.stringify(metadata, null, 2);
-    } catch (e) {
+    } catch {
       return String(metadata);
     }
   };

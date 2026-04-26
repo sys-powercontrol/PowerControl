@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { notificationApi } from "../services/notificationApi";
 import { 
   HelpCircle, 
-  Mail, 
   MessageSquare, 
   ExternalLink,
   ChevronRight,
@@ -21,7 +20,7 @@ import { toast } from "sonner";
 import { formatBR } from "../lib/dateUtils";
 
 export default function Support() {
-  const queryClient = useQueryClient();
+  
   const { user } = useAuth();
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
