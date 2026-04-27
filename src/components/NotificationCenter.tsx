@@ -127,13 +127,24 @@ export default function NotificationCenter() {
       });
     });
 
-    // 3. Rejected Invoices
+    // 3. Rejected & Emitted Invoices
     invoices.filter((i: any) => i.status === "Rejeitada").forEach((i: any) => {
       list.push({
-        id: `invoice-${i.id}`,
+        id: `invoice-rej-${i.id}`,
         title: "NF-e Rejeitada",
         message: `A nota fiscal #${i.number} foi rejeitada pela SEFAZ.`,
         type: 'error',
+        link: "/Fiscal",
+        date: new Date().toISOString()
+      });
+    });
+
+    invoices.filter((i: any) => i.status === "Emitida" && i.date === today).forEach((i: any) => {
+      list.push({
+        id: `invoice-emi-${i.id}`,
+        title: "NF-e Autorizada",
+        message: `A nota fiscal #${i.number} para ${i.client_name} foi autorizada com sucesso!`,
+        type: 'success',
         link: "/Fiscal",
         date: new Date().toISOString()
       });
@@ -196,7 +207,7 @@ export default function NotificationCenter() {
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+            className="absolute right-0 mt-2 w-[90vw] max-w-[360px] sm:w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-[100]"
           >
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div>

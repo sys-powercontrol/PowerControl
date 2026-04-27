@@ -27,6 +27,7 @@ export interface User {
   phone?: string;
   cpf?: string;
   address?: string;
+  avatar?: string;
   created_at: FirebaseTimestamp;
 }
 

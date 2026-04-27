@@ -298,8 +298,12 @@ export default function Layout() {
             </div>
           )}
           <div className="flex items-center gap-3 p-2">
-            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
-              {user?.full_name?.charAt(0) || "U"}
+            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold overflow-hidden">
+              {user?.avatar ? (
+                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                user?.full_name?.charAt(0) || "U"
+              )}
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-semibold text-gray-900 truncate">{user?.full_name || "Carregando..."}</p>
@@ -328,8 +332,12 @@ export default function Layout() {
               <p className="text-xs font-bold text-gray-900">{user?.full_name}</p>
               <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{user?.role}</p>
             </div>
-            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">
-              {user?.full_name?.charAt(0)}
+            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden cursor-pointer" onClick={() => navigate('/profile')}>
+              {user?.avatar ? (
+                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                user?.full_name?.charAt(0)
+              )}
             </div>
           </div>
         </header>

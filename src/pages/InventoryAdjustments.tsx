@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { inventory } from "../lib/inventory";
 import { 
   ArrowUpCircle, 
@@ -10,13 +11,17 @@ import {
   Search,
   Plus,
   Minus,
-  Info
+  Info,
+  Building2
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function InventoryAdjustments() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const currentCompanyId = api.getCompanyId();
+
+  const [activeTab, setActiveTab] = useState<'SIMPLE' | 'TRANSFER'>('SIMPLE');
 
   const [selectedProductId, setSelectedProductId] = useState("");
   const [type, setType] = useState<'IN' | 'OUT'>('IN');
@@ -24,10 +29,18 @@ export default function InventoryAdjustments() {
   const [reason, setReason] = useState('MANUAL');
   const [observation, setObservation] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const [destCompanyId, setDestCompanyId] = useState("");
 
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ["products", currentCompanyId],
     queryFn: () => api.get("products"),
+  });
+  
+  const { data: companies = [] } = useQuery({
+    queryKey: ["companies"],
+    queryFn: () => api.get("companies"),
+    enabled: user?.role === 'Master' || user?.role === 'Admin',
   });
 
   const filteredProducts = products.filter((p: any) => 
@@ -55,6 +68,24 @@ export default function InventoryAdjustments() {
     }
   });
 
+  const transferMutation = useMutation({
+    mutationFn: (data: any) => inventory.processTransfer(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory_movements"] });
+      toast.success("Transferência inter-filial realizada com sucesso!");
+      // Reset form
+      setSelectedProductId("");
+      setQuantity(0);
+      setDestCompanyId("");
+      setObservation("");
+      setSearchTerm("");
+    },
+    onError: (error: any) => {
+      toast.error(`Erro ao realizar transferência: ${error.message}`);
+    }
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -65,6 +96,22 @@ export default function InventoryAdjustments() {
 
     if (quantity <= 0) {
       toast.error("A quantidade deve ser maior que zero");
+      return;
+    }
+
+    if (activeTab === 'TRANSFER') {
+      if (!destCompanyId) {
+        toast.error("Selecione a filial de destino");
+        return;
+      }
+      transferMutation.mutate({
+        sourceCompanyId: currentCompanyId,
+        destCompanyId,
+        productId: selectedProductId,
+        sku: selectedProduct?.sku,
+        quantity,
+        observation
+      });
       return;
     }
 
@@ -82,9 +129,34 @@ export default function InventoryAdjustments() {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Ajuste de Estoque</h1>
-        <p className="text-gray-500">Realize correções manuais de saldo de produtos de forma rápida e segura.</p>
+         <h1 className="text-2xl font-bold text-gray-900">Ajuste de Estoque</h1>
+         <p className="text-gray-500">Realize correções manuais ou transfira saldo entre filiais de forma rápida e segura.</p>
       </div>
+
+      {(user?.role === 'Master' || user?.role === 'Admin') && (
+        <div className="flex bg-gray-100 p-1 rounded-2xl w-full max-w-sm">
+           <button
+             onClick={() => setActiveTab('SIMPLE')}
+             className={`flex-1 py-2 px-4 rounded-xl font-bold text-sm transition-all ${
+               activeTab === 'SIMPLE' 
+               ? 'bg-white text-blue-600 shadow-md' 
+               : 'text-gray-500 hover:bg-gray-200'
+             }`}
+           >
+             Ajuste Simples
+           </button>
+           <button
+             onClick={() => setActiveTab('TRANSFER')}
+             className={`flex-1 py-2 px-4 rounded-xl font-bold text-sm transition-all ${
+               activeTab === 'TRANSFER' 
+               ? 'bg-white text-blue-600 shadow-md' 
+               : 'text-gray-500 hover:bg-gray-200'
+             }`}
+           >
+             Transferência
+           </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-6">
@@ -131,38 +203,39 @@ export default function InventoryAdjustments() {
               </div>
             </div>
 
-            {/* Tipo de Ajuste */}
-            <div className="space-y-4">
-              <label className="block text-sm font-bold text-gray-700">2. Tipo de Movimentação</label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setType('IN')}
-                  className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all ${
-                    type === 'IN' 
-                    ? 'border-green-500 bg-green-50 text-green-700' 
-                    : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200'
-                  }`}
-                >
-                  <ArrowUpCircle size={24} />
-                  <span className="font-bold">Entrada (+)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setType('OUT')}
-                  className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all ${
-                    type === 'OUT' 
-                    ? 'border-red-500 bg-red-50 text-red-700' 
-                    : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200'
-                  }`}
-                >
-                  <ArrowDownCircle size={24} />
-                  <span className="font-bold">Saída (-)</span>
-                </button>
+            {activeTab === 'SIMPLE' && (
+              <div className="space-y-4">
+                <label className="block text-sm font-bold text-gray-700">2. Tipo de Movimentação</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setType('IN')}
+                    className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                      type === 'IN' 
+                      ? 'border-green-500 bg-green-50 text-green-700' 
+                      : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200'
+                    }`}
+                  >
+                    <ArrowUpCircle size={24} />
+                    <span className="font-bold">Entrada (+)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setType('OUT')}
+                    className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                      type === 'OUT' 
+                      ? 'border-red-500 bg-red-50 text-red-700' 
+                      : 'border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200'
+                    }`}
+                  >
+                    <ArrowDownCircle size={24} />
+                    <span className="font-bold">Saída (-)</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Quantidade e Motivo */}
+            {/* Quantidade e Motivo/Destino */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-gray-700">Quantidade</label>
@@ -195,22 +268,41 @@ export default function InventoryAdjustments() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-bold text-gray-700">Motivo</label>
-                <select 
-                  className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  required
-                >
-                  <option value="MANUAL">Ajuste Manual</option>
-                  <option value="QUEBRA">Quebra / Avaria</option>
-                  <option value="PERDA">Perda / Roubo</option>
-                  <option value="INVENTARIO">Inventário Periódico</option>
-                  <option value="BONIFICACAO">Bonificação</option>
-                  <option value="RETURN">Devolução de Cliente</option>
-                </select>
-              </div>
+              {activeTab === 'SIMPLE' ? (
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">Motivo</label>
+                  <select 
+                    className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    required
+                  >
+                    <option value="MANUAL">Ajuste Manual</option>
+                    <option value="QUEBRA">Quebra / Avaria</option>
+                    <option value="PERDA">Perda / Roubo</option>
+                    <option value="INVENTARIO">Inventário Periódico</option>
+                    <option value="BONIFICACAO">Bonificação</option>
+                    <option value="RETURN">Devolução de Cliente</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">Filial de Destino</label>
+                  <select 
+                    className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={destCompanyId}
+                    onChange={(e) => setDestCompanyId(e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    {companies.map((c: any) => (
+                      c.id !== currentCompanyId && (
+                        <option key={c.id} value={c.id}>{c.name} {c.cnpj ? `(${c.cnpj})` : ''}</option>
+                      )
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Observação */}
@@ -218,7 +310,7 @@ export default function InventoryAdjustments() {
               <label className="block text-sm font-bold text-gray-700">Observação (Opcional)</label>
               <textarea 
                 rows={3}
-                placeholder="Descreva o motivo do ajuste..."
+                placeholder={activeTab === 'TRANSFER' ? "Descreva os detalhes da transferência..." : "Descreva o motivo do ajuste..."}
                 className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 value={observation}
                 onChange={(e) => setObservation(e.target.value)}
@@ -227,15 +319,15 @@ export default function InventoryAdjustments() {
 
             <button
               type="submit"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || transferMutation.isPending}
               className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
             >
-              {mutation.isPending ? (
+              {mutation.isPending || transferMutation.isPending ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
                 <>
                   <Save size={20} />
-                  Confirmar Ajuste
+                  {activeTab === 'TRANSFER' ? 'Confirmar Transferência' : 'Confirmar Ajuste'}
                 </>
               )}
             </button>
@@ -246,7 +338,7 @@ export default function InventoryAdjustments() {
           <div className="bg-blue-600 p-6 rounded-3xl text-white shadow-lg shadow-blue-200">
             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
               <Info size={20} />
-              Resumo do Ajuste
+              Resumo da Operação
             </h3>
             <div className="space-y-4 text-sm">
               <div className="flex justify-between border-b border-blue-500 pb-2">
@@ -257,18 +349,37 @@ export default function InventoryAdjustments() {
                 <span className="opacity-80">Estoque Atual:</span>
                 <span className="font-bold">{selectedProduct?.stock_quantity || 0} un</span>
               </div>
-              <div className="flex justify-between border-b border-blue-500 pb-2">
-                <span className="opacity-80">Alteração:</span>
-                <span className={`font-bold ${type === 'IN' ? 'text-green-300' : 'text-red-300'}`}>
-                  {type === 'IN' ? '+' : '-'}{quantity || 0} un
-                </span>
-              </div>
-              <div className="flex justify-between pt-2">
-                <span className="opacity-80">Novo Estoque:</span>
-                <span className="text-xl font-black">
-                  {(selectedProduct?.stock_quantity || 0) + (type === 'IN' ? (quantity || 0) : -(quantity || 0))} un
-                </span>
-              </div>
+              {activeTab === 'SIMPLE' ? (
+                <>
+                  <div className="flex justify-between border-b border-blue-500 pb-2">
+                    <span className="opacity-80">Alteração:</span>
+                    <span className={`font-bold ${type === 'IN' ? 'text-green-300' : 'text-red-300'}`}>
+                      {type === 'IN' ? '+' : '-'}{quantity || 0} un
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2">
+                    <span className="opacity-80">Novo Estoque:</span>
+                    <span className="text-xl font-black">
+                      {(selectedProduct?.stock_quantity || 0) + (type === 'IN' ? (quantity || 0) : -(quantity || 0))} un
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between border-b border-blue-500 pb-2">
+                    <span className="opacity-80">Saída Transferência:</span>
+                    <span className="font-bold text-red-300">
+                      -{quantity || 0} un
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2">
+                    <span className="opacity-80">Estoque Restante:</span>
+                    <span className="text-xl font-black">
+                      {Math.max(0, (selectedProduct?.stock_quantity || 0) - (quantity || 0))} un
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

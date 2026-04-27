@@ -54,6 +54,107 @@ export const inventory = {
     });
   },
 
+  async processTransfer(data: { sourceCompanyId: string, destCompanyId: string, productId: string, sku: string, quantity: number, observation?: string }, userContext?: User) {
+    const user = userContext || (await api.get<User>("me")) as User;
+    if (!user) throw new Error("Usuário não autenticado");
+
+    if (!data.sku) {
+      throw new Error("O produto de origem precisa ter um SKU cadastrado para poder ser transferido entre filiais.");
+    }
+    
+    if (data.sourceCompanyId === data.destCompanyId) {
+      throw new Error("A filial de origem e destino não podem ser a mesma.");
+    }
+
+    // Since we cannot run queries inside a client transaction, we must find the dest product outside first
+    // Note: We use global api without passing 'company_id' parameter, so we might need to be explicit.
+    // However, api.get will default to currentCompanyId if not passed.
+    // Instead we can use getDocs to bypass the api wrapper if it forces the header,
+    // but api.get works if we pass the company_id query params. Actually, passing it is fine.
+    
+    // We will do this explicitly:
+    const { collection, query, where, getDocs } = await import("firebase/firestore");
+    const productsRef = collection(db, "products");
+    const q = query(productsRef, where("company_id", "==", data.destCompanyId), where("sku", "==", data.sku));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      throw new Error(`Produto com SKU "${data.sku}" não encontrado na filial de destino. Por favor cadastre-o primeiro.`);
+    }
+    
+    const destProductId = querySnapshot.docs[0].id;
+
+    return runTransaction(db, async (transaction) => {
+      // 1. Get both products
+      const sourceProductRef = doc(db, "products", data.productId);
+      const destProductRef = doc(db, "products", destProductId);
+
+      const sourceProductDoc = await transaction.get(sourceProductRef);
+      const destProductDoc = await transaction.get(destProductRef);
+
+      if (!sourceProductDoc.exists()) throw new Error("Produto de origem não encontrado");
+      if (!destProductDoc.exists()) throw new Error("Produto de destino não encontrado no exato momento da transação");
+
+      const sourceProduct = sourceProductDoc.data();
+      const destProduct = destProductDoc.data();
+
+      const sourcePrevStock = sourceProduct.stock_quantity || 0;
+      const destPrevStock = destProduct.stock_quantity || 0;
+
+      // Allow negative stock check
+      const companyRef = doc(db, "companies", data.sourceCompanyId);
+      const companyDoc = await transaction.get(companyRef);
+      const allowNegativeStock = companyDoc.data()?.allow_negative_stock === "true" || companyDoc.data()?.allow_negative_stock === true;
+
+      if (!allowNegativeStock && sourcePrevStock < data.quantity) {
+          throw new Error(`Estoque insuficiente na origem. Disponível: ${sourcePrevStock}`);
+      }
+
+      const sourceCurrentStock = sourcePrevStock - data.quantity;
+      const destCurrentStock = destPrevStock + data.quantity;
+
+      // Update stocks
+      transaction.update(sourceProductRef, { stock_quantity: sourceCurrentStock });
+      transaction.update(destProductRef, { stock_quantity: destCurrentStock });
+
+      // Record OUT movement
+      const outMovementRef = doc(collection(db, "inventory_movements"));
+      transaction.set(outMovementRef, {
+        product_id: data.productId,
+        product_name: sourceProduct.name,
+        company_id: data.sourceCompanyId,
+        type: 'OUT',
+        reason: 'TRANSFER_OUT',
+        quantity: data.quantity,
+        previous_stock: sourcePrevStock,
+        current_stock: sourceCurrentStock,
+        user_id: user.id,
+        user_name: user.full_name || user.email || "Sistema",
+        observation: data.observation || `Transferência para a filial (SKU: ${data.sku})`,
+        timestamp: serverTimestamp()
+      });
+
+      // Record IN movement
+      const inMovementRef = doc(collection(db, "inventory_movements"));
+      transaction.set(inMovementRef, {
+        product_id: destProductId,
+        product_name: destProduct.name,
+        company_id: data.destCompanyId,
+        type: 'IN',
+        reason: 'TRANSFER_IN',
+        quantity: data.quantity,
+        previous_stock: destPrevStock,
+        current_stock: destCurrentStock,
+        user_id: user.id,
+        user_name: user.full_name || user.email || "Sistema",
+        observation: data.observation || `Transferência da filial (SKU: ${data.sku})`,
+        timestamp: serverTimestamp()
+      });
+
+      return { success: true, sourceCurrentStock, destCurrentStock };
+    });
+  },
+
   async processSale(saleData: Partial<Sale> & Record<string, unknown>, items: SaleItem[], userContext?: User) {
     const user = userContext || (await api.get<User>("me")) as User;
     if (!user) throw new Error("Usuário não autenticado");

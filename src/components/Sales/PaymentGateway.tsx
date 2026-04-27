@@ -62,9 +62,12 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
           setQrCode(response.data.qr_code);
         }
         setStatus("PENDING");
-      } catch (error) {
+      } catch (error: any) {
         if (!isMounted) return;
         console.error("Error creating payment:", error);
+        if (error.response?.data?.error) {
+          toast.error(error.response.data.error);
+        }
         // Fallback for demo/manual confirmation without backend
         setPaymentId("mock_" + Date.now());
         if (activeTab === "pix") {
@@ -95,6 +98,33 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
       isMounted = false;
     };
   }, [activeTab, amount, companyData, companyId]);
+
+  useEffect(() => {
+    if (!paymentId || status !== "PENDING") return;
+    
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(`/api/payments/status/${paymentId}`);
+        if (!isMounted) return;
+        if (res.data.status === "CONFIRMED") {
+          setStatus("CONFIRMED");
+          toast.success("Pagamento via Mercado Pago aprovado!");
+          setTimeout(onSuccess, 1500);
+        } else if (res.data.status === "EXPIRED") {
+          setStatus("EXPIRED");
+          toast.error("O pagamento expirou. Tente novamente.");
+        }
+      } catch (err) {
+        // Ignorar erros de rede no polling
+      }
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [paymentId, status, onSuccess]);
 
   const handleManualConfirmation = () => {
     setStatus("CONFIRMED");

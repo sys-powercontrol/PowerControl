@@ -1,7 +1,9 @@
-import React, {} from "react";
+import React, { useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { auth } from "../lib/firebase";
+import { updatePassword } from "firebase/auth";
 import { 
   Mail, 
   Phone, 
@@ -25,6 +27,8 @@ export default function Profile() {
     enabled: !!user?.company_id
   });
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const updateProfileMutation = useMutation({
     mutationFn: (data: any) => api.put("users", user?.id, data),
     onSuccess: () => {
@@ -46,11 +50,51 @@ export default function Profile() {
     },
   });
 
-  const handleProfileSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleProfileSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
+
+    const pwd = data.password as string;
+    if (pwd && pwd.trim().length > 0) {
+      if (pwd.length < 6) {
+        toast.error("A nova senha deve ter no mínimo 6 caracteres.");
+        return;
+      }
+      try {
+        if (auth.currentUser) {
+          await updatePassword(auth.currentUser, pwd);
+          toast.success("Senha alterada com sucesso!");
+        }
+      } catch (err: any) {
+        if (err.code === "auth/requires-recent-login") {
+          toast.error("Faça login novamente para alterar a senha.");
+        } else {
+          toast.error("Erro ao alterar a senha.");
+        }
+        return;
+      }
+    }
+
+    delete data.password;
     updateProfileMutation.mutate(data);
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      updateProfileMutation.mutate({ avatar: base64 });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCreateCompany = (e: React.FormEvent<HTMLFormElement>) => {
@@ -253,10 +297,24 @@ export default function Profile() {
         <div className="space-y-6">
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-center">
             <div className="relative inline-block mb-6">
-              <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-4xl font-bold border-4 border-white shadow-lg">
-                {user.full_name?.charAt(0) || "U"}
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                ref={fileInputRef} 
+                onChange={handleAvatarChange} 
+              />
+              <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-4xl font-bold border-4 border-white shadow-lg overflow-hidden">
+                {user.avatar ? (
+                  <img src={user.avatar} alt={user.full_name} className="w-full h-full object-cover" />
+                ) : (
+                  user.full_name?.charAt(0) || "U"
+                )}
               </div>
-              <button className="absolute bottom-0 right-0 p-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-transform hover:scale-110">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-0 right-0 p-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-transform hover:scale-110"
+              >
                 <Camera size={18} />
               </button>
             </div>

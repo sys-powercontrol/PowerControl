@@ -15,6 +15,9 @@ export default function Login() {
   const [showInitialSpinner, setShowInitialSpinner] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isResetLoading, setIsResetLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -79,16 +82,26 @@ export default function Login() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) {
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) {
       toast.error("Por favor, informe seu e-mail.");
       return;
     }
+    setIsResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email);
-      toast.success("E-mail de recuperação enviado!");
-    } catch {
-      toast.error("Erro ao enviar e-mail de recuperação.");
+      await sendPasswordResetEmail(auth, resetEmail);
+      toast.success("E-mail de recuperação enviado com sucesso!");
+      setShowForgotPassword(false);
+      setResetEmail("");
+    } catch (err: any) {
+      if (err.code === "auth/user-not-found") {
+        toast.error("E-mail não encontrado.");
+      } else {
+        toast.error("Erro ao enviar e-mail de recuperação.");
+      }
+    } finally {
+      setIsResetLoading(false);
     }
   };
 
@@ -109,9 +122,62 @@ export default function Login() {
           <p className="text-gray-500 font-medium">Gestão empresarial inteligente e simplificada.</p>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
+        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 relative overflow-hidden">
+          {showForgotPassword ? (
+            <motion.div 
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 50 }}
+              className="space-y-6"
+            >
+              <div className="text-center space-y-2 mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Recuperar Senha</h3>
+                <p className="text-sm text-gray-500">Informe seu e-mail para receber as instruções.</p>
+              </div>
+
+              <form onSubmit={handleForgotPassword} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">E-mail Cadastrado</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <input 
+                      type="email" 
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="seu@email.com"
+                      className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button 
+                    type="submit" 
+                    disabled={isResetLoading}
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                  >
+                    {isResetLoading ? <Loader2 className="animate-spin" size={24} /> : "Enviar E-mail"}
+                  </button>
+                  
+                  <button 
+                    type="button" 
+                    onClick={() => setShowForgotPassword(false)}
+                    className="w-full py-4 bg-gray-50 text-gray-700 rounded-2xl font-bold hover:bg-gray-100 transition-all"
+                  >
+                    Voltar para Login
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+            >
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700 ml-1">E-mail de Acesso</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -148,7 +214,7 @@ export default function Login() {
               </label>
               <button 
                 type="button" 
-                onClick={handleForgotPassword}
+                onClick={() => setShowForgotPassword(true)}
                 className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
               >
                 Esqueceu a senha?
@@ -191,6 +257,8 @@ export default function Login() {
               </Link>
             </p>
           </div>
+        </motion.div>
+        )}
         </div>
 
         <p className="text-center text-gray-400 text-sm">
