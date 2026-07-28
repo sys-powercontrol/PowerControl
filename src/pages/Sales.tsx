@@ -17,14 +17,15 @@ import {
   Tag,
   Package,
   Lock,
-  CreditCard
+  CreditCard,
+  FileText
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
 import { formatCurrency } from "../lib/currencyUtils";
-import { printReceipt } from "../lib/utils/print";
+import { printReceipt, printA4Quote } from "../lib/utils/print";
 import { subDays } from "date-fns";
 import { PaymentGateway } from "../components/Sales/PaymentGateway";
 import { offlineStore } from "../lib/offlineStore";
@@ -794,9 +795,15 @@ if (!canCreate) {
               <div className="flex gap-3 pt-4">
                 <button 
                   onClick={() => printReceipt(lastSale, company)}
-                  className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
                 >
-                  <Printer size={20} /> Imprimir
+                  <Printer size={20} /> Recibo 80mm
+                </button>
+                <button 
+                  onClick={() => printA4Quote(lastSale, company)}
+                  className="flex-1 py-3 bg-blue-50 text-blue-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
+                >
+                  <FileText size={20} /> Orçamento A4
                 </button>
                 <button 
                   onClick={() => setShowReceipt(false)}

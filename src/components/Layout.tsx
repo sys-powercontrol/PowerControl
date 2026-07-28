@@ -328,17 +328,19 @@ export default function Layout() {
           
           <div className="flex items-center gap-4">
             <NotificationCenter />
-            <div className="hidden sm:flex flex-col items-end">
-              <p className="text-xs font-bold text-gray-900">{user?.full_name}</p>
-              <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{user?.role}</p>
-            </div>
-            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden cursor-pointer" onClick={() => navigate('/profile')}>
-              {user?.avatar ? (
-                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                user?.full_name?.charAt(0)
-              )}
-            </div>
+            <Link to="/MeuPerfil" className="flex items-center gap-3 group cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="hidden sm:flex flex-col items-end">
+                <p className="text-xs font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{user?.full_name}</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{user?.role}</p>
+              </div>
+              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden border border-blue-200 group-hover:border-blue-400 transition-colors">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  user?.full_name?.charAt(0)
+                )}
+              </div>
+            </Link>
           </div>
         </header>
 

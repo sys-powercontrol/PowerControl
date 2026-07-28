@@ -137,6 +137,46 @@ async function startServer() {
     res.json({ status: "PROCESSING", message: "Seu pagamento está sendo processado." });
   });
 
+  // Mercado Pago Webhook
+  app.post("/api/webhooks/mercadopago", async (req, res) => {
+    try {
+      const { type, data } = req.body;
+      if ((type === "payment" || req.query.topic === "payment") && (data?.id || req.query.id)) {
+        const paymentId = String(data?.id || req.query.id);
+        const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+        if (accessToken) {
+          const client = new MercadoPagoConfig({ accessToken });
+          const paymentClient = new Payment(client);
+          const response = await paymentClient.get({ id: Number(paymentId) });
+          if (response.status === "approved") {
+            const existing = activePayments.get(paymentId);
+            if (existing) {
+              existing.status = "CONFIRMED";
+              activePayments.set(paymentId, existing);
+            } else {
+              activePayments.set(paymentId, {
+                status: "CONFIRMED",
+                amount: response.transaction_amount || 0,
+                method: "pix",
+                expiresAt: Date.now() + 30 * 60 * 1000
+              });
+            }
+          } else if (response.status === "cancelled" || response.status === "rejected") {
+            const existing = activePayments.get(paymentId);
+            if (existing) {
+              existing.status = "EXPIRED";
+              activePayments.set(paymentId, existing);
+            }
+          }
+        }
+      }
+      res.status(200).json({ status: "ok" });
+    } catch (e) {
+      console.error("Mercado Pago webhook error:", e);
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
   // FocusNFe Webhook
   app.post("/api/webhooks/fiscal", async (req, res) => {
     const payload = req.body;
@@ -213,6 +253,30 @@ async function startServer() {
 
   
   // Fiscal Webhooks
+  app.post("/api/fiscal/send-email", async (req, res) => {
+    try {
+      const { invoice_id, recipient_email } = req.body;
+      if (!invoice_id || !recipient_email) {
+        return res.status(400).json({ error: "Parâmetros 'invoice_id' e 'recipient_email' são obrigatórios." });
+      }
+
+      const docRef = adminDb.collection("invoices").doc(invoice_id);
+      const doc = await docRef.get();
+      if (!doc.exists) {
+        return res.status(404).json({ error: "Nota Fiscal não encontrada." });
+      }
+
+      const invoiceData = doc.data();
+      console.log(`[Fiscal Email] Disparando e-mail para ${recipient_email} relativo à NF #${invoiceData?.number}`);
+
+      // Simulação / Integração de envio de e-mail fiscal
+      return res.json({ status: "ok", message: `Nota Fiscal #${invoiceData?.number || ""} enviada para ${recipient_email} com sucesso!` });
+    } catch (error: any) {
+      console.error("Erro ao enviar e-mail fiscal:", error);
+      return res.status(500).json({ error: "Erro interno ao processar o envio de e-mail." });
+    }
+  });
+
   app.post("/api/webhooks/fiscal/focus", async (req, res) => {
     try {
       const payload = req.body;

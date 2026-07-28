@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { processMovement } from "../lib/finance";
 import { formatCurrency } from "../lib/currencyUtils";
+import ExportButton from "../components/ExportButton";
 
 export default function Transfers() {
   const { user, hasPermission } = useAuth();
@@ -114,6 +115,15 @@ export default function Transfers() {
     const fromAccount = [...bankAccounts, ...cashiers].find(a => a.id === fromAccountId);
     const toAccount = [...bankAccounts, ...cashiers].find(a => a.id === toAccountId);
 
+    const amountNum = parseFloat(data.amount as string);
+    if ((data.type === "Transferência" || data.type === "Saída") && fromAccount) {
+      const currentBal = Number(fromAccount.balance ?? fromAccount.current_balance ?? 0);
+      if (amountNum > currentBal) {
+        toast.error(`Saldo insuficiente em "${fromAccount.name}". Saldo atual: ${formatCurrency(currentBal)}.`);
+        return;
+      }
+    }
+
     createMutation.mutate({
       ...data,
       from_account_id: fromAccountId || null,
@@ -155,7 +165,31 @@ if (!canManage) {
           <h1 className="text-2xl font-bold text-gray-900">Transferências</h1>
           <p className="text-gray-500">Movimentações entre contas e caixas.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-2">
+            <ExportButton 
+              data={filteredMovements.map((m: any) => ({
+                tipo: m.type,
+                descricao: m.description || "Sem descrição",
+                valor: m.amount || 0,
+                origem: m.from_account_name || "---",
+                destino: m.to_account_name || "---",
+                data: new Date(m.movement_date).toLocaleString(),
+                usuario: m.user_name || "Sistema"
+              }))} 
+              filename="transferencias-movimentacoes" 
+              format="xlsx" 
+              headers={{
+                tipo: "Tipo",
+                descricao: "Descrição",
+                valor: "Valor (R$)",
+                origem: "Conta Origem",
+                destino: "Conta Destino",
+                data: "Data/Hora",
+                usuario: "Usuário"
+              }}
+            />
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 

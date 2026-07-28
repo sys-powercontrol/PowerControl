@@ -1,36 +1,52 @@
-# Relatório Gerencial: Funcionalidades Pendentes e Gargalos de Finalização
+# Relatório Geral de Funcionalidades Pendentes de Finalização
 
-O sistema **PowerControl** encontra-se estruturalmente sólido e funcional nas esferas de permissionamento, Multi-Tenant (Matriz/Filial via `company_id`), rotinas fiscais e controle financeiro manual. Entretanto, para ser considerado um produto "Go-to-Market" completo de nível Enterprise (ERP/PDV real), algumas áreas precisam de implementação ou refinamento.
+**Data e Hora de Geração:** 28/07/2026 13:28:15 (Horário de Brasília)
 
-Este documento sumariza **exclusivamente** o que falta finalizar no sistema, de acordo com a análise de código atual.
+---
 
-## 1. Integrações Híbridas de Pagamento (TEF / Pix Dinâmico)
-- **Status Atual:** A escolha de método de pagamento no PDV (Vendas) é referencial (somente strings "A Prazo", "Pix", "Cartão de Crédito").
-- **O que falta:** Integrar APIs bancárias (ex: Mercado Pago, Asaas, Pagar.me) ou TEF para gerar **QR Codes do Pix sob demanda** e processar a resposta automatizada confirmando o pagamento da venda antes de liberar o recibo. Caso contrário, o vendedor depende de conferir o comprovante manualmente, abrindo margem a fraudes.
+## Análise do Estado Atual do Sistema PowerControl
 
-## 2. Persistência de Cache Offline (React Query)
-- **Status Atual:** A API de Service Workers e o banco de dados `idb` guardam ações de mutação (Sales, Clients, Accounts Payable) offline perfeitamente (`offlineStore.ts`).
-- **O que falta:** O cache de leitura (catálogo de produtos, categorias, clientes previamente carregados) vive na memória do `@tanstack/react-query`. Se a aba for atualizada (F5) enquanto o caixa está sem internet, o React Query perderá o estado e a tela de vendas ficará em branco.
-- **Resolução:** Utilizar o `PersistQueryClientProvider` atrelado ao IndexedDB para espelhar todo o catálogo localmente, garantindo PWA offline "zero-reload" seguro.
+Após uma auditoria detalhada da estrutura da aplicação React/Vite/TypeScript, servidor Express (`server.ts`) e Firestore/Firebase, verificou-se que as funcionalidades principais de ERP/PDV (Autenticação, Multi-Tenant `company_id`, Vendas PDV, Controle de Caixa, Certificados, Ajustes de Estoque e Emissão Fiscal) estão devidamente estruturadas.
 
-## 3. Retorno Físico/Assíncrono de Notas Fiscais (Webhooks de Sefaz)
-- **Status Atual:** Há integração com provedores (WebmaniaBR / FocusNFe) configurada. Contudo, Sefaz frequentemente põe emissões em "Processamento" gerando lentidão. 
-- **O que falta:** O sistema depende do usuário clicar ativamente no botão "Consultar Status" na aba Fiscal para atualizar de *Processando* para *Autorizada/Rejeitada*. Falta a construção de num endpoint servidor (Firestore Function / Cloud Run API) como um **Webhook Receiver**, que escuta callbacks do integrador fiscal e atualiza o respectivo documento da collection Firestore *no background*, enviando uma notificação push para o UI.
+Este relatório compila **exclusivamente as finalizações e refinamentos pendentes** nos módulos existentes, garantindo que não haja adição de escopo ou novas funcionalidades não solicitadas.
 
-## 4. Auth & Segurança UX
-- **Status Atual:** Temos restrições rigorosas no banco graças à refatoração das regras do Firestore. Login via Email/Senha implantado.
-- **O que falta:** 
-   1. **Recuperação de Senha (Forgot Password):** O fluxo para o funcionário que "esqueceu a senha" não existe na tela `/login`.
-   2. **Gerenciamento de Conta:** O Profile (`MeuPerfil`) não deixa o funcionário alterar a própria senha, atualizar fotos (Firebase Storage) de perfil.
-   3. **MFA/2FA:** Tratando-se de um ERP com acesso financeiro e fiscal integral, administradores e *master* deveriam ter a opção de ativar Autenticação por Dois Fatores (OTP).
+---
 
-## 5. Transferência de Estoque Sistêmica (Matriz-Filial)
-- **Status Atual:** O sistema suporta múltiplas *"companies"* no caso de uma hierarquia Matriz -> Filiais. Há fluxo de transferências, porém focadas no painel *Financeiro* (Transferências entre caixas/bancos).
-- **O que falta:** Falta uma feature de **Transferência de Mercadorias (Estoque)** inter-empresas. Atualmente, caso a filial 1 mande 5 unidades de um produto para a filial 2, o usuário precisa fazer uma *"Ajuste: Saída"* na filial 1 e logo, um *"Ajuste: Entrada"* na filial 2 manualmente.
+## Módulos e Pendências de Finalização
 
-## 6. Documentos PDF, Recibos e Exportações
-- **Status Atual:** Impressão crua e geração de relatórios simples nos gráficos do *Dashboard*.
-- **O que falta:** Faltam gerações contínuas de arquivos PDF "baixáveis" de Vendas formato A4 (Orçamentos elegantes com Logo), exportação de tabelas de histórico/relatório via formato Planilha/CSV, e re-emissão de recibo não-fiscal formato 80mm térmica resgatado dos históricos de transações.
+### 1. Autenticação e Gestão de Perfil de Usuário (`Login.tsx`, `Profile.tsx`, `auth.tsx`)
+- **Status Atual:** Fluxos de login por e-mail/senha, Google OAuth, "Esqueceu a senha" e atualização de foto/senha básica estão implementados.
+- **O que falta finalizar:**
+  - **Reautenticação para Alteração de Senha:** Tratar o erro `auth/requires-recent-login` no componente `Profile.tsx` solicitando a senha atual do usuário antes da redefinir a nova senha.
+  - **MFA/2FA Opcional:** Adicionar a funcionalidade de ativação de Autenticação em Duas Etapas (MFA) para perfil com papel `master` e `admin` no painel de perfil.
 
-## Conclusão
-Tecnicamente a fundação do aplicativo é excepcional. A resolução desses *6 épicos* removerá gargalos cruciais operacionais de lojistas em operação de grande volume e selará a entrega da ferramenta no que tange a um ERP escalável PWA+Offline.
+### 2. Conciliação e Webhooks de Pagamento PIX e Cartão (`PaymentGateway.tsx`, `server.ts`)
+- **Status Atual:** Integração com Mercado Pago PIX e cartão simulado configurados no `server.ts` e no frontend `PaymentGateway.tsx`.
+- **O que falta finalizar:**
+  - **Status de Expiração e Cancelamento:** Exibir feedback em tempo real no modal de pagamento no PDV quando a consulta de status retornar `EXPIRED` ou `CANCELLED`, permitindo reiniciar a cobrança sem travar o PDV.
+  - **Webhook de Retorno Automático Mercado Pago:** Endpoint `/api/webhooks/mercadopago` no servidor para atualizar a venda/transação em background no Firestore assim que o evento `payment.updated` for recebido.
+
+### 3. Emissão e Gestão Fiscal NFC-e/NF-e (`Fiscal.tsx`, `server.ts`, `NotificationCenter.tsx`)
+- **Status Atual:** Emissão via WebmaniaBR/FocusNFe e recepção de webhooks no `server.ts` que salvam o XML no Storage.
+- **O que falta finalizar:**
+  - **Ação de Download/Visualização do XML Armazenado:** Exibir o botão para download/visualização do arquivo XML armazenado em `xml_storage_url` diretamente na tabela de notas fiscais em `Fiscal.tsx`.
+  - **Invalidação de Cache e Atualização em Tempo Real:** Atualizar automaticamente a lista de notas em `Fiscal.tsx` via escuta de notificações ou re-fetch imediato ao mudar o status da nota por webhook.
+
+### 4. Indicador de Rede e PWA Offline (`Layout.tsx`, `App.tsx`, `queryClient.ts`)
+- **Status Atual:** Cache local persistente configurado via `@tanstack/react-query-persist-client` e `idb-keyval`.
+- **O que falta finalizar:**
+  - **Indicador do Status PWA no Layout:** Exibir no cabeçalho do `Layout.tsx` o badge indicando se o sistema está *On-line* ou *Off-line*, além do contador de vendas pendentes no IndexedDB aguardando sincronização com a nuvem.
+
+### 5. Auditoria de Transferências de Estoque Inter-Filiais (`Transfers.tsx`, `InventoryHistory.tsx`)
+- **Status Atual:** Transferência entre empresas (Matriz -> Filial) construída na aba de `InventoryAdjustments.tsx` com decremento na origem e incremento no destino em transação atômica no Firestore.
+- **O que falta finalizar:**
+  - **Filtro e Exibição de Transferências no Histórico de Estoque:** Exibir na página `InventoryHistory.tsx` e/ou `Transfers.tsx` as movimentações com motivos `TRANSFER_OUT` e `TRANSFER_IN`, apresentando o nome da filial de origem e destino para auditoria completa.
+
+### 6. Padronização de Relatórios e Impressões (`PurchaseHistory.tsx`, `CashFlowReport.tsx`, `ExportButton.tsx`)
+- **Status Atual:** Geração de Orçamentos A4 em PDF e Recibos 80mm integrados no PDV (`Sales.tsx`) e no Histórico de Vendas (`SalesHistory.tsx`).
+- **O que falta finalizar:**
+  - **Impressão de Comprovante no Histórico de Compras (`PurchaseHistory.tsx`):** Incluir o botão de impressão de recibo de compra para conferência de entrada de mercadorias com o fornecedor.
+  - **Padronização do ExportButton em Relatórios:** Integrar o componente `ExportButton.tsx` nos relatórios de Giro de Estoque (`InventoryTurnoverReport.tsx`), DRE (`CashFlowReport.tsx`) e Lucratividade (`ProfitabilityReport.tsx`) para exportação em Excel/CSV.
+
+---
+**Conclusão:** A conclusão destes 6 itens garantirá a prontidão operacional e a integridade de todas as telas e fluxos existentes do PowerControl.

@@ -78,6 +78,12 @@ export default function CashFlowReport() {
     enabled: !!user
   });
 
+  const { data: accountsReceivable = [] } = useQuery({ 
+    queryKey: ["accountsReceivable", currentCompanyId], 
+    queryFn: () => api.get("accountsReceivable"),
+    enabled: !!user
+  });
+
   const handleFilterChange = (type: string) => {
     setFilterType(type);
     const now = getNowBR();
@@ -112,7 +118,16 @@ export default function CashFlowReport() {
       return isWithinInterval(date, { start: startOfDay(dateRange.start), end: endOfDay(dateRange.end) });
     });
 
-    const totalRevenue = filteredSales.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+    const filteredReceivables = accountsReceivable.filter((r: any) => {
+      if (r.company_id !== currentCompanyId) return false;
+      if (r.status !== "Recebido") return false;
+      const date = parseISO(r.receipt_date || r.due_date);
+      return isWithinInterval(date, { start: startOfDay(dateRange.start), end: endOfDay(dateRange.end) });
+    });
+
+    const totalSalesRevenue = filteredSales.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+    const totalOtherIncome = filteredReceivables.reduce((acc: number, r: any) => acc + (r.amount || 0), 0);
+    const totalRevenue = totalSalesRevenue + totalOtherIncome;
     const totalCOGS = filteredPurchases.reduce((acc: number, p: any) => acc + (p.total || 0), 0);
     const totalOpEx = filteredExpenses.reduce((acc: number, a: any) => acc + (a.amount || 0), 0);
     
@@ -127,6 +142,13 @@ export default function CashFlowReport() {
         descricao: `Venda #${String(s.id).substring(0, 8).toUpperCase()} - ${s.client_name || 'Balcão'}`,
         valor: s.total || 0,
         forma_pagamento: s.payment_method || '-',
+      })),
+      ...filteredReceivables.map((r: any) => ({
+        tipo: 'Receita (Conta Recebida)',
+        data: formatBR(r.receipt_date || r.due_date, 'dd/MM/yyyy'),
+        descricao: r.description || `Recebimento - ${r.client_name || 'Cliente'}`,
+        valor: r.amount || 0,
+        forma_pagamento: r.payment_method || '-',
       })),
       ...filteredPurchases.map((p: any) => ({
         tipo: 'CPV (Compra)',
@@ -158,7 +180,7 @@ export default function CashFlowReport() {
       expensesCount: filteredExpenses.length,
       detailedMovements
     };
-  }, [sales, purchases, accountsPayable, currentCompanyId, dateRange]);
+  }, [sales, purchases, accountsPayable, accountsReceivable, currentCompanyId, dateRange]);
 
   const chartData = [
     { name: 'Receitas', valor: dreData.totalRevenue, color: '#10B981' },

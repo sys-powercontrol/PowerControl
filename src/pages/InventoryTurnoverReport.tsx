@@ -12,7 +12,9 @@ import {
   Search, 
   Filter,
   ArrowRight,
-  Package
+  Package,
+  Printer,
+  FileText
 } from "lucide-react";
 import { 
   BarChart, 
@@ -26,6 +28,7 @@ import {
 } from "recharts";
 import { subDays, isAfter } from "date-fns";
 import ExportButton from "../components/ExportButton";
+import { exportToPdf } from "../lib/utils/pdfExport";
 
 export default function InventoryTurnoverReport() {
   const { user, hasPermission } = useAuth();
@@ -167,13 +170,34 @@ if (!canView) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" id="turnover-report-content">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Relatório de Giro e Reposição</h1>
           <p className="text-gray-500">Análise de velocidade de vendas e sugestões de compra baseadas em demanda.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 hide-on-print">
+            <button 
+              onClick={() => window.print()}
+              className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"
+              title="Imprimir Relatório"
+            >
+              <Printer size={18} />
+            </button>
+            <button 
+              onClick={() => exportToPdf({ 
+                elementId: 'turnover-report-content', 
+                filename: 'Relatorio-Giro-Reposicao', 
+                title: 'Relatório de Giro e Reposição',
+              })}
+              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center gap-2 font-bold text-sm"
+              title="Exportar como PDF"
+            >
+              <FileText size={16} />
+              PDF
+            </button>
+          </div>
           <ExportButton 
             data={reportData} 
             filename="relatorio-giro-reposicao" 

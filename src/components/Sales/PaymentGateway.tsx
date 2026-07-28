@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   CreditCard,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -115,7 +116,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
           setStatus("EXPIRED");
           toast.error("O pagamento expirou. Tente novamente.");
         }
-      } catch (err) {
+      } catch (_err) {
         // Ignorar erros de rede no polling
       }
     }, 5000);
@@ -179,6 +180,32 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Pagamento Confirmado!</h2>
             <p className="text-gray-500">Aguarde, finalizando sua venda...</p>
+          </div>
+        ) : status === "EXPIRED" ? (
+          <div className="py-8 space-y-4">
+            <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle size={48} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Cobrança Expirada</h2>
+            <p className="text-sm text-gray-500">O tempo limite para este QR Code expirou ou o pagamento foi cancelado.</p>
+            <div className="space-y-3 pt-4">
+              <button 
+                onClick={() => {
+                  setStatus("PENDING");
+                  setPaymentId(null);
+                  setQrCode(null);
+                }}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-100"
+              >
+                <RefreshCw size={18} /> Gerar Novo QR Code / Tentar Novamente
+              </button>
+              <button 
+                onClick={handleManualConfirmation}
+                className="w-full py-3 bg-green-50 text-green-700 border border-green-200 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors"
+              >
+                <CheckCircle2 size={18} /> Confirmação Manual
+              </button>
+            </div>
           </div>
         ) : (
           <>

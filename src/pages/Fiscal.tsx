@@ -35,6 +35,10 @@ export default function Fiscal() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDanfeOpen, setIsDanfeOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailInvoice, setEmailInvoice] = useState<any>(null);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
@@ -231,6 +235,27 @@ export default function Fiscal() {
     emitMutation.mutate(data);
   };
 
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInvoice || !recipientEmail) return;
+
+    setIsSendingEmail(true);
+    try {
+      await api.post("fiscal/send-email", {
+        invoice_id: emailInvoice.id,
+        recipient_email: recipientEmail
+      });
+      toast.success(`Nota Fiscal #${emailInvoice.number} enviada por e-mail com sucesso!`);
+      setIsEmailModalOpen(false);
+      setEmailInvoice(null);
+      setRecipientEmail("");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao enviar e-mail fiscal.");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
 if (!canManage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
@@ -392,7 +417,15 @@ if (!canManage) {
                           <Download size={18} />
                         </a>
                       )}
-                      <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Enviar por E-mail">
+                      <button 
+                        onClick={() => {
+                          setEmailInvoice(invoice);
+                          setRecipientEmail(invoice.client_email || "");
+                          setIsEmailModalOpen(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                        title="Enviar por E-mail"
+                      >
                         <Send size={18} />
                       </button>
                       <button 
@@ -472,6 +505,58 @@ if (!canManage) {
         pdfUrl={selectedInvoice?.pdf_url} 
         invoiceNumber={selectedInvoice?.number} 
       />
+
+      {/* Modal Enviar E-mail Fiscal */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEmailModalOpen(false)} />
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-6 space-y-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <Send size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Enviar Nota por E-mail</h3>
+                  <p className="text-xs text-gray-500">Nota Fiscal #{emailInvoice?.number}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsEmailModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <form onSubmit={handleSendEmail} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">E-mail do Destinatário</label>
+                <input 
+                  type="email" 
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="cliente@exemplo.com"
+                  required
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsEmailModalOpen(false)} 
+                  className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSendingEmail || !recipientEmail} 
+                  className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center gap-2"
+                >
+                  {isSendingEmail ? "Enviando..." : "Enviar E-mail"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

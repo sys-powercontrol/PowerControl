@@ -191,7 +191,7 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Relatório de Lucratividade</h1>
           <p className="text-gray-500">Análise detalhada de margens, lucros e desempenho financeiro.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
             {[
               { label: '7d', value: '7' },
@@ -211,7 +211,7 @@ if (!canView) {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 hide-on-print">
+          <div className="flex flex-wrap items-center gap-2 hide-on-print">
             <button 
               onClick={() => window.print()}
               className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { auth } from "../lib/firebase";
-import { updatePassword } from "firebase/auth";
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { 
   Mail, 
   Phone, 
@@ -13,7 +13,9 @@ import {
   LogOut,
   ShieldCheck,
   Shield,
-  Crown
+  Crown,
+  KeyRound,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
@@ -28,6 +30,10 @@ export default function Profile() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showReauthModal, setShowReauthModal] = React.useState(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = React.useState("");
+  const [pendingNewPassword, setPendingNewPassword] = React.useState("");
+  const [isReauthenticating, setIsReauthenticating] = React.useState(false);
 
   const updateProfileMutation = useMutation({
     mutationFn: (data: any) => api.put("users", user?.id, data),
@@ -68,9 +74,11 @@ export default function Profile() {
         }
       } catch (err: any) {
         if (err.code === "auth/requires-recent-login") {
-          toast.error("Faça login novamente para alterar a senha.");
+          setPendingNewPassword(pwd);
+          setShowReauthModal(true);
+          toast.info("Por segurança, confirme sua senha atual para prosseguir.");
         } else {
-          toast.error("Erro ao alterar a senha.");
+          toast.error("Erro ao alterar a senha: " + (err.message || ""));
         }
         return;
       }
@@ -78,6 +86,26 @@ export default function Profile() {
 
     delete data.password;
     updateProfileMutation.mutate(data);
+  };
+
+  const handleReauthenticate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPasswordInput || !auth.currentUser || !user?.email) return;
+
+    setIsReauthenticating(true);
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPasswordInput);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await updatePassword(auth.currentUser, pendingNewPassword);
+      toast.success("Senha alterada com sucesso!");
+      setShowReauthModal(false);
+      setCurrentPasswordInput("");
+      setPendingNewPassword("");
+    } catch (_err: any) {
+      toast.error("Senha atual incorreta. Tente novamente.");
+    } finally {
+      setIsReauthenticating(false);
+    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -411,6 +439,62 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {showReauthModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <KeyRound size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Confirmação de Segurança</h3>
+                  <p className="text-xs text-gray-500">Digite sua senha atual para alterar a senha</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowReauthModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleReauthenticate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Senha Atual</label>
+                <input 
+                  type="password"
+                  value={currentPasswordInput}
+                  onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReauthModal(false)}
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isReauthenticating || !currentPasswordInput}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {isReauthenticating ? "Confirmando..." : "Confirmar e Salvar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

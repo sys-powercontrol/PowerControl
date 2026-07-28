@@ -10,13 +10,14 @@ import {
   XCircle,
   ChevronDown,
   Shield,
-  Trash2
+  Trash2,
+  FileText
 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import ExportButton from "../components/ExportButton";
-import { printReceipt } from "../lib/utils/print";
+import { printReceipt, printA4Quote } from "../lib/utils/print";
 
 type DateFilterType = "day" | "week" | "month" | "custom" | "all";
 
@@ -462,13 +463,20 @@ if (!canView) {
               </div>
             </div>
 
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3">
               <button 
                 onClick={() => printReceipt(selectedSale, company)}
                 className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors"
-                title="Imprimir Comprovante"
+                title="Imprimir Recibo (80mm)"
               >
-                <Printer size={18} />
+                <Printer size={18} /> <span className="hidden sm:inline">Recibo 80mm</span>
+              </button>
+              <button 
+                onClick={() => printA4Quote(selectedSale, company)}
+                className="flex-1 py-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
+                title="Salvar Orçamento (PDF A4)"
+              >
+                <FileText size={18} /> <span className="hidden sm:inline">Orçamento A4</span>
               </button>
               {selectedSale.status !== "Cancelada" && canDelete && (
                 <button 

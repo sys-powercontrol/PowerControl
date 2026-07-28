@@ -11,8 +11,7 @@ import {
   Search,
   Plus,
   Minus,
-  Info,
-  Building2
+  Info
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,7 +39,7 @@ export default function InventoryAdjustments() {
   const { data: companies = [] } = useQuery({
     queryKey: ["companies"],
     queryFn: () => api.get("companies"),
-    enabled: user?.role === 'Master' || user?.role === 'Admin',
+    enabled: user?.role === 'master' || user?.role === 'admin',
   });
 
   const filteredProducts = products.filter((p: any) => 
@@ -133,7 +132,7 @@ export default function InventoryAdjustments() {
          <p className="text-gray-500">Realize correções manuais ou transfira saldo entre filiais de forma rápida e segura.</p>
       </div>
 
-      {(user?.role === 'Master' || user?.role === 'Admin') && (
+      {(user?.role === 'master' || user?.role === 'admin') && (
         <div className="flex bg-gray-100 p-1 rounded-2xl w-full max-w-sm">
            <button
              onClick={() => setActiveTab('SIMPLE')}
