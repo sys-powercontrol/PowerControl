@@ -14,15 +14,27 @@ service cloud.firestore {
     }
     
     function getUserCompanyId() {
-      return request.auth.token.get('company_id', getUser().get('company_id', ''));
+      return request.auth.token.get('company_id', 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('company_id', '')
+          : ''
+      );
     }
     
     function getUserRole() {
-      return request.auth.token.get('role', getUser().get('role', ''));
+      return request.auth.token.get('role', 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '')
+          : ''
+      );
     }
     
     function getUserPermissions() {
-      return request.auth.token.get('permissions', getUser().get('permissions', []));
+      return request.auth.token.get('permissions', 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('permissions', [])
+          : []
+      );
     }
 
     function isMaster() {
@@ -46,7 +58,11 @@ service cloud.firestore {
     }
 
     function isActive() {
-      return isMaster() || getUser().get('is_active', false) == true;
+      return isMaster() || (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('is_active', false) == true
+          : false
+      );
     }
 
     function belongsToCompany(companyId) {
