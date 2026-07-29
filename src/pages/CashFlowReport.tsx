@@ -218,34 +218,35 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">DRE Simplificado</h1>
           <p className="text-gray-500">Demonstrativo de Resultados do Exercício e Lucratividade.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="bg-white p-1 rounded-xl border border-gray-100 shadow-sm flex">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="bg-white p-1 rounded-xl border border-gray-100 shadow-sm grid grid-cols-2 sm:flex sm:flex-row gap-1 w-full sm:w-auto">
             <button 
               onClick={() => handleFilterChange("current_month")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === "current_month" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all text-center ${filterType === "current_month" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
             >
               Mês Atual
             </button>
             <button 
               onClick={() => handleFilterChange("last_month")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === "last_month" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all text-center ${filterType === "last_month" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
             >
               Mês Anterior
             </button>
             <button 
               onClick={() => setFilterType("custom")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === "custom" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all text-center col-span-2 sm:col-span-1 ${filterType === "custom" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
             >
               Personalizado
             </button>
           </div>
-          <div className="flex items-center gap-2 hide-on-print">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto hide-on-print">
             <button 
               onClick={() => window.print()}
-              className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm"
               title="Imprimir Relatório"
             >
               <Printer size={18} />
+              <span>Imprimir</span>
             </button>
             <button 
               onClick={() => exportToPdf({ 
@@ -253,17 +254,38 @@ if (!canView) {
                 filename: 'DRE-Simplificado', 
                 title: 'DRE Simplificado',
               })}
-              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center gap-2 font-bold text-sm"
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm"
               title="Exportar como PDF"
             >
               <FileText size={16} />
-              PDF
+              <span>PDF</span>
             </button>
             <ExportButton 
-              data={dreData.detailedMovements} 
+              data={dreData.detailedMovements.map((item: any) => ({
+                ...item,
+                valor: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor)
+              }))} 
               filename="DRE-Movimentacoes" 
               format="xlsx" 
               title="DRE - Movimentações"
+              className="w-full sm:w-auto justify-center shadow-sm border border-green-200 text-sm"
+              headers={{
+                tipo: 'Tipo',
+                data: 'Data',
+                descricao: 'Descrição',
+                valor: 'Valor',
+                forma_pagamento: 'Forma de Pagto'
+              }}
+            />
+            <ExportButton 
+              data={dreData.detailedMovements.map((item: any) => ({
+                ...item,
+                valor: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor)
+              }))} 
+              filename="DRE-Movimentacoes" 
+              format="csv" 
+              title="DRE - Movimentações"
+              className="w-full sm:w-auto justify-center shadow-sm border border-gray-200 text-sm"
               headers={{
                 tipo: 'Tipo',
                 data: 'Data',

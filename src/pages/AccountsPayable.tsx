@@ -448,7 +448,7 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Contas a Pagar</h1>
           <p className="text-gray-500">Gestão de despesas e compromissos.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <ExportButton 
             data={filteredAccounts} 
             filename={`contas-pagar-${activeTab.toLowerCase()}`} 
@@ -462,6 +462,7 @@ if (!canView) {
               status: 'Status',
               payment_date: 'Data Pagamento'
             }}
+            className="w-full justify-center text-sm"
           />
           <ExportButton 
             data={filteredAccounts} 
@@ -476,20 +477,21 @@ if (!canView) {
               status: 'Status',
               payment_date: 'Data Pagamento'
             }}
+            className="w-full justify-center text-sm"
           />
-            <button 
-              onClick={() => {
-                setSupplierSearch("");
-                setCategorySearch("");
-                setSelectedSupplierId("");
-                setSelectedCategoryId("");
-                setIsModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-shadow shadow-lg shadow-red-200"
-            >
-              <Plus size={20} />
-              Nova Conta
-            </button>
+          <button 
+            onClick={() => {
+              setSupplierSearch("");
+              setCategorySearch("");
+              setSelectedSupplierId("");
+              setSelectedCategoryId("");
+              setIsModalOpen(true);
+            }}
+            className="col-span-2 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-shadow shadow-lg shadow-red-200"
+          >
+            <Plus size={20} />
+            Nova Conta
+          </button>
         </div>
       </div>
 
@@ -639,7 +641,7 @@ if (!canView) {
       {isPayModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsPayModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">Confirmar Pagamento</h2>
               <button onClick={() => setIsPayModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -678,7 +680,7 @@ if (!canView) {
       {isEditDateModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEditDateModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold flex flex-col">
                 <span>Alterar Vencimento</span>
@@ -726,7 +728,7 @@ if (!canView) {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setIsDeleteModalOpen(false); setAccountToDelete(null); }} />
-          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6">
+          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
               <Trash2 size={40} />
             </div>
@@ -754,7 +756,7 @@ if (!canView) {
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">{editingAccount ? "Editar Conta" : "Nova Conta a Pagar"}</h2>
               <button onClick={() => { setIsModalOpen(false); setEditingAccount(null); }} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -915,7 +917,7 @@ if (!canView) {
       {isReverseModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setIsReverseModalOpen(false); setAccountToReverse(null); }} />
-          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6">
+          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto">
               <RotateCcw size={40} />
             </div>

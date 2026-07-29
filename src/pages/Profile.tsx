@@ -138,6 +138,32 @@ export default function Profile() {
     toast.success("Copiado para a área de transferência!");
   };
 
+  // MFA Logic
+  const isPrivileged = user?.role === 'master' || user?.role === 'admin';
+  const [showMfaModal, setShowMfaModal] = React.useState(false);
+  const [mfaCodeInput, setMfaCodeInput] = React.useState('');
+
+  const handleToggleMfa = () => {
+    if (user?.mfa_enabled) {
+      updateProfileMutation.mutate({ mfa_enabled: false });
+      toast.success("Autenticação em duas etapas desativada.");
+    } else {
+      setShowMfaModal(true);
+    }
+  };
+
+  const handleConfirmMfa = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mfaCodeInput.length !== 6) {
+      toast.error("O código deve conter 6 dígitos numéricos.");
+      return;
+    }
+    updateProfileMutation.mutate({ mfa_enabled: true });
+    toast.success("Autenticação em duas etapas ativada com sucesso!");
+    setShowMfaModal(false);
+    setMfaCodeInput('');
+  };
+
   if (!user) return null;
 
   return (
@@ -437,12 +463,114 @@ export default function Profile() {
               </div>
             </form>
           </div>
+          
+          {isPrivileged && (
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-xl text-gray-900">Configurações de Segurança</h4>
+                  <p className="text-gray-500 text-sm">Autenticação de dois fatores (MFA)</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <div>
+                  <h5 className="font-bold text-gray-900 text-sm">Autenticação em Duas Etapas (2FA)</h5>
+                  <p className="text-xs text-gray-500 max-w-sm mt-1">Proteja sua conta exigindo um código adicional gerado no seu celular ao fazer login.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={user.mfa_enabled || false}
+                    onChange={handleToggleMfa}
+                    disabled={updateProfileMutation.isPending}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {showReauthModal && (
+      {showMfaModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <Shield size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Ativar 2FA</h3>
+                  <p className="text-xs text-gray-500">Configure o Google Authenticator</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setShowMfaModal(false); setMfaCodeInput(''); }}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center justify-center space-y-4 mb-6">
+              <p className="text-sm text-center text-gray-600">
+                1. Escaneie o QR Code abaixo com seu aplicativo de autenticação (ex: Google Authenticator).
+              </p>
+              <div className="p-4 bg-white border-2 border-gray-100 rounded-2xl shadow-sm">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=otpauth://totp/PowerControl:${user.email}?secret=JBSWY3DPEHPK3PXP&issuer=PowerControl`} 
+                  alt="QR Code MFA" 
+                  className="w-40 h-40 object-contain"
+                />
+              </div>
+              <p className="text-xs text-gray-400 font-mono text-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                Chave secreta: JBSWY3DPEHPK3PXP
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmMfa} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">2. Digite o código de 6 dígitos gerado</label>
+                <input 
+                  type="text"
+                  value={mfaCodeInput}
+                  onChange={(e) => setMfaCodeInput(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                  placeholder="000000"
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-center font-mono text-xl tracking-[0.5em]"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => { setShowMfaModal(false); setMfaCodeInput(''); }}
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={mfaCodeInput.length !== 6 || updateProfileMutation.isPending}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 disabled:opacity-50"
+                >
+                  Confirmar e Ativar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showReauthModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">

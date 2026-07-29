@@ -172,12 +172,13 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Histórico de Compras</h1>
           <p className="text-gray-500">Acompanhe todas as entradas de estoque.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2 w-full md:w-auto">
           <ExportButton 
             data={filteredPurchases} 
             filename="historico-compras" 
             format="xlsx" 
             headers={purchaseExportHeaders} 
+            className="w-full justify-center text-sm"
           />
           <ExportButton 
             data={filteredPurchases} 
@@ -185,6 +186,7 @@ if (!canView) {
             format="pdf" 
             title="Histórico de Compras"
             headers={purchaseExportHeaders} 
+            className="w-full justify-center text-sm"
           />
         </div>
       </div>
@@ -239,6 +241,19 @@ if (!canView) {
                     {formatBR(p.purchase_date)}
                   </td>
                   <td className="py-4 text-right flex justify-end gap-2">
+                    <button 
+                      onClick={() => {
+                         if (company) {
+                           printPurchaseReceipt(p, company);
+                         } else {
+                           toast.error("Dados da empresa não encontrados.");
+                         }
+                      }}
+                      className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Imprimir Comprovante"
+                    >
+                      <Printer size={18} />
+                    </button>
                     <button 
                       onClick={() => { setSelectedPurchase(p); setIsDetailsModalOpen(true); }}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -418,7 +433,7 @@ if (!canView) {
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">Editar Compra</h2>
               <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>

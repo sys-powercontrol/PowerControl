@@ -22,9 +22,11 @@ import {
   History,
   BarChart3,
   Globe,
-  Tag
+  Tag,
+  Wifi,
+  WifiOff
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -33,6 +35,7 @@ import { twMerge } from "tailwind-merge";
 import { useAuth } from "../lib/auth";
 import { PermissionId } from "../lib/permissions";
 import { motion, AnimatePresence } from "motion/react";
+import * as idb from "idb-keyval";
 
 import GlobalSearch from "./GlobalSearch";
 import NotificationCenter from "./NotificationCenter";
@@ -50,6 +53,41 @@ export default function Layout() {
   const queryClient = useQueryClient();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(api.getCompanyId());
   const hasCompany = !!(user?.company_id || selectedCompanyId);
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [offlineQueueLength, setOfflineQueueLength] = useState(0);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Periodically check for offline mutations in React Query Cache from IDB
+    const checkOfflineQueue = async () => {
+      try {
+        const cache = await idb.get("react-query-offline-cache");
+        if (cache && cache.clientState && cache.clientState.mutations) {
+          const pendingMutations = cache.clientState.mutations.filter((m: any) => m.state.status === "pending" || m.state.isPaused);
+          setOfflineQueueLength(pendingMutations.length);
+        } else {
+          setOfflineQueueLength(0);
+        }
+      } catch (err) {
+        console.error("Error reading offline queue", err);
+      }
+    };
+
+    const interval = setInterval(checkOfflineQueue, 5000);
+    checkOfflineQueue();
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      clearInterval(interval);
+    };
+  }, []);
 
   const { data: companies = [] } = useQuery({
     queryKey: ["companies", "all"],
@@ -324,7 +362,32 @@ export default function Layout() {
       <main className="flex-1 md:ml-64 pb-24 md:pb-8">
         {/* Header Bar */}
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100 p-4 flex items-center justify-between">
-          <GlobalSearch />
+          <div className="flex items-center gap-4">
+            <GlobalSearch />
+            
+            {/* Connectivity Badge */}
+            <div className="hidden sm:flex items-center gap-2">
+              {isOnline ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-100">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider">On-line</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-100">
+                  <WifiOff size={12} className="text-orange-500" />
+                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">Off-line</span>
+                </div>
+              )}
+              
+              {/* Offline Queue Counter */}
+              {!isOnline && offlineQueueLength > 0 && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 border border-red-200" title="Vendas/Ações aguardando sincronização">
+                  <span className="text-xs font-bold text-red-700">{offlineQueueLength}</span>
+                  <span className="text-[10px] text-red-600 font-medium">pendentes</span>
+                </div>
+              )}
+            </div>
+          </div>
           
           <div className="flex items-center gap-4">
             <NotificationCenter />

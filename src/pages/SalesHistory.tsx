@@ -251,7 +251,7 @@ if (!canView) {
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2 w-full md:w-auto">
           <ExportButton 
             data={filteredSales} 
             filename="historico-vendas" 
@@ -277,6 +277,7 @@ if (!canView) {
                 isPrimary: false
               }))
             ]}
+            className="w-full justify-center text-sm"
           />
           <ExportButton 
             data={filteredSales} 
@@ -303,6 +304,7 @@ if (!canView) {
                 isPrimary: false
               }))
             ]}
+            className="w-full justify-center text-sm"
           />
         </div>
       </div>

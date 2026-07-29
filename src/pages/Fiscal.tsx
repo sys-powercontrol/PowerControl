@@ -24,6 +24,42 @@ import ExportButton from "../components/ExportButton";
 
 import { Link } from "react-router-dom";
 
+function XmlDownloadButton({ invoice }: { invoice: any }) {
+  const [isDownloading, setIsDownloading] = React.useState(false);
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const url = invoice.xml_storage_url || invoice.xml_url;
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `NFe-${invoice.access_key || invoice.number}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      toast.error("Tentando abrir link diretamente...", { duration: 1500 });
+      window.open(invoice.xml_storage_url || invoice.xml_url, "_blank");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <button 
+      onClick={handleDownload}
+      disabled={isDownloading}
+      className={`p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors ${isDownloading ? 'opacity-50' : ''}`} 
+      title={invoice.xml_storage_url ? "Baixar XML (Armazenamento Seguro)" : "Baixar XML (Link Externo)"}
+    >
+      <Download size={18} className={isDownloading ? 'animate-bounce' : ''} />
+    </button>
+  );
+}
+
 export default function Fiscal() {
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
@@ -280,32 +316,32 @@ if (!canManage) {
           <h1 className="text-2xl font-bold text-gray-900">Fiscal (NF-e / NFC-e)</h1>
           <p className="text-gray-500">Emissão e controle de Notas Fiscais Eletrônicas.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <div className="flex gap-2">
-            <ExportButton 
-              data={filteredInvoices} 
-              filename="notas-fiscais" 
-              format="xlsx" 
-              headers={invoiceExportHeaders} 
-            />
-            <ExportButton 
-              data={filteredInvoices} 
-              filename="notas-fiscais" 
-              format="pdf" 
-              title="Relatório de Notas Fiscais"
-              headers={invoiceExportHeaders} 
-            />
-          </div>
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <ExportButton 
+            data={filteredInvoices} 
+            filename="notas-fiscais" 
+            format="xlsx" 
+            headers={invoiceExportHeaders} 
+            className="w-full justify-center text-sm"
+          />
+          <ExportButton 
+            data={filteredInvoices} 
+            filename="notas-fiscais" 
+            format="pdf" 
+            title="Relatório de Notas Fiscais"
+            headers={invoiceExportHeaders} 
+            className="w-full justify-center text-sm"
+          />
           <Link 
             to="/Certificado"
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all"
+            className="col-span-1 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all text-xs sm:text-sm"
           >
             <Shield size={20} className="text-blue-600" />
             Certificado Digital
           </Link>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+            className="col-span-1 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200 text-xs sm:text-sm"
           >
             <Plus size={20} />
             Emitir Nova Nota
@@ -406,16 +442,8 @@ if (!canManage) {
                       >
                         <Printer size={18} />
                       </button>
-                      {(invoice.xml_storage_url || invoice.xml_url) && (
-                        <a 
-                          href={invoice.xml_storage_url || invoice.xml_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
-                          title={invoice.xml_storage_url ? "Baixar XML (Armazenamento Seguro)" : "Baixar XML (Link Externo)"}
-                        >
-                          <Download size={18} />
-                        </a>
+                      {(invoice.xml_storage_url || invoice.xml_url) && invoice.status === "Emitida" && (
+                        <XmlDownloadButton invoice={invoice} />
                       )}
                       <button 
                         onClick={() => {
@@ -451,7 +479,7 @@ if (!canManage) {
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">Emitir Nota Fiscal</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -510,7 +538,7 @@ if (!canManage) {
       {isEmailModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEmailModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-6 space-y-6">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-6 space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">

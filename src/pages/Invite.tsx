@@ -248,7 +248,7 @@ if (user?.role !== 'admin' && user?.role !== 'master') {
       {/* New Invite Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-blue-600 text-white">
               <h2 className="text-xl font-bold">Novo Convite</h2>
               <button onClick={() => setIsModalOpen(false)} className="hover:rotate-90 transition-transform">

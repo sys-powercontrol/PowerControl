@@ -60,7 +60,7 @@ export default function ConfirmationModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
           >
             <div className="p-6 flex items-start gap-4">
               <div className={`p-3 ${currentVariant.bg} rounded-2xl shrink-0`}>

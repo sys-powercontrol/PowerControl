@@ -344,14 +344,15 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
             {activeTab === "Marcas" && "Gerencie as marcas dos seus produtos."}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           {activeTab === "Produtos" && (
-            <div className="flex gap-2">
+            <>
               <ExportButton 
                 data={filteredProducts} 
                 filename="produtos" 
                 format="xlsx" 
                 headers={productExportHeaders} 
+                className="w-full justify-center text-sm"
               />
               <ExportButton 
                 data={filteredProducts} 
@@ -359,17 +360,16 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                 format="pdf" 
                 title="Relatório de Produtos"
                 headers={productExportHeaders} 
+                className="w-full justify-center text-sm"
               />
-            </div>
-          )}
-          {activeTab === "Produtos" && (
-            <button 
-              onClick={() => setIsLabelModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-shadow shadow-sm"
-            >
-              <Tag size={20} className="text-blue-600" />
-              Etiquetas
-            </button>
+              <button 
+                onClick={() => setIsLabelModalOpen(true)}
+                className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-shadow shadow-sm text-sm"
+              >
+                <Tag size={20} className="text-blue-600" />
+                Etiquetas
+              </button>
+            </>
           )}
           {canManage && (
             <button 
@@ -383,7 +383,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                 if (activeTab === "Categorias") { setEditingCategory(null); setIsCategoryModalOpen(true); }
                 if (activeTab === "Marcas") { setEditingBrand(null); setIsBrandModalOpen(true); }
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+              className={`${activeTab === "Produtos" ? "col-span-2 sm:col-span-1" : "col-span-2"} w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200 text-sm`}
             >
               <Plus size={20} />
               {activeTab === "Produtos" && "Novo Produto"}
@@ -908,7 +908,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">{editingCategory ? "Editar Categoria" : "Nova Categoria"}</h2>
               <button onClick={() => setIsCategoryModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -936,7 +936,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       {isBrandModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsBrandModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">{editingBrand ? "Editar Marca" : "Nova Marca"}</h2>
               <button onClick={() => setIsBrandModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>

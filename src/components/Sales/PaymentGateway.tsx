@@ -167,7 +167,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="relative bg-white p-8 rounded-3xl shadow-2xl text-center space-y-6 max-w-md w-full overflow-hidden"
+        className="relative bg-white p-8 rounded-3xl shadow-2xl text-center space-y-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
       >
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
           <X size={24} />

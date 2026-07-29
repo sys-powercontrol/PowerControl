@@ -165,49 +165,50 @@ if (!canManage) {
           <h1 className="text-2xl font-bold text-gray-900">Transferências</h1>
           <p className="text-gray-500">Movimentações entre contas e caixas.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-2">
-            <ExportButton 
-              data={filteredMovements.map((m: any) => ({
-                tipo: m.type,
-                descricao: m.description || "Sem descrição",
-                valor: m.amount || 0,
-                origem: m.from_account_name || "---",
-                destino: m.to_account_name || "---",
-                data: new Date(m.movement_date).toLocaleString(),
-                usuario: m.user_name || "Sistema"
-              }))} 
-              filename="transferencias-movimentacoes" 
-              format="xlsx" 
-              headers={{
-                tipo: "Tipo",
-                descricao: "Descrição",
-                valor: "Valor (R$)",
-                origem: "Conta Origem",
-                destino: "Conta Destino",
-                data: "Data/Hora",
-                usuario: "Usuário"
-              }}
-            />
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-64"
-            />
-          </div>
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <ExportButton 
+            data={filteredMovements.map((m: any) => ({
+              tipo: m.type,
+              descricao: m.description || "Sem descrição",
+              valor: m.amount || 0,
+              origem: m.from_account_name || "---",
+              destino: m.to_account_name || "---",
+              data: new Date(m.movement_date).toLocaleString(),
+              usuario: m.user_name || "Sistema"
+            }))} 
+            filename="transferencias-movimentacoes" 
+            format="xlsx" 
+            headers={{
+              tipo: "Tipo",
+              descricao: "Descrição",
+              valor: "Valor (R$)",
+              origem: "Conta Origem",
+              destino: "Conta Destino",
+              data: "Data/Hora",
+              usuario: "Usuário"
+            }}
+            className="w-full justify-center text-sm"
+          />
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+            className="col-span-1 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200 text-sm"
           >
             <Plus size={20} />
             Nova Movimentação
           </button>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <input 
+          type="text" 
+          placeholder="Buscar..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+        />
       </div>
 
       {/* List */}
@@ -262,7 +263,7 @@ if (!canManage) {
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">Nova Movimentação</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -328,7 +329,7 @@ if (!canManage) {
       {isDetailsModalOpen && selectedMovement && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsDetailsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">Detalhes da Movimentação</h2>
               <button onClick={() => setIsDetailsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>

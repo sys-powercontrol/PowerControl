@@ -1,52 +1,57 @@
-# Relatório Geral de Funcionalidades Pendentes de Finalização
+# Relatório de Implementações Pendentes (Análise de Finalização)
 
-**Data e Hora de Geração:** 28/07/2026 13:28:15 (Horário de Brasília)
-
----
-
-## Análise do Estado Atual do Sistema PowerControl
-
-Após uma auditoria detalhada da estrutura da aplicação React/Vite/TypeScript, servidor Express (`server.ts`) e Firestore/Firebase, verificou-se que as funcionalidades principais de ERP/PDV (Autenticação, Multi-Tenant `company_id`, Vendas PDV, Controle de Caixa, Certificados, Ajustes de Estoque e Emissão Fiscal) estão devidamente estruturadas.
-
-Este relatório compila **exclusivamente as finalizações e refinamentos pendentes** nos módulos existentes, garantindo que não haja adição de escopo ou novas funcionalidades não solicitadas.
+**Data e Hora de Geração:** 28/07/2026 18:05:00 (Horário de Brasília)
 
 ---
 
-## Módulos e Pendências de Finalização
-
-### 1. Autenticação e Gestão de Perfil de Usuário (`Login.tsx`, `Profile.tsx`, `auth.tsx`)
-- **Status Atual:** Fluxos de login por e-mail/senha, Google OAuth, "Esqueceu a senha" e atualização de foto/senha básica estão implementados.
-- **O que falta finalizar:**
-  - **Reautenticação para Alteração de Senha:** Tratar o erro `auth/requires-recent-login` no componente `Profile.tsx` solicitando a senha atual do usuário antes da redefinir a nova senha.
-  - **MFA/2FA Opcional:** Adicionar a funcionalidade de ativação de Autenticação em Duas Etapas (MFA) para perfil com papel `master` e `admin` no painel de perfil.
-
-### 2. Conciliação e Webhooks de Pagamento PIX e Cartão (`PaymentGateway.tsx`, `server.ts`)
-- **Status Atual:** Integração com Mercado Pago PIX e cartão simulado configurados no `server.ts` e no frontend `PaymentGateway.tsx`.
-- **O que falta finalizar:**
-  - **Status de Expiração e Cancelamento:** Exibir feedback em tempo real no modal de pagamento no PDV quando a consulta de status retornar `EXPIRED` ou `CANCELLED`, permitindo reiniciar a cobrança sem travar o PDV.
-  - **Webhook de Retorno Automático Mercado Pago:** Endpoint `/api/webhooks/mercadopago` no servidor para atualizar a venda/transação em background no Firestore assim que o evento `payment.updated` for recebido.
-
-### 3. Emissão e Gestão Fiscal NFC-e/NF-e (`Fiscal.tsx`, `server.ts`, `NotificationCenter.tsx`)
-- **Status Atual:** Emissão via WebmaniaBR/FocusNFe e recepção de webhooks no `server.ts` que salvam o XML no Storage.
-- **O que falta finalizar:**
-  - **Ação de Download/Visualização do XML Armazenado:** Exibir o botão para download/visualização do arquivo XML armazenado em `xml_storage_url` diretamente na tabela de notas fiscais em `Fiscal.tsx`.
-  - **Invalidação de Cache e Atualização em Tempo Real:** Atualizar automaticamente a lista de notas em `Fiscal.tsx` via escuta de notificações ou re-fetch imediato ao mudar o status da nota por webhook.
-
-### 4. Indicador de Rede e PWA Offline (`Layout.tsx`, `App.tsx`, `queryClient.ts`)
-- **Status Atual:** Cache local persistente configurado via `@tanstack/react-query-persist-client` e `idb-keyval`.
-- **O que falta finalizar:**
-  - **Indicador do Status PWA no Layout:** Exibir no cabeçalho do `Layout.tsx` o badge indicando se o sistema está *On-line* ou *Off-line*, além do contador de vendas pendentes no IndexedDB aguardando sincronização com a nuvem.
-
-### 5. Auditoria de Transferências de Estoque Inter-Filiais (`Transfers.tsx`, `InventoryHistory.tsx`)
-- **Status Atual:** Transferência entre empresas (Matriz -> Filial) construída na aba de `InventoryAdjustments.tsx` com decremento na origem e incremento no destino em transação atômica no Firestore.
-- **O que falta finalizar:**
-  - **Filtro e Exibição de Transferências no Histórico de Estoque:** Exibir na página `InventoryHistory.tsx` e/ou `Transfers.tsx` as movimentações com motivos `TRANSFER_OUT` e `TRANSFER_IN`, apresentando o nome da filial de origem e destino para auditoria completa.
-
-### 6. Padronização de Relatórios e Impressões (`PurchaseHistory.tsx`, `CashFlowReport.tsx`, `ExportButton.tsx`)
-- **Status Atual:** Geração de Orçamentos A4 em PDF e Recibos 80mm integrados no PDV (`Sales.tsx`) e no Histórico de Vendas (`SalesHistory.tsx`).
-- **O que falta finalizar:**
-  - **Impressão de Comprovante no Histórico de Compras (`PurchaseHistory.tsx`):** Incluir o botão de impressão de recibo de compra para conferência de entrada de mercadorias com o fornecedor.
-  - **Padronização do ExportButton em Relatórios:** Integrar o componente `ExportButton.tsx` nos relatórios de Giro de Estoque (`InventoryTurnoverReport.tsx`), DRE (`CashFlowReport.tsx`) e Lucratividade (`ProfitabilityReport.tsx`) para exportação em Excel/CSV.
+## 1. Introdução e Objetivo da Análise
+Este relatório apresenta uma auditoria detalhada de finalizações técnicas necessárias no sistema **PowerControl** (ERP/PDV). O objetivo principal é identificar e mapear lacunas existentes entre as telas, fluxos de controle e APIs desenvolvidas, especificando **exclusivamente o que falta para finalizar os fluxos já iniciados**, sem propor ou introduzir novos escopos ou funcionalidades não solicitadas no projeto original.
 
 ---
-**Conclusão:** A conclusão destes 6 itens garantirá a prontidão operacional e a integridade de todas as telas e fluxos existentes do PowerControl.
+
+## 2. Mapeamento das Pendências por Módulo
+
+### Módulo A: Segurança e Perfil de Usuário
+*   **Páginas:** `/MeuPerfil` (`src/pages/Profile.tsx`)
+*   **Contexto Atual:** A reautenticação para troca de senha usando `requires-recent-login` já está integrada com o modal, porém a ativação de Autenticação de Dois Fatores (MFA/2FA) ainda está pendente de uma implementação real/simulada robusta para usuários com cargos `master` e `admin`.
+*   **O que falta finalizar:** 
+    *   Criação de um seletor visual e configuração persistente no perfil para habilitar MFA/2FA.
+    *   Simular ou conectar com o fluxo de segurança do Firebase Auth para garantir a proteção extra em contas administrativas.
+
+### Módulo B: Conciliação de Pagamentos no PDV
+*   **Páginas/Servidor:** `src/components/Sales/PaymentGateway.tsx`, `/server.ts`
+*   **Contexto Atual:** Integração com Mercado Pago (PIX e Cartão simulado) está configurada, mas o PDV carece de tratamento contínuo de status se o pagamento expirar ou for cancelado.
+*   **O que falta finalizar:**
+    *   No modal de pagamento no PDV, quando a consulta contínua (polling) retornar status `EXPIRED` ou `CANCELLED`, exibir feedback sonoro/visual, habilitando um botão para "Gerar Novo Código PIX" ou "Tentar Novamente" de forma direta.
+    *   Garantir a atualização do status da venda correspondente no Firestore por meio do webhook do Mercado Pago em `/api/webhooks/mercadopago`.
+
+### Módulo C: Gestão e Download de Documentos Fiscais
+*   **Páginas/Servidor:** `/Fiscal` (`src/pages/Fiscal.tsx`), `src/components/NotificationCenter.tsx`, `/server.ts`
+*   **Contexto Atual:** O backend recebe webhooks da FocusNFe ou WebmaniaBR e salva o XML em `xml_storage_url`, mas o usuário final não tem acesso simples de download na tabela.
+*   **O que falta finalizar:**
+    *   Adicionar um botão de ação "Download XML" na tabela de Notas Fiscais em `Fiscal.tsx`, acessando o `xml_storage_url` de forma transparente.
+    *   Integrar a invalidação de cache automática (`queryClient.invalidateQueries({ queryKey: ["invoices"] })`) quando notificações fiscais forem disparadas por webhook ou no `NotificationCenter.tsx`.
+
+### Módulo D: Indicador de Conectividade e Fila Offline
+*   **Páginas/Componentes:** Layout Principal (`src/components/Layout.tsx`), `src/App.tsx`, `src/lib/queryClient.ts`
+*   **Contexto Atual:** Estrutura de cache persistente com `@tanstack/react-query-persist-client` e `idb-keyval` está funcional para uso offline, mas falta feedback visual de status para o operador.
+*   **O que falta finalizar:**
+    *   Adicionar no cabeçalho do `Layout.tsx` um indicador dinâmico do estado de rede: um badge de conectividade (`On-line` / `Off-line`).
+    *   Ler o banco IndexedDB (`idb-keyval`) e apresentar o número de vendas guardadas localmente aguardando sincronização com a nuvem quando o sistema estiver sem conexão.
+
+### Módulo E: Auditoria de Transferências Inter-Filiais
+*   **Páginas:** `/HistoricoEstoque` (`src/pages/InventoryHistory.tsx`), `/Transferencias` (`src/pages/Transfers.tsx`)
+*   **Contexto Atual:** A funcionalidade de transferência decrementa na origem e incrementa no destino, mas a rastreabilidade dessas movimentações de estoque não está exposta no histórico.
+*   **O que falta finalizar:**
+    *   Implementar filtros na tabela de `InventoryHistory.tsx` permitindo visualizar especificamente os tipos `TRANSFER_OUT` e `TRANSFER_IN`.
+    *   Exibir colunas com a filial de origem e a filial de destino em cada linha do histórico para propósitos de auditoria de inventário.
+
+### Módulo F: Impressão de Compras e Padronização de Exportação de Relatórios
+*   **Páginas:** `/HistoricoCompras` (`src/pages/PurchaseHistory.tsx`), `/RelatorioGiro` (`src/pages/InventoryTurnoverReport.tsx`), `/RelatorioDRE` (`src/pages/CashFlowReport.tsx`), `/RelatorioLucratividade` (`src/pages/ProfitabilityReport.tsx`)
+*   **Contexto Atual:** O sistema possui recursos avançados de PDF/Excel via `ExportButton.tsx` e impressões no PDV, mas alguns relatórios e o histórico de compras não possuem essa integração.
+*   **O que falta finalizar:**
+    *   Em `PurchaseHistory.tsx`, adicionar um botão de impressão do recibo de compra (conferência do fornecedor).
+    *   Integrar o componente `ExportButton.tsx` nos relatórios de Giro de Estoque, DRE (Fluxo de Caixa) e Lucratividade para possibilitar a exportação das respectivas tabelas para Excel (.xlsx) e CSV.
+
+---
+**Status da Análise:** Concluída para especificação técnica subsequente.

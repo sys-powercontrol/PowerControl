@@ -251,7 +251,7 @@ if (!canView) {
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">{editingCashier ? "Editar Caixa" : "Novo Caixa"}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -285,7 +285,7 @@ if (!canView) {
       {isOpeningModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsOpeningModalOpen(false)} />
-          <div className="relative bg-white p-8 rounded-3xl shadow-2xl space-y-6 max-w-sm w-full">
+          <div className="relative bg-white p-8 rounded-3xl shadow-2xl space-y-6 max-w-sm w-full max-h-[90vh] overflow-y-auto">
             <div className="text-center">
               <h2 className="text-xl font-bold">Abrir Caixa</h2>
               <p className="text-sm text-gray-500">Informe o saldo inicial para abertura.</p>
@@ -320,7 +320,7 @@ if (!canView) {
       {historyCashier && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setHistoryCashier(null)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900">

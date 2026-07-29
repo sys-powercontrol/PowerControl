@@ -191,8 +191,8 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Relatório de Lucratividade</h1>
           <p className="text-gray-500">Análise detalhada de margens, lucros e desempenho financeiro.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">
+          <div className="grid grid-cols-3 sm:flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm w-full sm:w-auto">
             {[
               { label: '7d', value: '7' },
               { label: '30d', value: '30' },
@@ -201,7 +201,7 @@ if (!canView) {
               <button
                 key={opt.value}
                 onClick={() => setDateRange(opt.value)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all text-center ${
                   dateRange === opt.value 
                     ? "bg-blue-600 text-white shadow-md shadow-blue-100" 
                     : "text-gray-500 hover:bg-gray-50"
@@ -211,13 +211,14 @@ if (!canView) {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-2 hide-on-print">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto hide-on-print">
             <button 
               onClick={() => window.print()}
-              className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm"
               title="Imprimir Relatório"
             >
               <Printer size={18} />
+              <span>Imprimir</span>
             </button>
             <button 
               onClick={() => exportToPdf({ 
@@ -225,17 +226,39 @@ if (!canView) {
                 filename: 'Relatorio-Lucratividade', 
                 title: 'Relatório de Lucratividade',
               })}
-              className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center gap-2 font-bold text-sm"
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm"
               title="Exportar como PDF"
             >
               <FileText size={16} />
-              PDF
+              <span>PDF</span>
             </button>
             <ExportButton 
-              data={reportData.topProducts} 
+              data={reportData.topProducts.map((item: any) => ({
+                ...item,
+                revenue: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.revenue),
+                profit: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.profit),
+              }))} 
               filename="relatorio-lucratividade" 
               format="xlsx" 
               title="Relatório de Lucratividade - Top Produtos"
+              className="w-full sm:w-auto justify-center shadow-sm border border-green-200 text-sm"
+              headers={{
+                name: 'Produto',
+                qty: 'Qtd Vendida',
+                revenue: 'Receita Total',
+                profit: 'Lucro Bruto'
+              }}
+            />
+            <ExportButton 
+              data={reportData.topProducts.map((item: any) => ({
+                ...item,
+                revenue: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.revenue),
+                profit: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.profit),
+              }))} 
+              filename="relatorio-lucratividade" 
+              format="csv" 
+              title="Relatório de Lucratividade - Top Produtos"
+              className="w-full sm:w-auto justify-center shadow-sm border border-gray-200 text-sm"
               headers={{
                 name: 'Produto',
                 qty: 'Qtd Vendida',

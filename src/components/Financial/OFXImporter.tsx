@@ -587,7 +587,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       {isManualMatching && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsManualMatching(null)} />
-          <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+          <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
               <h3 className="text-lg font-bold">Vincular Lançamento Manualmente</h3>
               <button onClick={() => setIsManualMatching(null)} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -633,7 +633,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       {isSavingRule && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsSavingRule(null)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 text-center space-y-6">
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 text-center space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
               <ArrowRightLeft size={40} />
             </div>

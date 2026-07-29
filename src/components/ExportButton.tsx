@@ -9,7 +9,7 @@ import { formatBR, getNowBR } from "../lib/dateUtils";
 interface ExportButtonProps {
   data: any[];
   filename: string;
-  format: 'pdf' | 'xlsx';
+  format: 'pdf' | 'xlsx' | 'csv';
   title?: string;
   headers?: Record<string, string>;
   className?: string;
@@ -48,8 +48,37 @@ export default function ExportButton({
 
     if (format === 'xlsx') {
       exportToExcel(exportData);
+    } else if (format === 'csv') {
+      exportToCSV(exportData);
     } else {
       exportToPDF(exportData);
+    }
+  };
+
+  const exportToCSV = (preparedData: any[]) => {
+    try {
+      const wsData: any[][] = [];
+      if (preparedData.length > 0) {
+        const tableHeaders = Object.keys(preparedData[0]);
+        wsData.push(tableHeaders);
+        preparedData.forEach(item => {
+          wsData.push(Object.values(item));
+        });
+      }
+      const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+      const csvOutput = XLSX.utils.sheet_to_csv(worksheet, { FS: ";" }); // pt-BR standard uses semicolon
+      const blob = new Blob(["\uFEFF" + csvOutput], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel pt-BR
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${filename}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Arquivo CSV gerado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao exportar CSV:", error);
+      toast.error("Erro ao gerar arquivo CSV.");
     }
   };
 
@@ -190,8 +219,8 @@ export default function ExportButton({
   };
 
   const Icon = format === 'pdf' ? FileText : TableIcon;
-  const label = format === 'pdf' ? 'Exportar PDF' : 'Exportar Excel';
-  const bgColor = format === 'pdf' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100';
+  const label = format === 'pdf' ? 'Exportar PDF' : format === 'csv' ? 'Exportar CSV' : 'Exportar Excel';
+  const bgColor = format === 'pdf' ? 'bg-red-50 text-red-600 hover:bg-red-100' : format === 'csv' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-green-50 text-green-600 hover:bg-green-100';
 
   return (
     <button

@@ -142,7 +142,7 @@ if (!canManage) {
           <h1 className="text-2xl font-bold text-gray-900">Fechamento de Comissões</h1>
           <p className="text-gray-500">Gerencie e pague as comissões pendentes dos seus vendedores.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <ExportButton 
             data={filteredSales} 
             filename="comissoes-pendentes" 
@@ -155,6 +155,7 @@ if (!canManage) {
               total: 'Total Venda (R$)',
               commission_amount: 'Comissão (R$)'
             }}
+            className="w-full justify-center text-sm"
           />
         </div>
       </div>

@@ -17,6 +17,7 @@ import { User } from "../types";
 
 export interface ExtendedUser extends User {
   permissions?: PermissionId[];
+  mfa_enabled?: boolean;
 }
 
 interface AuthContextType {

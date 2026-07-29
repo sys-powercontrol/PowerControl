@@ -68,7 +68,7 @@ export default function InventoryHistory() {
           <h1 className="text-2xl font-bold text-gray-900">Kardex (Histórico de Estoque)</h1>
           <p className="text-gray-500">Rastreabilidade completa de todas as movimentações de produtos.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <ExportButton 
             data={filteredMovements} 
             filename="historico-estoque" 
@@ -84,6 +84,7 @@ export default function InventoryHistory() {
               current_stock: 'Estoque Atual',
               user_name: 'Usuário'
             }}
+            className="w-full justify-center text-sm"
           />
           <ExportButton 
             data={filteredMovements} 
@@ -100,6 +101,7 @@ export default function InventoryHistory() {
               current_stock: 'Estoque Atual',
               user_name: 'Usuário'
             }}
+            className="w-full justify-center text-sm"
           />
         </div>
       </div>
@@ -128,6 +130,8 @@ export default function InventoryHistory() {
               <option value="IN">Entradas</option>
               <option value="OUT">Saídas</option>
               <option value="ADJUSTMENT">Ajustes</option>
+              <option value="TRANSFER_IN">Transferência (Entrada)</option>
+              <option value="TRANSFER_OUT">Transferência (Saída)</option>
             </select>
           </div>
 
@@ -144,6 +148,7 @@ export default function InventoryHistory() {
               <option value="MANUAL">Manual</option>
               <option value="CANCEL">Cancelamentos</option>
               <option value="RETURN">Devoluções</option>
+              <option value="TRANSFER">Transferências</option>
             </select>
           </div>
         </div>
@@ -155,7 +160,7 @@ export default function InventoryHistory() {
                 <th className="pb-4 font-bold">Data/Hora</th>
                 <th className="pb-4 font-bold">Produto</th>
                 <th className="pb-4 font-bold">Tipo</th>
-                <th className="pb-4 font-bold">Motivo</th>
+                <th className="pb-4 font-bold">Motivo / Obs</th>
                 <th className="pb-4 font-bold text-center">Qtd</th>
                 <th className="pb-4 font-bold text-center">Anterior</th>
                 <th className="pb-4 font-bold text-center">Atual</th>
@@ -195,15 +200,15 @@ export default function InventoryHistory() {
                   </td>
                   <td className="py-4">
                     <div className="flex items-center gap-2">
-                      {m.type === 'IN' ? (
+                      {m.type === 'IN' || m.type === 'TRANSFER_IN' ? (
                         <div className="flex items-center gap-1 text-green-600 font-bold">
                           <ArrowUpCircle size={16} />
-                          <span>Entrada</span>
+                          <span>{m.type === 'TRANSFER_IN' ? 'Transf. Entrada' : 'Entrada'}</span>
                         </div>
-                      ) : m.type === 'OUT' ? (
+                      ) : m.type === 'OUT' || m.type === 'TRANSFER_OUT' ? (
                         <div className="flex items-center gap-1 text-red-600 font-bold">
                           <ArrowDownCircle size={16} />
-                          <span>Saída</span>
+                          <span>{m.type === 'TRANSFER_OUT' ? 'Transf. Saída' : 'Saída'}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 text-blue-600 font-bold">
@@ -214,12 +219,19 @@ export default function InventoryHistory() {
                     </div>
                   </td>
                   <td className="py-4">
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-[10px] font-bold uppercase">
-                      {m.reason}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-[10px] font-bold uppercase w-fit">
+                        {m.reason}
+                      </span>
+                      {m.observation && (
+                        <span className="text-[10px] text-gray-500 italic max-w-[150px] truncate" title={m.observation}>
+                          {m.observation}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-4 text-center font-bold text-gray-900">
-                    {m.type === 'OUT' ? '-' : m.type === 'IN' ? '+' : ''}{m.quantity}
+                    {m.type === 'OUT' || m.type === 'TRANSFER_OUT' ? '-' : (m.type === 'IN' || m.type === 'TRANSFER_IN') ? '+' : ''}{m.quantity}
                   </td>
                   <td className="py-4 text-center text-gray-500">{m.previous_stock}</td>
                   <td className="py-4 text-center font-bold text-gray-900">{m.current_stock}</td>

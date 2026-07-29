@@ -183,29 +183,29 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Fornecedores</h1>
           <p className="text-gray-500">Gerencie seus parceiros de suprimentos.</p>
         </div>
-        <div className="flex gap-2">
-          <div className="flex gap-2 mr-2">
-            <ExportButton 
-              data={filteredSuppliers} 
-              filename="fornecedores" 
-              format="xlsx" 
-              headers={supplierExportHeaders} 
-            />
-            <ExportButton 
-              data={filteredSuppliers} 
-              filename="fornecedores" 
-              format="pdf" 
-              title="Relatório de Fornecedores"
-              headers={supplierExportHeaders} 
-            />
-          </div>
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <ExportButton 
+            data={filteredSuppliers} 
+            filename="fornecedores" 
+            format="xlsx" 
+            headers={supplierExportHeaders} 
+            className="w-full justify-center text-sm"
+          />
+          <ExportButton 
+            data={filteredSuppliers} 
+            filename="fornecedores" 
+            format="pdf" 
+            title="Relatório de Fornecedores"
+            headers={supplierExportHeaders} 
+            className="w-full justify-center text-sm"
+          />
           <button 
             onClick={() => {
               setEditingSupplier(null);
               setFetchedData({});
               setIsModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+            className="col-span-2 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
           >
             <Plus size={20} />
             Novo Fornecedor
@@ -308,7 +308,7 @@ if (!canView) {
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold">{editingSupplier ? "Editar Fornecedor" : "Novo Fornecedor"}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>

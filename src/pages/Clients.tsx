@@ -149,29 +149,29 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
           <p className="text-gray-500">Gerencie sua base de clientes.</p>
         </div>
-        <div className="flex gap-2">
-          <div className="flex gap-2 mr-2">
-            <ExportButton 
-              data={filteredClients} 
-              filename="clientes" 
-              format="xlsx" 
-              headers={clientExportHeaders} 
-            />
-            <ExportButton 
-              data={filteredClients} 
-              filename="clientes" 
-              format="pdf" 
-              title="Relatório de Clientes"
-              headers={clientExportHeaders} 
-            />
-          </div>
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <ExportButton 
+            data={filteredClients} 
+            filename="clientes" 
+            format="xlsx" 
+            headers={clientExportHeaders} 
+            className="w-full justify-center text-sm"
+          />
+          <ExportButton 
+            data={filteredClients} 
+            filename="clientes" 
+            format="pdf" 
+            title="Relatório de Clientes"
+            headers={clientExportHeaders} 
+            className="w-full justify-center text-sm"
+          />
           <button 
             onClick={() => { 
               setEditingClient(null); 
               setAddressData({});
               setIsModalOpen(true); 
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+            className="col-span-2 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
           >
             <Plus size={20} />
             Novo Cliente
