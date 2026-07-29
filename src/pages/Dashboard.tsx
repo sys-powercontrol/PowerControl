@@ -110,7 +110,14 @@ export default function Dashboard() {
     return purchasesData.filter((item: any) => item.company_id === currentCompanyId);
   }, [purchasesData, currentCompanyId]);
 
-  const totalSalesMonth = sales.reduce((acc: number, sale: any) => acc + (sale.total || 0), 0);
+  const currentMonthStr = useMemo(() => formatBR(getNowBR(), 'yyyy-MM'), []);
+  const salesThisMonth = useMemo(() => {
+    return sales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM') === currentMonthStr);
+  }, [sales, currentMonthStr]);
+
+  const totalSalesMonth = useMemo(() => {
+    return salesThisMonth.reduce((acc: number, sale: any) => acc + (sale.total || 0), 0);
+  }, [salesThisMonth]);
   const totalReceivable = accountsReceivable.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0);
   const totalPayable = accountsPayable.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0);
   const totalPurchases = purchases.reduce((acc: number, p: any) => acc + (p.total || 0), 0);
@@ -165,7 +172,7 @@ export default function Dashboard() {
           value={formatCurrency(totalSalesMonth)} 
           icon={TrendingUp} 
           color="from-green-500 to-green-600"
-          subtitle={`${sales.length} vendas realizadas`}
+          subtitle={`${salesThisMonth.length} vendas realizadas`}
         />
         <StatCard 
           title="Compras do Mês" 

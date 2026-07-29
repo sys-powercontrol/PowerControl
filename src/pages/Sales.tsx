@@ -165,6 +165,14 @@ export default function Sales() {
     }
   }, [hasOpenCashier, cashiers, user?.id, selectedCashier]);
 
+  // Auto-select first bank account if none selected and payment method needs it
+  useEffect(() => {
+    const needsAccount = ["PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"].includes(paymentMethod);
+    if (needsAccount && !selectedBankAccount && bankAccounts.length > 0) {
+      setTimeout(() => setSelectedBankAccount(bankAccounts[0]), 0);
+    }
+  }, [paymentMethod, bankAccounts, selectedBankAccount]);
+
   
 
   const { data: companyData } = useQuery({ 
@@ -694,7 +702,13 @@ if (!canCreate) {
           <div className="space-y-3">
             {paymentMethod === "PIX" && (
               <button 
-                onClick={() => setShowPaymentGateway(true)}
+                onClick={() => {
+                  if (!selectedBankAccount) {
+                    toast.error("Selecione a conta bancária de destino antes de gerar o QR Code!");
+                    return;
+                  }
+                  setShowPaymentGateway(true);
+                }}
                 className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors"
               >
                 <QrCode size={20} />
@@ -703,7 +717,13 @@ if (!canCreate) {
             )}
             {(paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito") && (
               <button 
-                onClick={() => setShowPaymentGateway(true)}
+                onClick={() => {
+                  if (!selectedBankAccount) {
+                    toast.error("Selecione a conta bancária de destino antes de iniciar o pagamento!");
+                    return;
+                  }
+                  setShowPaymentGateway(true);
+                }}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
               >
                 <CreditCard size={20} />
@@ -759,6 +779,9 @@ if (!canCreate) {
             finalizeSale.mutate();
           }}
           onClose={() => setShowPaymentGateway(false)}
+          bankAccounts={bankAccounts}
+          selectedBankAccount={selectedBankAccount}
+          onBankAccountChange={setSelectedBankAccount}
         />
       )}
 

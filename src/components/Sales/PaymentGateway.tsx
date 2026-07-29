@@ -23,9 +23,20 @@ interface PaymentGatewayProps {
   method: string;
   onSuccess: () => void;
   onClose: () => void;
+  bankAccounts?: any[];
+  selectedBankAccount?: any;
+  onBankAccountChange?: (account: any) => void;
 }
 
-export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGatewayProps) {
+export function PaymentGateway({ 
+  amount, 
+  method, 
+  onSuccess, 
+  onClose,
+  bankAccounts = [],
+  selectedBankAccount = null,
+  onBankAccountChange
+}: PaymentGatewayProps) {
   const [status, setStatus] = useState<"PENDING" | "PROCESSING" | "CONFIRMED" | "EXPIRED" | "ERROR">("PENDING");
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -50,6 +61,34 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
   const pixKey = companyData?.pix_key || "00000000000";
   const compName = companyData?.name || "EMPRESA PDV";
   const compCity = companyData?.city || "BRASILIA";
+
+  const displayQrCode = React.useMemo(() => {
+    if (!qrCode) return null;
+    const isDummy = qrCode.includes("00000000000");
+    if (activeTab === "pix" && isDummy) {
+      try {
+        const safePixKey = String(pixKey || "00000000000");
+        const safeCompName = String(compName || "EMPRESA PDV");
+        const safeCompCity = String(compCity || "BRASILIA");
+        const suffix = paymentId ? String(paymentId).slice(-4) : "9999";
+        return generatePixPayload(
+           safePixKey,
+           amount || 0,
+           safeCompName.substring(0, 25),
+           safeCompCity.substring(0, 15),
+           "PDV" + suffix
+        );
+      } catch (_err) {
+        return qrCode;
+      }
+    }
+    return qrCode;
+  }, [qrCode, activeTab, amount, pixKey, compName, compCity, paymentId]);
+
+  const configRef = React.useRef({ pixKey, compName, compCity });
+  useEffect(() => {
+    configRef.current = { pixKey, compName, compCity };
+  }, [pixKey, compName, compCity]);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,9 +116,9 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
         setPaymentId("mock_" + Date.now());
         if (activeTab === "pix") {
           try {
-            const safePixKey = String(pixKey || "00000000000");
-            const safeCompName = String(compName || "EMPRESA PDV");
-            const safeCompCity = String(compCity || "BRASILIA");
+            const safePixKey = String(configRef.current.pixKey || "00000000000");
+            const safeCompName = String(configRef.current.compName || "EMPRESA PDV");
+            const safeCompCity = String(configRef.current.compCity || "BRASILIA");
             const payload = generatePixPayload(
                safePixKey,
                amount || 0,
@@ -103,7 +142,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
     return () => {
       isMounted = false;
     };
-  }, [activeTab, amount, pixKey, compName, compCity]);
+  }, [activeTab, amount]);
 
   useEffect(() => {
     if (!paymentId || status !== "PENDING") return;
@@ -160,8 +199,8 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
   };
 
   const copyPix = () => {
-    if (qrCode) {
-      navigator.clipboard.writeText(qrCode);
+    if (displayQrCode) {
+      navigator.clipboard.writeText(displayQrCode);
       toast.success("Código PIX copiado!");
     }
   };
@@ -236,9 +275,28 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
               </div>
             ) : activeTab === "pix" ? (
               <div className="space-y-6">
+                {bankAccounts && bankAccounts.length > 0 && (
+                  <div className="text-left space-y-1.5 p-3 bg-purple-50/50 border border-purple-100 rounded-2xl">
+                    <label className="text-[11px] font-bold text-purple-700 uppercase tracking-wide">Conta Bancária de Destino *</label>
+                    <select 
+                      className="w-full px-3 py-2 bg-white border border-purple-100 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-xs font-semibold text-gray-700"
+                      value={selectedBankAccount?.id || ""}
+                      onChange={(e) => {
+                        const account = bankAccounts.find((a: any) => a.id === e.target.value);
+                        if (onBankAccountChange) onBankAccountChange(account || null);
+                      }}
+                    >
+                      <option value="">Selecione a conta bancária...</option>
+                      {bankAccounts.map((a: any) => (
+                        <option key={a.id} value={a.id}>{a.name} ({formatCurrency(a.balance || 0)})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="bg-white p-4 rounded-2xl border-2 border-purple-50 inline-block shadow-inner min-w-[200px] min-h-[200px] flex items-center justify-center mx-auto">
-                  {qrCode ? (
-                    <QRCodeSVG value={qrCode} size={200} />
+                  {displayQrCode ? (
+                    <QRCodeSVG value={displayQrCode} size={200} />
                   ) : (
                     <div className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 text-gray-400">
                       <Loader2 className="animate-spin text-purple-600" size={32} />
