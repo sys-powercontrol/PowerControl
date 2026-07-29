@@ -589,6 +589,23 @@ if (!canCreate) {
           <h2 className="font-bold text-xl">Resumo</h2>
 
           <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase">Forma de Pagamento *</label>
+              <select 
+                className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              >
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Cartão de Crédito">Cartão de Crédito</option>
+                <option value="Cartão de Débito">Cartão de Débito</option>
+                <option value="PIX">PIX</option>
+                <option value="Boleto">Boleto</option>
+                <option value="A Prazo">A Prazo</option>
+                <option value="Fiado">Fiado</option>
+              </select>
+            </div>
+
             {paymentMethod === "Dinheiro" ? (
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Caixa Destino *</label>
@@ -624,23 +641,6 @@ if (!canCreate) {
                 </select>
               </div>
             ) : null}
-
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">Forma de Pagamento *</label>
-              <select 
-                className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-              >
-                <option value="Dinheiro">Dinheiro</option>
-                <option value="Cartão de Crédito">Cartão de Crédito</option>
-                <option value="Cartão de Débito">Cartão de Débito</option>
-                <option value="PIX">PIX</option>
-                <option value="Boleto">Boleto</option>
-                <option value="A Prazo">A Prazo</option>
-                <option value="Fiado">Fiado</option>
-              </select>
-            </div>
 
             {(paymentMethod === "A Prazo" || paymentMethod === "Fiado") && (
               <div>
