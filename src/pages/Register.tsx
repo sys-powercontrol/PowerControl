@@ -11,7 +11,7 @@ export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const inviteId = searchParams.get("invite");
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [inviteData, setInviteData] = useState<any>(null);
   const [isInviteLoading, setIsInviteLoading] = useState(!!inviteId);
@@ -66,12 +66,26 @@ export default function Register() {
         toast.success(`Bem-vindo à ${inviteData.company_name || "sua nova empresa"}!`);
         navigate("/");
       } else {
-        toast.success("Conta criada com sucesso! Agora vincule sua empresa.");
+        toast.success("Conta criada com sucesso! Aguarde a liberação do seu acesso.");
         navigate("/MeuPerfil");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error);
-      toast.error("Erro ao criar conta. Tente novamente.");
+      toast.error(error.message || "Erro ao criar conta. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    setIsLoading(true);
+    try {
+      await loginWithGoogle();
+      toast.success("Cadastro realizado com sucesso via Google!");
+      navigate("/MeuPerfil");
+    } catch (error: any) {
+      console.error("Google register error:", error);
+      toast.error(error.message || "Erro ao cadastrar com conta Google.");
     } finally {
       setIsLoading(false);
     }
@@ -208,7 +222,28 @@ export default function Register() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-100"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-400">Ou cadastrar com</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleRegister}
+              disabled={isLoading}
+              className="mt-6 w-full py-3 px-4 bg-white border border-gray-200 rounded-2xl font-bold text-gray-700 hover:bg-gray-50 transition-all flex items-center justify-center gap-3 shadow-sm disabled:opacity-70"
+            >
+              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+              Cadastrar com Google
+            </button>
+          </div>
+
+          <div className="mt-8 text-center">
             <p className="text-sm text-gray-500">
               Já tem uma conta?{" "}
               <Link to="/login" className="text-blue-600 font-bold hover:underline">

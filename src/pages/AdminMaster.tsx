@@ -23,7 +23,12 @@ import {
   DollarSign,
   BarChart3,
   Loader2,
-  MessageSquare
+  MessageSquare,
+  CheckCircle2,
+  Power,
+  Trash2,
+  UserCheck,
+  UserX
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -45,6 +50,7 @@ import { AuditLog } from "../types";
 import { subDays } from "date-fns";
 import { InputMask } from "../components/ui/InputMask";
 import { externalApi } from "../services/externalApi";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 export default function AdminMaster() {
   const queryClient = useQueryClient();
@@ -52,6 +58,8 @@ export default function AdminMaster() {
   const [activeTab, setActiveTab] = useState("Visão Geral");
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+  const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editingCompany, setEditingCompany] = useState<any>(null);
   const [isSearchingCEP, setIsSearchingCEP] = useState(false);
@@ -147,10 +155,12 @@ export default function AdminMaster() {
     }
   };
 
-  const filteredUsers = users.filter((u: any) => 
-    u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter((u: any) => {
+    const search = searchTerm.toLowerCase();
+    const name = (u.full_name || u.name || "").toLowerCase();
+    const email = (u.email || "").toLowerCase();
+    return name.includes(search) || email.includes(search);
+  });
 
   const filteredCompanies = companies.filter((c: any) => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -237,6 +247,51 @@ export default function AdminMaster() {
       setIsUserModalOpen(false);
       setEditingUser(null);
     },
+  });
+
+  const toggleUserStatusMutation = useMutation({
+    mutationFn: async ({ userId, is_active, full_name }: { userId: string; is_active: boolean; full_name: string }) => {
+      const result = await api.put("users", userId, { is_active });
+      await api.log({
+        action: 'UPDATE',
+        entity: 'users',
+        entity_id: String(userId),
+        description: `${is_active ? 'Ativou/Aprovou' : 'Desativou'} usuário ${full_name}`,
+        metadata: { userId, is_active }
+      });
+      return result;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
+      toast.success(variables.is_active ? "Usuário aprovado e liberado com sucesso!" : "Usuário desativado com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao alterar o status do usuário.");
+    }
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (targetUser: any) => {
+      await api.delete("users", targetUser.id);
+      await api.log({
+        action: 'DELETE',
+        entity: 'users',
+        entity_id: String(targetUser.id),
+        description: `Excluiu permanentemente o usuário ${targetUser.full_name || targetUser.email}`,
+        metadata: { userId: targetUser.id, email: targetUser.email }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
+      toast.success("Usuário excluído permanentemente com sucesso!");
+      setIsDeleteUserModalOpen(false);
+      setUserToDelete(null);
+    },
+    onError: () => {
+      toast.error("Erro ao excluir usuário.");
+    }
   });
 
   const companyMutation = useMutation({
@@ -670,17 +725,57 @@ if (currentUser?.role !== 'master') {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${u.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {u.is_active ? "Ativo" : "Inativo"}
-                      </span>
+                      {u.is_active ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-green-100 text-green-700 inline-flex items-center gap-1">
+                          <UserCheck size={12} /> Ativo
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-800 inline-flex items-center gap-1">
+                          <UserX size={12} /> Pendente
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => { setEditingUser(u); setIsUserModalOpen(true); }}
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {!u.is_active && (
+                          <button 
+                            onClick={() => toggleUserStatusMutation.mutate({ userId: u.id, is_active: true, full_name: u.full_name })}
+                            disabled={toggleUserStatusMutation.isPending}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-sm transition-all"
+                            title="Aprovar e Liberar Acesso"
+                          >
+                            <CheckCircle2 size={14} />
+                            Aprovar
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => toggleUserStatusMutation.mutate({ userId: u.id, is_active: !u.is_active, full_name: u.full_name })}
+                          disabled={toggleUserStatusMutation.isPending || u.id === currentUser?.id}
+                          className={`p-2 rounded-xl transition-colors ${
+                            u.is_active 
+                              ? "text-amber-600 hover:bg-amber-50" 
+                              : "text-green-600 hover:bg-green-50"
+                          }`}
+                          title={u.is_active ? "Desativar Usuário" : "Ativar Usuário"}
+                        >
+                          <Power size={16} />
+                        </button>
+                        <button 
+                          onClick={() => { setEditingUser(u); setIsUserModalOpen(true); }}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                          title="Editar Usuário"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => { setUserToDelete(u); setIsDeleteUserModalOpen(true); }}
+                          disabled={u.id === currentUser?.id}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title={u.id === currentUser?.id ? "Você não pode excluir sua própria conta aqui" : "Excluir Usuário"}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1296,6 +1391,25 @@ if (currentUser?.role !== 'master') {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={isDeleteUserModalOpen}
+        onClose={() => {
+          setIsDeleteUserModalOpen(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={() => {
+          if (userToDelete) {
+            deleteUserMutation.mutate(userToDelete);
+          }
+        }}
+        title="Excluir Usuário"
+        message={`Tem certeza que deseja excluir permanentemente o usuário ${userToDelete?.full_name || userToDelete?.email}? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir Usuário"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={deleteUserMutation.isPending}
+      />
     </div>
   );
 }

@@ -76,11 +76,12 @@ export const api = {
         } else {
           const newUser = {
             email: user.email || '',
-            full_name: user.email?.split("@")[0] || "Usuário",
+            full_name: user.displayName || user.email?.split("@")[0] || "Usuário",
             role: isMasterEmail ? "master" : "user",
             company_id: null,
             created_at: serverTimestamp(),
-            is_active: true,
+            is_active: isMasterEmail ? true : false,
+            avatar: user.photoURL || null
           };
           await setDoc(doc(db, "users", user.uid), newUser);
           currentUserData = { id: user.uid, ...newUser } as User;
@@ -94,10 +95,11 @@ export const api = {
         currentUserData = {
           id: user.uid,
           email: user.email || '',
-          full_name: user.email?.split("@")[0] || "Usuário",
+          full_name: user.displayName || user.email?.split("@")[0] || "Usuário",
           role: isMasterEmail ? "master" : "user",
           company_id: null,
-          is_active: true,
+          is_active: isMasterEmail ? true : false,
+          avatar: user.photoURL || null,
           created_at: new Date().toISOString()
         } as User;
         return currentUserData as T;

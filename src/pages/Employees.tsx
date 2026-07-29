@@ -17,7 +17,12 @@ import {
   Phone,
   FileText,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CheckCircle2,
+  Power,
+  Trash2,
+  UserCheck,
+  UserX
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -36,6 +41,8 @@ export default function Employees() {
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [employeeToUnlink, setEmployeeToUnlink] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
   const [isUnlinking, setIsUnlinking] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionId[]>([]);
@@ -52,6 +59,27 @@ export default function Employees() {
     e.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) => 
+      api.put("users", id, { is_active, active: is_active }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["employees", currentCompanyId] });
+      toast.success(variables.is_active ? "Funcionário aprovado e liberado com sucesso!" : "Funcionário desativado com sucesso!");
+    },
+    onError: () => toast.error("Erro ao alterar o status do funcionário.")
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: (id: string) => api.delete("users", id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees", currentCompanyId] });
+      toast.success("Usuário excluído permanentemente!");
+      setIsDeleteModalOpen(false);
+      setEmployeeToDelete(null);
+    },
+    onError: () => toast.error("Erro ao excluir funcionário.")
+  });
 
   const employeeMutation = useMutation({
     mutationFn: (data: any) => api.put("users", editingEmployee.id, data),
@@ -169,79 +197,143 @@ if (!canManage) {
           <div className="col-span-full py-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
             Nenhum funcionário encontrado.
           </div>
-        ) : filteredEmployees.map((employee: any) => (
-          <div key={employee.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group relative">
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-lg overflow-hidden">
-                {employee.photo_url ? (
-                  <img src={employee.photo_url} alt={employee.full_name} className="w-full h-full object-cover" />
-                ) : (
-                  employee.full_name?.charAt(0) || "U"
-                )}
+        ) : filteredEmployees.map((employee: any) => {
+          const isEmployeeActive = employee.is_active !== false && employee.active !== false;
+
+          return (
+            <div key={employee.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group relative flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-lg overflow-hidden">
+                    {employee.photo_url ? (
+                      <img src={employee.photo_url} alt={employee.full_name} className="w-full h-full object-cover" />
+                    ) : (
+                      employee.full_name?.charAt(0) || "U"
+                    )}
+                  </div>
+                  <div className="flex gap-1 items-center">
+                    {isEmployeeActive ? (
+                      <span className="px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase flex items-center gap-1">
+                        <UserCheck size={12} /> Ativo
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold uppercase flex items-center gap-1">
+                        <UserX size={12} /> Pendente
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <h3 className="font-bold text-lg text-gray-900 mb-1 flex items-center gap-2">
+                  {employee.full_name}
+                  {isEmployeeActive && <BadgeCheck size={18} className="text-blue-500" />}
+                </h3>
+                
+                <div className="space-y-2 mt-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Mail size={16} />
+                    <span className="truncate">{employee.email}</span>
+                  </div>
+                  {employee.phone && (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Phone size={16} />
+                      <span>{employee.phone}</span>
+                    </div>
+                  )}
+                  {employee.document && (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <FileText size={16} />
+                      <span>{employee.document}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Shield size={16} />
+                    <span className="flex items-center gap-1">
+                      {employee.role === 'master' ? (
+                        <span className="text-red-600 font-bold flex items-center gap-1"><Crown size={12} /> Admin Master</span>
+                      ) : employee.role === 'admin' ? (
+                        <span className="text-purple-600 font-bold flex items-center gap-1"><ShieldCheck size={12} /> Admin Empresa</span>
+                      ) : (
+                        employee.role || "Funcionário"
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => {
-                    setEditingEmployee(employee);
-                    setSelectedPermissions(employee.permissions || []);
-                    setShowPermissions(false);
-                    setIsModalOpen(true);
-                  }}
-                  className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <Edit size={18} />
-                </button>
-                {employee.id !== user?.id && (
+
+              {/* Action Toolbar */}
+              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                <div>
+                  {!isEmployeeActive && (
+                    <button 
+                      onClick={() => toggleActiveMutation.mutate({ id: employee.id, is_active: true })}
+                      disabled={toggleActiveMutation.isPending}
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-sm transition-all"
+                      title="Aprovar e Liberar Acesso"
+                    >
+                      <CheckCircle2 size={14} />
+                      Aprovar
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => toggleActiveMutation.mutate({ id: employee.id, is_active: !isEmployeeActive })}
+                    disabled={toggleActiveMutation.isPending || employee.id === user?.id}
+                    className={`p-2 rounded-xl transition-colors ${
+                      isEmployeeActive 
+                        ? "text-amber-600 hover:bg-amber-50" 
+                        : "text-green-600 hover:bg-green-50"
+                    }`}
+                    title={isEmployeeActive ? "Desativar Funcionário" : "Ativar Funcionário"}
+                  >
+                    <Power size={16} />
+                  </button>
+
                   <button 
                     onClick={() => {
-                      setEmployeeToUnlink(employee.id);
-                      setIsConfirmModalOpen(true);
+                      setEditingEmployee(employee);
+                      setSelectedPermissions(employee.permissions || []);
+                      setShowPermissions(false);
+                      setIsModalOpen(true);
                     }}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                    title="Editar Funcionário"
                   >
-                    <UserMinus size={18} />
+                    <Edit size={16} />
                   </button>
-                )}
-              </div>
-            </div>
 
-            <h3 className="font-bold text-lg text-gray-900 mb-1 flex items-center gap-2">
-              {employee.full_name}
-              {employee.active && <BadgeCheck size={18} className="text-blue-500" />}
-            </h3>
-            
-            <div className="space-y-2 mt-4">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Mail size={16} />
-                <span className="truncate">{employee.email}</span>
-              </div>
-              {employee.phone && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Phone size={16} />
-                  <span>{employee.phone}</span>
-                </div>
-              )}
-              {employee.document && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <FileText size={16} />
-                  <span>{employee.document}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Shield size={16} />
-                <span className="flex items-center gap-1">
-                  {employee.role === 'master' ? (
-                    <span className="text-red-600 font-bold flex items-center gap-1"><Crown size={12} /> Admin Master</span>
-                  ) : employee.role === 'admin' ? (
-                    <span className="text-purple-600 font-bold flex items-center gap-1"><ShieldCheck size={12} /> Admin Empresa</span>
-                  ) : (
-                    employee.role || "Funcionário"
+                  {employee.id !== user?.id && (
+                    <>
+                      <button 
+                        onClick={() => {
+                          setEmployeeToUnlink(employee.id);
+                          setIsConfirmModalOpen(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-colors"
+                        title="Desvincular da Empresa"
+                      >
+                        <UserMinus size={16} />
+                      </button>
+
+                      <button 
+                        onClick={() => {
+                          setEmployeeToDelete(employee);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                        title="Excluir Usuário do Sistema"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
                   )}
-                </span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Modal Vincular/Editar Funcionário */}
@@ -386,6 +478,25 @@ if (!canManage) {
         title="Desvincular Funcionário"
         message="Tem certeza que deseja desvincular este funcionário da sua empresa? Ele perderá o acesso aos dados da empresa."
         isLoading={isUnlinking}
+      />
+
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setEmployeeToDelete(null);
+        }}
+        onConfirm={() => {
+          if (employeeToDelete) {
+            deleteEmployeeMutation.mutate(employeeToDelete.id);
+          }
+        }}
+        title="Excluir Usuário"
+        message={`Tem certeza que deseja excluir permanentemente o usuário ${employeeToDelete?.full_name || employeeToDelete?.email}? Esta ação removerá a conta do sistema.`}
+        confirmText="Excluir Usuário"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={deleteEmployeeMutation.isPending}
       />
     </div>
   );

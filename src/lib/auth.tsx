@@ -9,7 +9,7 @@ import {
   signInWithPopup
 } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { api } from "./api";
 
 import { PermissionId, DEFAULT_ROLE_PERMISSIONS } from "./permissions";
@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: firebaseUser.email,
               full_name: firebaseUser.email?.split("@")[0] || "Usuário",
               role: firebaseUser.email?.toLowerCase() === "sys.powercontrol@gmail.com" ? "master" : "user",
+              is_active: firebaseUser.email?.toLowerCase() === "sys.powercontrol@gmail.com",
               company_id: null
             };
           }
@@ -100,19 +101,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isSystemAdmin = email?.toLowerCase() === "sys.powercontrol@gmail.com";
     
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err: any) {
+      if (err.code === "auth/email-already-in-use") {
+        throw new Error("Este e-mail já está em uso por outra conta.", { cause: err });
+      } else if (err.code === "auth/weak-password") {
+        throw new Error("A senha deve conter no mínimo 6 caracteres.", { cause: err });
+      } else if (err.code === "auth/invalid-email") {
+        throw new Error("E-mail informado é inválido.", { cause: err });
+      }
+      throw err;
+    }
+
     const uid = userCredential.user.uid;
     
-    const userData = {
+    const rawUserData: Record<string, any> = {
       email,
-      full_name,
-      phone,
-      cpf,
+      full_name: full_name || email?.split("@")[0] || "Usuário",
+      phone: phone || null,
+      cpf: cpf || null,
       role: inviteData ? inviteData.role : (isSystemAdmin ? "master" : "user"),
-      is_active: true,
+      is_active: inviteData ? true : (isSystemAdmin ? true : false),
       company_id: inviteData ? inviteData.company_id : null,
       created_at: serverTimestamp()
     };
+
+    const userData: Record<string, any> = {};
+    Object.keys(rawUserData).forEach(key => {
+      if (rawUserData[key] !== undefined) {
+        userData[key] = rawUserData[key];
+      }
+    });
 
     await setDoc(doc(db, "users", uid), userData);
 
@@ -124,7 +145,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    let result;
+    try {
+      result = await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
+        throw new Error("Login com Google cancelado pelo usuário.", { cause: err });
+      } else if (err.code === "auth/account-exists-with-different-credential") {
+        throw new Error("Já existe uma conta cadastrada com este e-mail.", { cause: err });
+      }
+      throw err;
+    }
+    const googleUser = result.user;
+
+    if (googleUser) {
+      const isMasterEmail = googleUser.email?.toLowerCase() === "sys.powercontrol@gmail.com";
+      const userRef = doc(db, "users", googleUser.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        const rawUserData: Record<string, any> = {
+          email: googleUser.email || "",
+          full_name: googleUser.displayName || googleUser.email?.split("@")[0] || "Usuário",
+          role: isMasterEmail ? "master" : "user",
+          is_active: isMasterEmail ? true : false,
+          company_id: null,
+          avatar: googleUser.photoURL || null,
+          created_at: serverTimestamp()
+        };
+        const userData: Record<string, any> = {};
+        Object.keys(rawUserData).forEach(key => {
+          if (rawUserData[key] !== undefined) {
+            userData[key] = rawUserData[key];
+          }
+        });
+        await setDoc(userRef, userData);
+      }
+    }
   };
 
   const logout = async () => {

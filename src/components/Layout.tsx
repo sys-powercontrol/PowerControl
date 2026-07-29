@@ -212,8 +212,12 @@ export default function Layout() {
   ];
   const { hasPermission } = useAuth();
   const isUserAdmin = user?.role === 'admin' || user?.role === 'master';
+  const isPendingApproval = Boolean(user && user.role !== 'master' && !user.is_active);
 
   const filteredMenuItems = menuItems.filter(item => {
+    if (isPendingApproval) {
+      return item.path === "/MeuPerfil" || item.path === "/Suporte";
+    }
     if (item.requiresSystemAdmin && user?.role !== 'master') return false;
     if (item.requiresAdmin && !isUserAdmin) return false;
     if (item.hideForAdmin && isUserAdmin) return false;
@@ -247,8 +251,8 @@ export default function Layout() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Only redirect non-master and non-admin users if they don't have a company
-  if (user && user.role !== 'admin' && user.role !== 'master' && !hasCompany && location.pathname !== "/MeuPerfil" && location.pathname !== "/Suporte") {
+  // Only redirect non-master users if pending approval or if they don't have a company
+  if (user && user.role !== 'master' && (!user.is_active || !hasCompany) && location.pathname !== "/MeuPerfil" && location.pathname !== "/Suporte") {
     return <Navigate to="/MeuPerfil" replace />;
   }
 
@@ -407,6 +411,20 @@ export default function Layout() {
           </div>
         </header>
 
+        {isPendingApproval && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-4 text-amber-900 text-sm flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 shrink-0 font-bold">
+              ⏳
+            </div>
+            <div>
+              <p className="font-bold">Aguardando Liberação por Administrador</p>
+              <p className="text-amber-700 text-xs">
+                Sua conta foi criada com sucesso! Você tem acesso restrito às páginas de <strong>Meu Perfil</strong> e <strong>Suporte</strong> enquanto aguarda a aprovação por um usuário administrador.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="p-4 md:p-8">
           <AnimatePresence mode="wait">
             <motion.div
@@ -424,7 +442,7 @@ export default function Layout() {
 
       {/* Mobile Bottom Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center p-2 z-30">
-        {hasCompany && (
+        {!isPendingApproval && hasCompany && (
           <>
             <Link to="/" className={cn("flex flex-col items-center p-2", isActive("/") ? "text-blue-600" : "text-gray-500")}>
               <LayoutDashboard size={24} />
@@ -443,6 +461,10 @@ export default function Layout() {
         <Link to="/MeuPerfil" className={cn("flex flex-col items-center p-2", isActive("/MeuPerfil") ? "text-blue-600" : "text-gray-500")}>
           <User size={24} />
           <span className="text-[10px] mt-1">Perfil</span>
+        </Link>
+        <Link to="/Suporte" className={cn("flex flex-col items-center p-2", isActive("/Suporte") ? "text-blue-600" : "text-gray-500")}>
+          <HelpCircle size={24} />
+          <span className="text-[10px] mt-1">Suporte</span>
         </Link>
         <button 
           onClick={() => setIsMobileMenuOpen(true)}

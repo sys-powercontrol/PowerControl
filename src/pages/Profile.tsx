@@ -166,12 +166,32 @@ export default function Profile() {
 
   if (!user) return null;
 
+  const isPendingUser = !user.is_active && user.role !== 'master';
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Meu Perfil</h1>
         <p className="text-gray-500">Gerencie suas informações pessoais e da empresa.</p>
       </div>
+
+      {/* Account Approval Status Banner if pending */}
+      {isPendingUser && (
+        <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl shadow-sm space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="p-2 bg-amber-100 text-amber-800 rounded-xl font-bold text-lg">⏳</span>
+            <div>
+              <h2 className="text-lg font-bold text-amber-900">Conta Aguardando Liberação</h2>
+              <span className="inline-block px-2.5 py-0.5 bg-amber-200 text-amber-900 rounded-full text-xs font-bold uppercase mt-0.5">
+                Pendente de Aprovação
+              </span>
+            </div>
+          </div>
+          <p className="text-sm text-amber-800 leading-relaxed pt-1">
+            Seu cadastro foi realizado com sucesso! Para garantir a segurança dos dados da organização, sua conta está aguardando a liberação por um usuário administrador. Enquanto aguarda, você pode visualizar e atualizar seus dados nesta página ou entrar em contato com a equipe através da aba de <strong>Suporte</strong>.
+          </p>
+        </div>
+      )}
 
       {/* Company Section */}
       {user.company_id ? (
