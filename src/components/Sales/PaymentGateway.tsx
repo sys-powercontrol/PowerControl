@@ -76,14 +76,22 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
         // Fallback for demo/manual confirmation without backend
         setPaymentId("mock_" + Date.now());
         if (activeTab === "pix") {
-          const payload = generatePixPayload(
-             pixKey,
-             amount,
-             compName.substring(0, 25),
-             compCity.substring(0, 15),
-             "PDV" + Date.now().toString().slice(-4)
-          );
-          setQrCode(payload);
+          try {
+            const safePixKey = String(pixKey || "00000000000");
+            const safeCompName = String(compName || "EMPRESA PDV");
+            const safeCompCity = String(compCity || "BRASILIA");
+            const payload = generatePixPayload(
+               safePixKey,
+               amount || 0,
+               safeCompName.substring(0, 25),
+               safeCompCity.substring(0, 15),
+               "PDV" + Date.now().toString().slice(-4)
+            );
+            setQrCode(payload);
+          } catch (payloadError) {
+            console.error("Error generating local PIX payload fallback:", payloadError);
+            setQrCode("00020101021226580014br.gov.bcb.pix011400000000000000021504PDV_5204000053039865405" + (amount || 0).toFixed(2) + "5802BR5915EMPRESA PDV6008BRASILIA62070503PDV6304");
+          }
         }
         setStatus("PENDING");
       } finally {
