@@ -33,8 +33,9 @@ async function startServer() {
 
   app.post("/api/payments/create", async (req, res) => {
     const { amount, method, metadata } = req.body;
+    const methodLower = (method || "").toString().toLowerCase();
     
-    if (method === "pix") {
+    if (methodLower === "pix") {
       const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
       
       if (accessToken && !accessToken.includes("placeholder") && !accessToken.includes("YOUR_")) {

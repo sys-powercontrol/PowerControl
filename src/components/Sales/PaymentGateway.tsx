@@ -47,6 +47,10 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
     cvv: ""
   });
 
+  const pixKey = companyData?.pix_key || "00000000000";
+  const compName = companyData?.name || "EMPRESA PDV";
+  const compCity = companyData?.city || "BRASILIA";
+
   useEffect(() => {
     let isMounted = true;
     const createPayment = async () => {
@@ -60,7 +64,7 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
         if (!isMounted) return;
         setPaymentId(response.data.id);
         if (activeTab === "pix") {
-          setQrCode(response.data.qr_code);
+          setQrCode(response.data.qr_code || null);
         }
         setStatus("PENDING");
       } catch (error: any) {
@@ -72,12 +76,11 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
         // Fallback for demo/manual confirmation without backend
         setPaymentId("mock_" + Date.now());
         if (activeTab === "pix") {
-          const pixKey = companyData.pix_key || "00000000000"; // fallback
           const payload = generatePixPayload(
              pixKey,
              amount,
-             companyData.name?.substring(0, 25) || "EMPRESA PDV",
-             companyData.city?.substring(0, 15) || "BRASILIA",
+             compName.substring(0, 25),
+             compCity.substring(0, 15),
              "PDV" + Date.now().toString().slice(-4)
           );
           setQrCode(payload);
@@ -88,17 +91,11 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
       }
     };
     
-    // Only run when we have company data to ensure dynamic PIX falls back gracefully
-    if (activeTab === 'pix' && !companyData.id && companyId) {
-       // Wait for company data to resolve query
-       return;
-    }
-    
     createPayment();
     return () => {
       isMounted = false;
     };
-  }, [activeTab, amount, companyData, companyId]);
+  }, [activeTab, amount, pixKey, compName, compCity]);
 
   useEffect(() => {
     if (!paymentId || status !== "PENDING") return;
@@ -231,8 +228,15 @@ export function PaymentGateway({ amount, method, onSuccess, onClose }: PaymentGa
               </div>
             ) : activeTab === "pix" ? (
               <div className="space-y-6">
-                <div className="bg-white p-4 rounded-2xl border-2 border-purple-50 inline-block shadow-inner">
-                  <QRCodeSVG value={qrCode || ""} size={200} />
+                <div className="bg-white p-4 rounded-2xl border-2 border-purple-50 inline-block shadow-inner min-w-[200px] min-h-[200px] flex items-center justify-center mx-auto">
+                  {qrCode ? (
+                    <QRCodeSVG value={qrCode} size={200} />
+                  ) : (
+                    <div className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 text-gray-400">
+                      <Loader2 className="animate-spin text-purple-600" size={32} />
+                      <span className="text-xs font-medium">Gerando QR Code...</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <div className="text-3xl font-bold text-gray-900">{formatCurrency(amount)}</div>
