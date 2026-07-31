@@ -383,8 +383,8 @@ if (!canView) {
             <h3 className="text-lg font-bold text-gray-900">Comparativo Financeiro</h3>
             <BarChart3 size={20} className="text-gray-400" />
           </div>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[300px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} />
@@ -409,8 +409,8 @@ if (!canView) {
             <h3 className="text-lg font-bold text-gray-900">Composição do Faturamento</h3>
             <PieChartIcon size={20} className="text-gray-400" />
           </div>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[300px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={pieData}

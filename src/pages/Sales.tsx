@@ -85,32 +85,32 @@ export default function Sales() {
 
   const { data: productsData = [] } = useQuery({ 
     queryKey: ["products", currentCompanyId], 
-    queryFn: () => api.get("products", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    queryFn: () => api.get("products"),
     enabled: !!currentCompanyId
   });
   const { data: servicesData = [] } = useQuery({ 
     queryKey: ["services", currentCompanyId], 
-    queryFn: () => api.get("services", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    queryFn: () => api.get("services"),
     enabled: !!currentCompanyId
   });
   const { data: clientsData = [] } = useQuery({ 
     queryKey: ["clients", currentCompanyId], 
-    queryFn: () => api.get("clients", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    queryFn: () => api.get("clients"),
     enabled: !!currentCompanyId
   });
   const { data: cashiersData = [] } = useQuery({ 
     queryKey: ["cashiers", currentCompanyId], 
-    queryFn: () => api.get("cashiers", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    queryFn: () => api.get("cashiers"),
     enabled: !!currentCompanyId
   });
   const { data: bankAccountsData = [] } = useQuery({ 
     queryKey: ["bankAccounts", currentCompanyId], 
-    queryFn: () => api.get("bankAccounts", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    queryFn: () => api.get("bankAccounts"),
     enabled: !!currentCompanyId
   });
   const { data: sellersData = [] } = useQuery({ 
     queryKey: ["sellers", currentCompanyId], 
-    queryFn: () => api.get("sellers", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    queryFn: () => api.get("sellers"),
     enabled: !!currentCompanyId
   });
 
@@ -135,9 +135,47 @@ export default function Sales() {
   }, [cashiersData, currentCompanyId]);
 
   const bankAccounts = useMemo(() => {
-    if (!currentCompanyId) return bankAccountsData;
-    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+    const list = !currentCompanyId 
+      ? bankAccountsData 
+      : bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+
+    if (list.length === 0 && currentCompanyId) {
+      return [{
+        id: "default_bank_account",
+        name: "Banco Padrão (PIX)",
+        bank_name: "Banco do Brasil",
+        agency: "0001",
+        account_number: "12345-6",
+        balance: 0,
+        company_id: currentCompanyId
+      }];
+    }
+    return list;
   }, [bankAccountsData, currentCompanyId]);
+
+  // Auto-create default bank account in Firestore if none exists
+  useEffect(() => {
+    if (currentCompanyId && bankAccountsData.length === 0) {
+      const createDefaultAccount = async () => {
+        try {
+          await api.post("bankAccounts", {
+            name: "Banco Padrão (PIX)",
+            bank_name: "Banco do Brasil",
+            agency: "0001",
+            account_number: "12345-6",
+            balance: 0,
+            active: true,
+            company_id: currentCompanyId,
+            created_at: new Date().toISOString()
+          });
+          queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+        } catch (err) {
+          console.error("Error creating default bank account:", err);
+        }
+      };
+      createDefaultAccount();
+    }
+  }, [bankAccountsData, currentCompanyId, queryClient]);
 
   const sellers = useMemo(() => {
     if (!currentCompanyId) return sellersData;
@@ -165,11 +203,14 @@ export default function Sales() {
     }
   }, [hasOpenCashier, cashiers, user?.id, selectedCashier]);
 
-  // Auto-select first bank account if none selected and payment method needs it
+  // Ensure selectedBankAccount is always a valid account from the active list
   useEffect(() => {
     const needsAccount = ["PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"].includes(paymentMethod);
-    if (needsAccount && !selectedBankAccount && bankAccounts.length > 0) {
-      setTimeout(() => setSelectedBankAccount(bankAccounts[0]), 0);
+    if (needsAccount && bankAccounts.length > 0) {
+      const exists = bankAccounts.some((a: any) => a.id === selectedBankAccount?.id);
+      if (!exists) {
+        setTimeout(() => setSelectedBankAccount(bankAccounts[0]), 0);
+      }
     }
   }, [paymentMethod, bankAccounts, selectedBankAccount]);
 

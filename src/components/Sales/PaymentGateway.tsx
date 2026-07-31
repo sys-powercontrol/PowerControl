@@ -109,8 +109,10 @@ export function PaymentGateway({
       } catch (error: any) {
         if (!isMounted) return;
         console.error("Error creating payment:", error);
-        if (error.response?.data?.error) {
-          toast.error(error.response.data.error);
+        const errVal = error.response?.data?.error || error.response?.data?.message;
+        if (errVal) {
+          const msg = typeof errVal === "string" ? errVal : (errVal.message || String(errVal));
+          toast.error(msg);
         }
         // Fallback for demo/manual confirmation without backend
         setPaymentId("mock_" + Date.now());

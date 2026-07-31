@@ -490,8 +490,8 @@ if (currentUser?.role !== 'master') {
                   <TrendingUp size={20} className="text-blue-600" />
                 </div>
               </div>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[300px] w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <LineChart data={revenueByDay}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis 
@@ -539,8 +539,8 @@ if (currentUser?.role !== 'master') {
                   <Building2 size={20} className="text-purple-600" />
                 </div>
               </div>
-              <div className="h-[300px] w-full flex items-center">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[300px] w-full min-w-0 flex items-center">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={revenueByCompany}
