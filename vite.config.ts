@@ -20,6 +20,9 @@ export default defineConfig(({mode}) => {
           maximumFileSizeToCacheInBytes: 4000000, // 4MB
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         },
+        devOptions: {
+          enabled: false,
+        },
         manifest: {
           name: 'PowerControl ERP',
           short_name: 'PowerControl',

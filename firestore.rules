@@ -184,6 +184,11 @@ service cloud.firestore {
       allow update: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('finance.manage');
     }
 
+    match /api_configurations/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isMaster();
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

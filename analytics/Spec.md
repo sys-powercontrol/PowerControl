@@ -1,75 +1,108 @@
-# Especificação Técnica de Finalizações (Spec)
-
-**Data e Hora de Geração:** 28/07/2026 18:05:00 (Horário de Brasília)
-
----
-
-## 1. Escopo de Implementação Técnica
-Este documento especifica os comportamentos (`behavior`), páginas (`page`) e componentes (`component`) necessários para a finalização dos módulos existentes mapeados no relatório de análise `/analytics/report.md`. Nenhuma funcionalidade nova de negócio deve ser introduzida além do detalhado abaixo.
+# Especificação Técnica de Finalização de Funcionalidades (Spec.md)
+> **Data e Hora de Geração:** 31/07/2026 às 19:59:23 (Horário de Brasília - BRT)
 
 ---
 
-## 2. Detalhamento de Especificações por Épico
+## 1. Visão Geral da Especificação
 
-### Épico 1: Autenticação de Dois Fatores (MFA/2FA) para Administradores
-*   **Páginas Afetadas:** `/MeuPerfil` (`src/pages/Profile.tsx`)
-*   **Componentes:**
-    *   `MfaSetupToggle` (Componente de Toggle Switch para ativar/desativar MFA).
-    *   `MfaModal` (Modal para configuração e verificação inicial do segundo fator, apresentando código QR ou chave secreta de backup).
-*   **Comportamentos (`behavior`):**
-    *   Ao habilitar o switch em `src/pages/Profile.tsx`, se o usuário possui cargo `master` ou `admin`, abrir o `MfaModal` com instruções para ler o QR Code com aplicativo autenticador (Google Authenticator, Microsoft Authenticator, etc.).
-    *   Após o usuário digitar o código temporário correto, salvar no cadastro do usuário no Firestore (`users/{uid}`) o atributo `mfa_enabled: true` e a data de ativação.
-    *   Se desativado, solicitar confirmação da senha e atualizar o Firestore para `mfa_enabled: false`.
-
-### Épico 2: Tratamento de Status e Regeneração de Código PIX no PDV
-*   **Páginas Afetadas:** Painel de Vendas PDV (`src/components/Sales/PaymentGateway.tsx`), Backend (`server.ts`)
-*   **Componentes:**
-    *   `PixFeedback` (Mensagens visuais dinâmicas com base no status do pagamento).
-    *   `RetryPaymentButton` (Botão para reiniciar tentativa de geração de Pix sem fechar o modal).
-*   **Comportamentos (`behavior`):**
-    *   No polling em `PaymentGateway.tsx`, caso o status retornado seja `EXPIRED` ou `CANCELLED`:
-        *   Parar o temporizador de verificação.
-        *   Exibir erro visual amigável informando que o tempo limite expirou ou o pagamento foi cancelado pelo cliente.
-        *   Ativar o botão "Gerar Novo QR Code", permitindo que o operador solicite uma nova requisição para `/api/payments/create` mantendo o mesmo fluxo da venda no PDV ativo.
-    *   No backend `/server.ts`, garantir que o webhook `/api/webhooks/mercadopago` identifique e atualize a transação e o documento de caixa correspondente no Firestore quando o evento mudar para aprovado, cancelado ou expirado.
-
-### Épico 3: Download de XML Fiscal e Atualização Automática de Notas
-*   **Páginas Afetadas:** `/Fiscal` (`src/pages/Fiscal.tsx`), `src/components/NotificationCenter.tsx`
-*   **Componentes:**
-    *   `XmlDownloadButton` (Botão com ícone de download inserido na coluna de ações da tabela de notas).
-*   **Comportamentos (`behavior`):**
-    *   Na lista de Notas Fiscais, caso a nota fiscal tenha o status "Emitida" e o campo `xml_storage_url` esteja preenchido, exibir o botão `XmlDownloadButton`.
-    *   O clique no botão deve baixar diretamente o arquivo `.xml` correspondente do Google Cloud Storage/Firebase Storage, aplicando o atributo HTML `download`.
-    *   Ao receber notificação de webhook de autorização/cancelamento de NF-e/NFC-e, o painel fiscal deve disparar uma invalidação automática no React Query (`queryClient.invalidateQueries({ queryKey: ["invoices"] })`), mantendo a listagem atualizada em tempo real sem exigir carregamento manual da página.
-
-### Épico 4: Indicador de Conectividade PWA e Contador de Fila Offline
-*   **Páginas Afetadas:** Layout do Sistema (`src/components/Layout.tsx`), Inicialização (`src/App.tsx`)
-*   **Componentes:**
-    *   `ConnectivityBadge` (Badge de status visual: verde com texto "On-line", laranja com texto "Off-line").
-    *   `OfflineQueueCounter` (Pill indicadora com número de vendas salvas na fila IndexedDB aguardando sincronização).
-*   **Comportamentos (`behavior`):**
-    *   Escutar os eventos `window.addEventListener('online')` e `window.addEventListener('offline')` para atualizar o estado de rede globalmente.
-    *   No cabeçalho de `Layout.tsx`, exibir o `ConnectivityBadge` com base no estado atual da rede.
-    *   Quando em modo `Off-line`, consultar ciclicamente ou escutar o banco IndexedDB (`idb-keyval`) para verificar se há registros de vendas locais pendentes de envio à nuvem. Se houver vendas pendentes, exibir o `OfflineQueueCounter` ao lado do badge de rede.
-
-### Épico 5: Rastreamento de Transferências de Estoque Inter-Filiais
-*   **Páginas Afetadas:** `/HistoricoEstoque` (`src/pages/InventoryHistory.tsx`), `/Transferencias` (`src/pages/Transfers.tsx`)
-*   **Componentes:**
-    *   `TransferFilterPanel` (Filtros de auditoria: Entradas, Saídas, Transferências).
-    *   `TransferRowDetails` (Exibição estendida com filial de origem e destino na tabela de movimentos).
-*   **Comportamentos (`behavior`):**
-    *   Na página `InventoryHistory.tsx`, adicionar a opção "Transferências" no filtro por tipo de movimentação.
-    *   Quando selecionado, renderizar as movimentações que contêm metadados ou motivos `TRANSFER_OUT` e `TRANSFER_IN`.
-    *   Nas linhas correspondentes, buscar ou decodificar os nomes das filiais de origem e de destino para apresentá-los na coluna "Origem/Destino", assegurando auditoria limpa e precisa do inventário.
-
-### Épico 6: Impressão de Compras e Exportação para Relatórios Analíticos
-*   **Páginas Afetadas:** `/HistoricoCompras` (`src/pages/PurchaseHistory.tsx`), `/RelatorioGiro` (`src/pages/InventoryTurnoverReport.tsx`), `/RelatorioDRE` (`src/pages/CashFlowReport.tsx`), `/RelatorioLucratividade` (`src/pages/ProfitabilityReport.tsx`)
-*   **Componentes:**
-    *   `PurchaseReceiptPrint` (Serviço de geração e formatação de recibo em formato A4 ou bobina 80mm para impressão).
-    *   `ExportButton` (Botão reutilizável para exportar dados para Excel/CSV).
-*   **Comportamentos (`behavior`):**
-    *   Em `PurchaseHistory.tsx`, adicionar coluna de ações com o botão "Imprimir Comprovante". O clique deve acionar um modal ou janela de impressão formatando os dados da compra e produtos adquiridos.
-    *   Nas páginas de Giro de Estoque, DRE (Fluxo de Caixa) e Lucratividade, integrar o componente `ExportButton.tsx` passando os dados já filtrados e formatados na tabela, gerando arquivos nos formatos Excel (.xlsx) e CSV com cabeçalhos apropriados em português.
+Esta especificação detalha os requisitos de sistema, comportamento e componentes necessários para a **finalização completa das funcionalidades já existentes no PowerControl ERP**, conforme levantado no relatório `/analytics/report.md`.
 
 ---
-**Resultado Esperado:** Garantia de cobertura total dos fluxos com máxima responsividade e conformidade técnica no ERP PowerControl.
+
+## 2. Especificações por Módulo
+
+### 2.1. Módulo Vendas e Sincronização Offline (PDV / PWA)
+
+#### **ESPEC-01: Tratamento de Conflitos e Baixa de Estoque no Sync Offline**
+* **Página:** `Sales.tsx` / `src/lib/offlineStore.ts`
+* **Comportamento (Behavior):**
+  * Quando o navegador recupera a conexão à internet, a fila `sync-sales` em `offlineStore.ts` processa sequencialmente as vendas represadas.
+  * Para cada venda offline, o sistema valida se a quantidade em estoque no Firestore atende aos itens da venda.
+  * Se o estoque for suficiente, realiza a baixa do estoque e altera o status da venda para `Concluída`.
+  * Se o estoque for insuficiente para algum item, altera o status da venda sincronizada para `Pendente de Estoque` e notifica o usuário via `NotificationCenter` com detalhes da divergência.
+* **Componentes Impactados:**
+  * `src/lib/offlineStore.ts` (Função `syncPendingSales`)
+  * `src/components/NotificationCenter.tsx` (Notificação de alerta de estoque insuficiente pós-sync)
+
+#### **ESPEC-02: Webhook e Confirmação Assíncrona de Pagamentos (PIX / Cartão)**
+* **Página:** `server.ts` / `src/components/Sales/PaymentGateway.tsx`
+* **Comportamento (Behavior):**
+  * O servidor backend em `server.ts` processa as notificações recebidas na rota `/api/payments/webhook`.
+  * Atualiza o registro da cobrança no banco de dados para `APPROVED` ou `REJECTED`.
+  * O componente `PaymentGateway.tsx` reage à mudança de status do pagamento emitindo evento de sucesso para conclusão automática da transação no PDV.
+* **Componentes Impactados:**
+  * `server.ts` (Endpoint `/api/payments/webhook`)
+  * `src/components/Sales/PaymentGateway.tsx` (Hook de listener / SSE / polling inteligente)
+
+---
+
+### 2.2. Módulo Financeiro e Conciliação Bancária
+
+#### **ESPEC-03: Recorrência e Liquidação em Lote no Contas a Pagar e Receber**
+* **Página:** `AccountsPayable.tsx` & `AccountsReceivable.tsx`
+* **Comportamento (Behavior):**
+  * **Recorrência:** Ao marcar uma conta recorrente como `Paga`/`Recebida`, o sistema gera automaticamente o lançamento referente ao próximo período (mensal/semanal), mantendo histórico do título original.
+  * **Liquidação em Lote:** Permite selecionar múltiplas contas através de checkboxes na tabela e executar a ação "Dar Baixa em Selecionados", informando conta bancária/caixa e data de pagamento únicas para o lote.
+* **Componentes Impactados:**
+  * `src/pages/AccountsPayable.tsx`
+  * `src/pages/AccountsReceivable.tsx`
+  * `src/components/ui/` (Checkbox de seleção global na tabela)
+
+#### **ESPEC-04: Auto-Matching Inteligente na Conciliação Bancária OFX**
+* **Página:** `BankReconciliation.tsx` / `OFXImporter.tsx`
+* **Comportamento (Behavior):**
+  * Ao importar um arquivo `.ofx`, o sistema compara cada item do extrato com os lançamentos pendentes em Contas a Pagar/Receber.
+  * O critério de correspondência avalia:
+    1. Valor exato.
+    2. Data de vencimento/pagamento em janela de ±3 dias.
+    3. Documento / Descrição similar.
+  * Transações com correspondência exata exibem um selo verde "Correspondência Encontrada" com botão de conciliação em 1 clique.
+* **Componentes Impactados:**
+  * `src/components/Financial/OFXImporter.tsx`
+  * `src/pages/BankReconciliation.tsx`
+
+---
+
+### 2.3. Módulo Fiscal (NFe e NFCe)
+
+#### **ESPEC-05: Reprocessamento de Pendências e Exportação de XMLs em Lote**
+* **Página:** `Fiscal.tsx` / `src/services/fiscalApi.ts`
+* **Comportamento (Behavior):**
+  * **Reprocessamento:** Notas fiscais no status `Pendente` possuem botão de "Consultar Status na SEFAZ" e rotina periódica de verificação de lote.
+  * **Download em Lote:** Na tela Fiscal, um filtro de período permite selecionar notas emitidas e baixar um arquivo `.zip` contendo os XMLs autorizados e seus respectivos DANFEs em PDF para a contabilidade.
+* **Componentes Impactados:**
+  * `src/pages/Fiscal.tsx`
+  * `src/services/fiscalApi.ts`
+
+---
+
+### 2.4. Módulo de Estoque, Compras e Ficha Técnica (BOM)
+
+#### **ESPEC-06: Dedução Automática de BOM e Atualização de Custo Médio em Compras**
+* **Página:** `BOMBuilder.tsx`, `Products.tsx`, `Purchases.tsx`
+* **Comportamento (Behavior):**
+  * **Ficha Técnica (BOM):** Ao vender um produto configurado com ficha técnica, o sistema abate o estoque das matérias-primas e insumos componentes proporcionalmente à quantidade vendida.
+  * **Preço Médio de Custo em Compras:** Ao dar entrada em uma compra em `Purchases.tsx`, o sistema calcula o novo custo médio do produto:
+    $$\text{Custo Médio Novo} = \frac{(\text{Estoque Antigo} \times \text{Custo Antigo}) + (\text{Qtd Comprada} \times \text{Preço Comprado})}{\text{Estoque Antigo} + \text{Qtd Comprada}}$$
+  * Ao confirmar o recebimento da compra, insere automaticamente as parcelas de pagamento no Contas a Pagar.
+* **Componentes Impactados:**
+  * `src/lib/inventory.ts`
+  * `src/components/BOMBuilder.tsx`
+  * `src/pages/Purchases.tsx`
+
+---
+
+### 2.5. Módulo de Pessoas, Comissões e RBAC
+
+#### **ESPEC-07: Integração Financeira de Comissões e Aplicação Estrita de Permissões**
+* **Página:** `CommissionPayouts.tsx`, `Layout.tsx`, `Configurations.tsx`
+* **Comportamento (Behavior):**
+  * **Baixa de Comissões:** Ao efetuar o pagamento da comissão de um vendedor em `CommissionPayouts.tsx`, o sistema gera uma transação de saída no caixa selecionado com a categoria "Despesa com Comissões".
+  * **Aplicação de RBAC:** O menu lateral em `Layout.tsx` oculta e restringe o acesso às páginas conforme o perfil do usuário logado (`role` / `permissions`), redirecionando para `/404` ou exibindo toast de acesso não autorizado caso o usuário tente acessar via URL direta.
+* **Componentes Impactados:**
+  * `src/pages/CommissionPayouts.tsx`
+  * `src/components/Layout.tsx`
+  * `src/pages/Configurations.tsx`
+
+---
+*Especificação de finalizações concluída com sucesso.*

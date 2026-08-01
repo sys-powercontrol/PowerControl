@@ -101,7 +101,7 @@ export default function Profile() {
       setShowReauthModal(false);
       setCurrentPasswordInput("");
       setPendingNewPassword("");
-    } catch (_err: any) {
+    } catch {
       toast.error("Senha atual incorreta. Tente novamente.");
     } finally {
       setIsReauthenticating(false);

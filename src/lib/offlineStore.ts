@@ -7,6 +7,7 @@ const STORE_SALES = "sales";
 const STORE_CLIENTS = "clients";
 const STORE_ACCOUNTS_PAYABLE = "accounts_payable";
 const STORE_PURCHASES = "purchases";
+const STORE_SALES_FAILED = "sales_failed_sync";
 
 import { api } from "./api";
 
@@ -30,7 +31,7 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 2, {
+    dbPromise = openDB(DB_NAME, 3, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_SALES)) {
           db.createObjectStore(STORE_SALES, { keyPath: "id" });
@@ -43,6 +44,9 @@ function getDB() {
         }
         if (!db.objectStoreNames.contains(STORE_PURCHASES)) {
           db.createObjectStore(STORE_PURCHASES, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(STORE_SALES_FAILED)) {
+          db.createObjectStore(STORE_SALES_FAILED, { keyPath: "id" });
         }
       },
     });
@@ -112,9 +116,29 @@ export const offlineStore = {
 
         await db.delete(STORE_SALES, sale.id);
         successCount++;
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erro ao sincronizar venda offline:", error);
+        const errMsg = error?.message || "Erro desconhecido";
+        await db.put(STORE_SALES_FAILED, { ...sale, error_reason: errMsg });
+        await db.delete(STORE_SALES, sale.id);
         failCount++;
+
+        const companyId = sale.saleData?.company_id || sale.userContext?.company_id;
+        if (companyId) {
+          try {
+            await api.post("notifications", {
+              company_id: companyId,
+              title: "Divergência de Estoque / Erro em Sync Offline",
+              message: `Venda para ${sale.saleData?.client_name || "Consumidor"} falhou: ${errMsg}`,
+              type: "error",
+              link: "/HistoricoVendas",
+              read: false,
+              created_at: new Date().toISOString()
+            });
+          } catch (nErr) {
+            console.warn("Erro ao registrar notificação de falha em sync:", nErr);
+          }
+        }
       }
     }
 
@@ -124,6 +148,16 @@ export const offlineStore = {
     if (failCount > 0) {
       toast.error(`${failCount} vendas falharam na sincronização.`);
     }
+  },
+
+  async getFailedSales(): Promise<any[]> {
+    const db = await getDB();
+    return db.getAll(STORE_SALES_FAILED);
+  },
+
+  async deleteFailedSale(id: string): Promise<void> {
+    const db = await getDB();
+    await db.delete(STORE_SALES_FAILED, id);
   },
 
   async hasPendingSales(): Promise<boolean> {

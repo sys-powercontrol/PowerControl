@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import NfeStatusBadge, { NfeStatus } from "../components/NfeStatusBadge";
 import DanfeViewer from "../components/DanfeViewer";
+import JSZip from "jszip";
 import { fiscalApi } from "../services/fiscalApi";
 import ExportButton from "../components/ExportButton";
 
@@ -40,7 +41,7 @@ function XmlDownloadButton({ invoice }: { invoice: any }) {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(blobUrl);
-    } catch (e) {
+    } catch {
       toast.error("Tentando abrir link diretamente...", { duration: 1500 });
       window.open(invoice.xml_storage_url || invoice.xml_url, "_blank");
     } finally {
@@ -78,6 +79,70 @@ export default function Fiscal() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
+  const [isExportingXmlZip, setIsExportingXmlZip] = useState(false);
+
+  const handleExportXmlZip = async () => {
+    const emittedInvoices = filteredInvoices.filter(
+      (i) => (i.status === "Emitida" || i.status === "Autorizada") && (i.xml_storage_url || i.xml_url || i.xml_content)
+    );
+
+    if (emittedInvoices.length === 0) {
+      toast.warning("Nenhuma nota fiscal emitida/autorizada com XML disponível para exportação no filtro atual.");
+      return;
+    }
+
+    setIsExportingXmlZip(true);
+    toast.info(`Compactando XMLs de ${emittedInvoices.length} nota(s)...`);
+
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder("XMLs_NFe");
+
+      let addedCount = 0;
+      for (const invoice of emittedInvoices) {
+        try {
+          let xmlData = "";
+          if (invoice.xml_content) {
+            xmlData = invoice.xml_content;
+          } else {
+            const url = invoice.xml_storage_url || invoice.xml_url;
+            const res = await fetch(url);
+            xmlData = await res.text();
+          }
+
+          const fileName = `NFe_${invoice.number || invoice.id}_${invoice.access_key || "chave"}.xml`;
+          folder?.file(fileName, xmlData);
+          addedCount++;
+        } catch (fileErr) {
+          console.warn(`Erro ao obter XML da nota #${invoice.number}:`, fileErr);
+        }
+      }
+
+      if (addedCount === 0) {
+        throw new Error("Não foi possível carregar os arquivos XML das notas selecionadas.");
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const now = new Date();
+      const monthYear = `${(now.getMonth() + 1).toString().padStart(2, "0")}${now.getFullYear()}`;
+      const downloadUrl = URL.createObjectURL(zipBlob);
+
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `NFe_Lote_${monthYear}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(downloadUrl);
+
+      toast.success(`Exportação concluída! ${addedCount} arquivo(s) XML baixado(s) em ZIP.`);
+    } catch (err: any) {
+      console.error("Erro na exportação ZIP de XML:", err);
+      toast.error(err.message || "Erro ao gerar arquivo ZIP com os XMLs.");
+    } finally {
+      setIsExportingXmlZip(false);
+    }
+  };
 
   const currentCompanyId = user?.company_id || api.getCompanyId();
 
@@ -332,6 +397,15 @@ if (!canManage) {
             headers={invoiceExportHeaders} 
             className="w-full justify-center text-sm"
           />
+          <button
+            onClick={handleExportXmlZip}
+            disabled={isExportingXmlZip}
+            className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold hover:bg-emerald-100 transition-all text-xs sm:text-sm disabled:opacity-50"
+            title="Exportar todos os XMLs emitidos compactados em arquivo ZIP"
+          >
+            <Download size={18} className={isExportingXmlZip ? "animate-bounce" : ""} />
+            {isExportingXmlZip ? "Exportando..." : "XMLs (ZIP)"}
+          </button>
           <Link 
             to="/Certificado"
             className="col-span-1 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all text-xs sm:text-sm"

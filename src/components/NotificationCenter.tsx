@@ -39,6 +39,15 @@ export default function NotificationCenter() {
   const currentCompanyId = api.getCompanyId();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const [activeFilter, setActiveFilter] = useState<'all' | 'alert' | 'info'>('all');
+
+  const { data: companyData } = useQuery({ 
+    queryKey: ["company", currentCompanyId], 
+    queryFn: () => api.get("companies", currentCompanyId as string),
+    enabled: !!currentCompanyId
+  });
+  const company = useMemo(() => companyData || {}, [companyData]);
+
   const canViewProducts = hasPermission('products.view');
   const canViewFinance = hasPermission('finance.view');
   const canViewFiscal = hasPermission('fiscal.manage');
@@ -92,40 +101,49 @@ export default function NotificationCenter() {
     const list: Alert[] = [];
     const today = getTodayBR();
 
+    const isLowStockEnabled = company.notify_low_stock !== false && company.notify_low_stock !== "false";
+    const isOverdueEnabled = company.notify_overdue_account !== false && company.notify_overdue_account !== "false";
+
     // 1. Low Stock Alerts
-    products.filter((p: any) => p.stock_quantity <= p.min_stock).forEach((p: any) => {
-      list.push({
-        id: `stock-${p.id}`,
-        title: "Estoque Baixo",
-        message: `O produto "${p.name}" está com apenas ${p.stock_quantity} unidades.`,
-        type: 'warning',
-        link: "/Produtos",
-        date: new Date().toISOString()
+    if (isLowStockEnabled) {
+      products.filter((p: any) => p.stock_quantity <= p.min_stock).forEach((p: any) => {
+        list.push({
+          id: `stock-${p.id}`,
+          title: "Estoque Baixo",
+          message: `O produto "${p.name}" está com apenas ${p.stock_quantity} unidades em estoque.`,
+          type: 'warning',
+          link: "/Produtos",
+          date: new Date().toISOString()
+        });
       });
-    });
+    }
 
-    // 2. Accounts Due Today
-    accountsPayable.filter((a: any) => a.due_date === today && a.status === "Pendente").forEach((a: any) => {
-      list.push({
-        id: `payable-${a.id}`,
-        title: "Conta a Pagar Hoje",
-        message: `Vencimento de ${formatCurrency(a.amount)} para "${a.description}".`,
-        type: 'error',
-        link: "/ContasPagar",
-        date: new Date().toISOString()
+    // 2. Accounts Due / Overdue
+    if (isOverdueEnabled) {
+      accountsPayable.filter((a: any) => a.due_date <= today && a.status === "Pendente").forEach((a: any) => {
+        const isPast = a.due_date < today;
+        list.push({
+          id: `payable-${a.id}`,
+          title: isPast ? "Conta a Pagar Vencida" : "Conta a Pagar Hoje",
+          message: `${isPast ? `Vencida em ${a.due_date}` : "Vencimento hoje"} de ${formatCurrency(a.amount)} para "${a.description}".`,
+          type: 'error',
+          link: "/ContasPagar",
+          date: new Date().toISOString()
+        });
       });
-    });
 
-    accountsReceivable.filter((a: any) => a.due_date === today && a.status === "Pendente").forEach((a: any) => {
-      list.push({
-        id: `receivable-${a.id}`,
-        title: "Conta a Receber Hoje",
-        message: `Expectativa de ${formatCurrency(a.amount)} de "${a.client_name || a.description}".`,
-        type: 'info',
-        link: "/ContasReceber",
-        date: new Date().toISOString()
+      accountsReceivable.filter((a: any) => a.due_date <= today && a.status === "Pendente").forEach((a: any) => {
+        const isPast = a.due_date < today;
+        list.push({
+          id: `receivable-${a.id}`,
+          title: isPast ? "Conta a Receber Atrasada" : "Conta a Receber Hoje",
+          message: `${isPast ? `Atrasada desde ${a.due_date}` : "Recebimento hoje"} de ${formatCurrency(a.amount)} (${a.client_name || a.description}).`,
+          type: 'info',
+          link: "/ContasReceber",
+          date: new Date().toISOString()
+        });
       });
-    });
+    }
 
     // 3. Rejected & Emitted Invoices
     invoices.filter((i: any) => i.status === "Rejeitada").forEach((i: any) => {
@@ -163,7 +181,17 @@ export default function NotificationCenter() {
     });
 
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [products, accountsPayable, accountsReceivable, invoices, notifications]);
+  }, [products, accountsPayable, accountsReceivable, invoices, notifications, company]);
+
+  const filteredAlerts = useMemo(() => {
+    if (activeFilter === 'alert') {
+      return alerts.filter(a => a.type === 'warning' || a.type === 'error');
+    }
+    if (activeFilter === 'info') {
+      return alerts.filter(a => a.type === 'info' || a.type === 'success');
+    }
+    return alerts;
+  }, [alerts, activeFilter]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -185,17 +213,17 @@ export default function NotificationCenter() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative z-[100]" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "relative p-2 rounded-xl transition-all",
-          isOpen ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+          "relative p-2 rounded-xl transition-all cursor-pointer",
+          isOpen ? "bg-blue-50 text-blue-600 ring-2 ring-blue-500/20" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
         )}
       >
         <Bell size={22} />
         {alerts.length > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-pulse">
+          <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-pulse shadow-sm">
             {alerts.length}
           </span>
         )}
@@ -207,7 +235,7 @@ export default function NotificationCenter() {
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute right-0 mt-2 w-[90vw] max-w-[360px] sm:w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-[100]"
+            className="absolute right-0 mt-2 w-[90vw] max-w-[380px] sm:w-96 bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-gray-200/80 overflow-hidden z-[9999]"
           >
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div>
@@ -218,24 +246,56 @@ export default function NotificationCenter() {
                 <button 
                   onClick={() => clearAllMutation.mutate()}
                   className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Limpar tudo"
+                  title="Marcar todas como lidas"
                 >
                   <Trash2 size={16} />
                 </button>
               )}
             </div>
 
+            {alerts.length > 0 && (
+              <div className="px-4 py-2 bg-gray-50/30 border-b border-gray-100 flex gap-2 text-xs font-medium">
+                <button
+                  onClick={() => setActiveFilter('all')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg transition-colors",
+                    activeFilter === 'all' ? "bg-white font-bold text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                  )}
+                >
+                  Todas ({alerts.length})
+                </button>
+                <button
+                  onClick={() => setActiveFilter('alert')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg transition-colors",
+                    activeFilter === 'alert' ? "bg-white font-bold text-amber-600 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                  )}
+                >
+                  Alertas ({alerts.filter(a => a.type === 'warning' || a.type === 'error').length})
+                </button>
+                <button
+                  onClick={() => setActiveFilter('info')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg transition-colors",
+                    activeFilter === 'info' ? "bg-white font-bold text-emerald-600 shadow-sm" : "text-gray-500 hover:text-gray-800"
+                  )}
+                >
+                  Avisos ({alerts.filter(a => a.type === 'info' || a.type === 'success').length})
+                </button>
+              </div>
+            )}
+
             <div className="max-h-[400px] overflow-y-auto">
-              {alerts.length === 0 ? (
+              {filteredAlerts.length === 0 ? (
                 <div className="p-12 text-center space-y-4">
                   <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300">
                     <Bell size={32} />
                   </div>
-                  <p className="text-sm text-gray-500">Tudo limpo por aqui! Nenhuma notificação pendente.</p>
+                  <p className="text-sm text-gray-500">Nenhuma notificação encontrada nesta categoria.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-50">
-                  {alerts.map((alert) => (
+                  {filteredAlerts.map((alert) => (
                     <div 
                       key={alert.id}
                       className="p-4 hover:bg-gray-50 transition-colors group relative"
@@ -282,12 +342,13 @@ export default function NotificationCenter() {
             <div className="p-3 bg-gray-50 border-t border-gray-100 text-center">
               <button 
                 onClick={() => {
-                  navigate("/Suporte");
+                  navigate("/Configuracoes", { state: { tab: "notifications" } });
                   setIsOpen(false);
                 }}
-                className="text-[10px] font-bold text-gray-400 hover:text-blue-600 uppercase tracking-widest transition-colors"
+                className="text-[10px] font-bold text-gray-500 hover:text-orange-600 uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 mx-auto"
               >
-                Central de Ajuda
+                <Bell size={12} />
+                Central de Notificações
               </button>
             </div>
           </motion.div>

@@ -5,41 +5,37 @@ import './index.css';
 
 // Suppress benign Vite HMR websocket connection errors in development environment
 if (typeof window !== 'undefined') {
-  const ignoreErrors = [
-    'WebSocket connection to',
-    'failed to connect to websocket',
-    'WebSocket closed without opened',
-    '[vite]',
-  ];
+  const isWsError = (err: any) => {
+    if (!err) return false;
+    const msg = typeof err === 'string' ? err : (err.message || err.reason || err.stack || String(err));
+    const targetUrl = err.target?.url || err.srcElement?.url || '';
+    return (
+      msg.includes('WebSocket') ||
+      msg.includes('websocket') ||
+      msg.includes('vite') ||
+      msg.includes('ws://') ||
+      msg.includes('wss://') ||
+      targetUrl.includes('ws://') ||
+      targetUrl.includes('wss://') ||
+      err.type === 'close' ||
+      err.name === 'CloseEvent' ||
+      err.constructor?.name === 'CloseEvent'
+    );
+  };
 
   window.addEventListener('error', (event) => {
-    const msg = event.message || '';
-    const errStack = event.error?.stack || '';
-    const errMsg = event.error?.message || '';
-    if (
-      ignoreErrors.some(sub => 
-        msg.includes(sub) || 
-        errStack.includes(sub) || 
-        errMsg.includes(sub)
-      )
-    ) {
+    if (isWsError(event.error) || isWsError(event.message) || isWsError(event.target)) {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
     }
   }, true);
 
   window.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason;
-    const msg = reason?.message || String(reason || '');
-    const stack = reason?.stack || '';
-    if (
-      ignoreErrors.some(sub => 
-        msg.includes(sub) || 
-        stack.includes(sub)
-      )
-    ) {
+    if (isWsError(event.reason) || isWsError(event.target)) {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
     }
   }, true);
 }
@@ -51,7 +47,7 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // Register Service Worker
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(registration => {
       console.log('SW registered: ', registration);

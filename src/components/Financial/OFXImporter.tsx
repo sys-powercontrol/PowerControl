@@ -12,9 +12,67 @@ import {
   Check
 } from "lucide-react";
 import { toast } from "sonner";
-import { parse } from "ofx-js";
 import { formatBR } from "../../lib/dateUtils";
 import { formatCurrency } from "../../lib/currencyUtils";
+
+// Custom browser-safe OFX Parser to avoid Node.js external dependencies warnings/errors
+function parseOFX(ofxContent: string): OFXTransaction[] {
+  const transactions: OFXTransaction[] = [];
+  
+  // Find all <STMTTRN>...</STMTTRN> blocks or <STMTTRN> tags
+  // OFX files can be standard SGML (unclosed tags) or XML (closed tags)
+  const chunks = ofxContent.split(/<STMTTRN>/i);
+  
+  // The first chunk is before any <STMTTRN>, so we skip it.
+  for (let i = 1; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    
+    // We want to extract: TRNTYPE, DTPOSTED, TRNAMT, FITID, MEMO, NAME
+    const trntype = getTagValue(chunk, "TRNTYPE");
+    const dtposted = getTagValue(chunk, "DTPOSTED");
+    const trnamt = getTagValue(chunk, "TRNAMT");
+    const fitid = getTagValue(chunk, "FITID");
+    const memo = getTagValue(chunk, "MEMO");
+    const name = getTagValue(chunk, "NAME");
+    
+    if (dtposted && trnamt) {
+      // OFX date format: YYYYMMDDHHMMSS
+      const year = dtposted.substring(0, 4) || new Date().getFullYear().toString();
+      const month = dtposted.substring(4, 6) || "01";
+      const day = dtposted.substring(6, 8) || "01";
+      const isoDate = `${year}-${month}-${day}T12:00:00Z`;
+      
+      const amt = parseFloat(trnamt.replace(",", ".")); // Handle comma if any
+      
+      transactions.push({
+        id: fitid || Math.random().toString(36).substring(2, 11),
+        type: (trntype || "").toUpperCase() === "CREDIT" ? "CREDIT" : "DEBIT",
+        date: isoDate,
+        amount: isNaN(amt) ? 0 : amt,
+        memo: memo || name || "Transação sem descrição",
+        fitid: fitid || ""
+      });
+    }
+  }
+  
+  return transactions;
+}
+
+function getTagValue(chunk: string, tagName: string): string {
+  // Matches <TAGNAME>VALUE with optional closing tag </TAGNAME> or newline or next tag start <
+  const regex = new RegExp(`<${tagName}>([^<\r\n]*)`, "i");
+  const match = chunk.match(regex);
+  if (match && match[1]) {
+    // Some OFX files have closing tags like <MEMO>TEXT</MEMO>
+    let value = match[1].trim();
+    const closeTagRegex = new RegExp(`</${tagName}>`, "i");
+    if (closeTagRegex.test(value)) {
+      value = value.split(closeTagRegex)[0].trim();
+    }
+    return value;
+  }
+  return "";
+}
 
 interface OFXTransaction {
   id: string;
@@ -145,16 +203,16 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       let score = 0;
       const reasons: string[] = [];
 
-      // Amount match (Crucial - Weight: 70)
+      // Amount match (ScoreValor: 50%)
       if (Math.abs(e.amount) === Math.abs(t.amount)) {
-        score += 70;
+        score += 50;
         reasons.push("Valor idêntico");
       } else if (Math.abs(Math.abs(e.amount) - Math.abs(t.amount)) < 0.05) {
-        score += 40;
+        score += 25;
         reasons.push("Valor aproximado");
       }
 
-      // Date match (Weight: 30)
+      // Date match (ScoreData: 30%)
       const eDate = new Date(e.due_date);
       const tDate = new Date(t.date);
       const diffDays = Math.abs(eDate.getTime() - tDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -169,14 +227,14 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
         score += 5;
       }
 
-      // Description match (Weight: 40)
-      const similarity = getStringSimilarity(t.memo, e.description);
+      // Description match (ScoreDescrição: 20%)
+      const similarity = getStringSimilarity(t.memo, e.description || e.supplier || e.client || "");
       if (similarity > 0.8) {
-        score += 40;
-        reasons.push("Descrição muito similar");
+        score += 20;
+        reasons.push("Descrição idêntica/similar");
       } else if (similarity > 0.4) {
-        score += 15;
-        reasons.push("Descrição similar");
+        score += 10;
+        reasons.push("Descrição parcialmente similar");
       }
 
       // Rule match boost (Weight: 50)
@@ -284,43 +342,14 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
     setIsParsing(true);
     try {
       const text = await file.text();
-      const data = await parse(text);
+      const parsedTransactions = parseOFX(text);
       
-      // Robust navigation of the OFX structure
-      const ofx = data.OFX;
-      if (!ofx) throw new Error("Estrutura OFX inválida");
-
-      const bankMsg = ofx.BANKMSGSRSV1 || ofx.CREDITCARDMSGSRSV1;
-      if (!bankMsg) throw new Error("Mensagens bancárias não encontradas");
-
-      const stmtTrnRs = bankMsg.STMTTRNRS || bankMsg.CCSTMTTRNRS;
-      const stmtRs = Array.isArray(stmtTrnRs) ? stmtTrnRs[0].STMTRS || stmtTrnRs[0].CCSTMTRS : stmtTrnRs.STMTRS || stmtTrnRs.CCSTMTRS;
-      const tranList = stmtRs.BANKTRANLIST?.STMTTRN || stmtRs.CCBANKTRANLIST?.STMTTRN;
-      
-      if (!tranList) {
+      if (parsedTransactions.length === 0) {
         toast.info("Nenhuma transação encontrada no período deste extrato.");
         setTransactions([]);
         return;
       }
       
-      const parsedTransactions: OFXTransaction[] = (Array.isArray(tranList) ? tranList : [tranList]).map((t: any) => {
-        // OFX date format: YYYYMMDDHHMMSS
-        const dateStr = t.DTPOSTED || "";
-        const year = dateStr.substring(0, 4) || new Date().getFullYear().toString();
-        const month = dateStr.substring(4, 6) || "01";
-        const day = dateStr.substring(6, 8) || "01";
-        const isoDate = `${year}-${month}-${day}T12:00:00Z`;
-
-        return {
-          id: t.FITID || Math.random().toString(36).substr(2, 9),
-          type: t.TRNTYPE,
-          date: isoDate,
-          amount: parseFloat(t.TRNAMT),
-          memo: t.MEMO || t.NAME || "Transação sem descrição",
-          fitid: t.FITID
-        };
-      });
-
       setTransactions(parsedTransactions);
       setSelectedTransactions(new Set(parsedTransactions.map(t => t.id)));
       toast.success(`${parsedTransactions.length} transações encontradas.`);

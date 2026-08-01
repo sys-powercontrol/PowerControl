@@ -46,6 +46,11 @@ export default function AccountsReceivable() {
   const [accountToReverse, setAccountToReverse] = useState<string | null>(null);
   const [editingAccount, setEditingAccount] = useState<any>(null);
 
+  // Batch selection states
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
+  const [isBatchReceiveModalOpen, setIsBatchReceiveModalOpen] = useState(false);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+
   const currentCompanyId = api.getCompanyId();
 
   const { data: accountsData = [], isLoading } = useQuery({ 
@@ -66,8 +71,32 @@ export default function AccountsReceivable() {
   });
 
   const bankAccounts = React.useMemo(() => {
-    if (!currentCompanyId) return bankAccountsData;
-    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+    let list = !currentCompanyId ? bankAccountsData : bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+
+    // Deduplicate the list by name, bank name and account number
+    const seen = new Set();
+    list = list.filter((a: any) => {
+      const key = `${a.name}-${a.bank_name || ''}-${a.account_number || ''}`.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Ensure Mercado Pago (API) is in the list
+    const hasMP = list.some((a: any) => a.id === "mercadopago_api" || a.name === "Mercado Pago (API)");
+    if (!hasMP && currentCompanyId) {
+      list = [...list, {
+        id: "mercadopago_api",
+        name: "Mercado Pago (API)",
+        bank_name: "Mercado Pago",
+        agency: "API",
+        account_number: "Integrada",
+        balance: 0,
+        company_id: currentCompanyId
+      }];
+    }
+
+    return list;
   }, [bankAccountsData, currentCompanyId]);
 
   const { data: cashiersData = [] } = useQuery({ 
@@ -215,6 +244,73 @@ export default function AccountsReceivable() {
   const handleEdit = (acc: any) => {
     setEditingAccount(acc);
     setIsModalOpen(true);
+  };
+
+  const toggleSelectAccount = (id: string) => {
+    setSelectedAccountIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedAccountIds.size === filteredAccounts.length) {
+      setSelectedAccountIds(new Set());
+    } else {
+      setSelectedAccountIds(new Set(filteredAccounts.map((a: any) => a.id)));
+    }
+  };
+
+  const handleBatchReceiveConfirm = async () => {
+    if (!selectedAccountId) {
+      toast.error("Selecione uma conta bancária ou caixa para crédito.");
+      return;
+    }
+    if (selectedAccountIds.size === 0) return;
+
+    setIsBatchProcessing(true);
+    const [type, accountId] = selectedAccountId.split(':');
+    const { processAccountReceipt } = await import("../lib/finance");
+
+    let successCount = 0;
+    for (const id of Array.from(selectedAccountIds)) {
+      try {
+        const currentAccount = accounts.find((a: any) => a.id === id);
+        if (currentAccount && currentAccount.status !== "Recebido") {
+          await processAccountReceipt(id, currentAccount, { type, id: accountId });
+          
+          if (currentAccount.is_recurring && currentAccount.frequency) {
+            const nextDueDate = calculateNextDueDate(currentAccount.due_date, currentAccount.frequency as Frequency);
+            await api.post("accountsReceivable", {
+              ...currentAccount,
+              id: undefined,
+              due_date: nextDueDate,
+              status: "Pendente",
+              receipt_date: undefined,
+              bank_account_id: undefined,
+              cashier_id: undefined,
+              created_at: new Date().toISOString()
+            });
+          }
+          successCount++;
+        }
+      } catch (err) {
+        console.error(`Erro ao receber conta ${id}:`, err);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
+    queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+    queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+    queryClient.invalidateQueries({ queryKey: ["movements"] });
+
+    toast.success(`${successCount} contas recebidas com sucesso em lote!`);
+    setIsBatchProcessing(false);
+    setIsBatchReceiveModalOpen(false);
+    setSelectedAccountIds(new Set());
+    setSelectedAccountId("");
   };
 
   const handleReceive = (id: string) => {
@@ -459,19 +555,48 @@ if (!canView) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200">
-        {["Pendentes", "Recebidas", "Atrasadas"].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 ${
-              activeTab === tab ? "border-green-600 text-green-600" : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      {/* Tabs and Batch Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 gap-4">
+        <div className="flex">
+          {["Pendentes", "Recebidas", "Atrasadas"].map(tab => (
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab);
+                setSelectedAccountIds(new Set());
+              }}
+              className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 ${
+                activeTab === tab ? "border-green-600 text-green-600" : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {activeTab !== "Recebidas" && filteredAccounts.length > 0 && (
+          <div className="flex items-center gap-3 pb-2 sm:pb-0">
+            <button
+              onClick={toggleSelectAll}
+              className="text-xs font-bold text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              {selectedAccountIds.size === filteredAccounts.length ? "Desmarcar Todos" : "Selecionar Todos"}
+            </button>
+            {selectedAccountIds.size > 0 && (
+              <button
+                onClick={() => setIsBatchReceiveModalOpen(true)}
+                className="px-4 py-1.5 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 transition-all shadow-md shadow-green-100 flex items-center gap-1.5"
+              >
+                <CheckCircle2 size={14} />
+                Baixar Selecionadas ({selectedAccountIds.size}) - {formatCurrency(
+                  filteredAccounts
+                    .filter((a: any) => selectedAccountIds.has(a.id))
+                    .reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* List */}
@@ -483,8 +608,16 @@ if (!canView) {
             Nenhuma conta encontrada nesta categoria.
           </div>
         ) : filteredAccounts.map((acc: any) => (
-          <div key={acc.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div key={acc.id} className={`bg-white p-6 rounded-2xl border transition-all shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 ${selectedAccountIds.has(acc.id) ? "border-green-400 bg-green-50/20" : "border-gray-100"}`}>
             <div className="flex items-center gap-4">
+              {activeTab !== "Recebidas" && (
+                <input
+                  type="checkbox"
+                  checked={selectedAccountIds.has(acc.id)}
+                  onChange={() => toggleSelectAccount(acc.id)}
+                  className="w-5 h-5 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                />
+              )}
               <div className={`p-3 rounded-xl ${acc.status === "Recebido" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
                 <TrendingUp size={24} />
               </div>
@@ -577,6 +710,66 @@ if (!canView) {
           </div>
         ))}
       </div>
+
+      {/* Modal Recebimento em Lote */}
+      {isBatchReceiveModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsBatchReceiveModalOpen(false)} />
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold">Baixa em Lote</h2>
+                <p className="text-xs text-gray-500">{selectedAccountIds.size} conta(s) selecionada(s)</p>
+              </div>
+              <button onClick={() => setIsBatchReceiveModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-green-50 rounded-2xl border border-green-100">
+                <p className="text-xs font-bold text-green-700 uppercase mb-1">Valor Total a Receber</p>
+                <p className="text-2xl font-bold text-green-700">
+                  {formatCurrency(
+                    filteredAccounts
+                      .filter((a: any) => selectedAccountIds.has(a.id))
+                      .reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+                  )}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">Conta para Crédito Única *</label>
+                <select 
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                >
+                  <option value="">Selecione uma conta...</option>
+                  <optgroup label="Contas Bancárias">
+                    {bankAccounts.map((a: any) => (
+                      <option key={`bank:${a.id}`} value={`bank:${a.id}`}>{a.name} ({formatCurrency(a.balance || 0)})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Caixas">
+                    {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
+                      <option key={`cashier:${c.id}`} value={`cashier:${c.id}`}>{c.name} ({formatCurrency(c.balance || 0)})</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-6">
+                <button onClick={() => setIsBatchReceiveModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
+                <button 
+                  onClick={handleBatchReceiveConfirm} 
+                  disabled={isBatchProcessing || !selectedAccountId}
+                  className="px-8 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 disabled:opacity-50"
+                >
+                  {isBatchProcessing ? "Processando..." : "Confirmar Baixa em Lote"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Recebimento */}
       {isReceiveModalOpen && (

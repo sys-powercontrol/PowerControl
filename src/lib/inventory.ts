@@ -416,8 +416,23 @@ export const inventory = {
         const current_stock = previous_stock + item.quantity;
         stockUpdates.set(item.id, current_stock);
 
+        // Custo Médio Ponderado
+        const previous_cost = Number(productData.cost) || Number(productData.cost_price) || 0;
+        const purchase_unit_cost = Number(item.cost) || Number(item.cost_price) || Number(item.price) || 0;
+
+        let new_weighted_cost = purchase_unit_cost;
+        if (previous_stock > 0 && current_stock > 0 && purchase_unit_cost > 0) {
+          const total_previous_val = previous_stock * previous_cost;
+          const total_new_val = item.quantity * purchase_unit_cost;
+          new_weighted_cost = (total_previous_val + total_new_val) / current_stock;
+        }
+
         const productRef = doc(db, "products", item.id);
-        transaction.update(productRef, { stock_quantity: current_stock });
+        transaction.update(productRef, { 
+          stock_quantity: current_stock,
+          cost: new_weighted_cost,
+          cost_price: new_weighted_cost
+        });
 
         // Record movement
         const movementRef = doc(collection(db, "inventory_movements"));

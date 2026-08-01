@@ -18,6 +18,36 @@ import axios from "axios";
 import { motion } from "motion/react";
 import { formatCurrency } from "../../lib/currencyUtils";
 
+function formatCardNumber(value: string) {
+  const v = value.replace(/\D/g, "");
+  return v.replace(/(\d{4})(?=\d)/g, "$1 ").substring(0, 19);
+}
+
+function formatCardExpiry(value: string) {
+  const v = value.replace(/\D/g, "");
+  if (v.length > 2) {
+    const month = v.substring(0, 2);
+    const year = v.substring(2, 4);
+    const valMonth = Math.min(parseInt(month) || 1, 12);
+    const formattedMonth = valMonth < 10 && valMonth > 0 ? "0" + valMonth : valMonth.toString();
+    return `${formattedMonth}/${year}`.substring(0, 5);
+  }
+  return v.substring(0, 5);
+}
+
+function formatCVV(value: string) {
+  return value.replace(/\D/g, "").substring(0, 4);
+}
+
+function detectCardBrand(number: string): "visa" | "mastercard" | "amex" | "elo" | "unknown" {
+  const clean = number.replace(/\s+/g, "");
+  if (/^4/.test(clean)) return "visa";
+  if (/^5[1-5]/.test(clean)) return "mastercard";
+  if (/^3[47]/.test(clean)) return "amex";
+  if (/^(636368|438935|504175|451416|5067|4576|4011)/.test(clean)) return "elo";
+  return "unknown";
+}
+
 interface PaymentGatewayProps {
   amount: number;
   method: string;
@@ -78,7 +108,7 @@ export function PaymentGateway({
            safeCompCity.substring(0, 15),
            "PDV" + suffix
         );
-      } catch (_err) {
+      } catch {
         return qrCode;
       }
     }
@@ -162,7 +192,7 @@ export function PaymentGateway({
           setStatus("EXPIRED");
           toast.error("O pagamento expirou. Tente novamente.");
         }
-      } catch (_err) {
+      } catch {
         // Ignorar erros de rede no polling
       }
     }, 5000);
@@ -181,6 +211,35 @@ export function PaymentGateway({
   const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentId) return;
+
+    const cleanNumber = cardData.number.replace(/\s+/g, "");
+    if (cleanNumber.length < 15) {
+      toast.error("Número do cartão inválido! Digite um cartão válido.");
+      return;
+    }
+    if (cardData.expiry.length !== 5) {
+      toast.error("Data de validade inválida! Use o formato MM/AA.");
+      return;
+    }
+    const [monthStr, yearStr] = cardData.expiry.split("/");
+    const month = parseInt(monthStr);
+    const year = parseInt("20" + yearStr);
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+
+    if (month < 1 || month > 12) {
+      toast.error("Mês de validade inválido!");
+      return;
+    }
+    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+      toast.error("O cartão informado está expirado!");
+      return;
+    }
+    if (cardData.cvv.length < 3) {
+      toast.error("CVV inválido! O código de segurança deve ter 3 ou 4 dígitos.");
+      return;
+    }
 
     setStatus("PROCESSING");
     try {
@@ -329,14 +388,30 @@ export function PaymentGateway({
               <form onSubmit={handleCardSubmit} className="space-y-4 text-left">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500 uppercase">Número do Cartão</label>
-                  <input 
-                    type="text" 
-                    placeholder="0000 0000 0000 0000"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={cardData.number}
-                    onChange={(e) => setCardData({...cardData, number: e.target.value})}
-                    required
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="0000 0000 0000 0000"
+                      className="w-full pl-4 pr-16 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                      value={cardData.number}
+                      onChange={(e) => setCardData({...cardData, number: formatCardNumber(e.target.value)})}
+                      required
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
+                      {detectCardBrand(cardData.number) === "visa" && (
+                        <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wider">Visa</span>
+                      )}
+                      {detectCardBrand(cardData.number) === "mastercard" && (
+                        <span className="text-[10px] font-extrabold text-red-600 bg-red-50 px-2 py-0.5 rounded-md uppercase tracking-wider">Master</span>
+                      )}
+                      {detectCardBrand(cardData.number) === "amex" && (
+                        <span className="text-[10px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-md uppercase tracking-wider">Amex</span>
+                      )}
+                      {detectCardBrand(cardData.number) === "elo" && (
+                        <span className="text-[10px] font-extrabold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-md uppercase tracking-wider">Elo</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500 uppercase">Nome no Cartão</label>
@@ -355,9 +430,9 @@ export function PaymentGateway({
                     <input 
                       type="text" 
                       placeholder="MM/AA"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
                       value={cardData.expiry}
-                      onChange={(e) => setCardData({...cardData, expiry: e.target.value})}
+                      onChange={(e) => setCardData({...cardData, expiry: formatCardExpiry(e.target.value)})}
                       required
                     />
                   </div>
@@ -366,9 +441,9 @@ export function PaymentGateway({
                     <input 
                       type="text" 
                       placeholder="123"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
                       value={cardData.cvv}
-                      onChange={(e) => setCardData({...cardData, cvv: e.target.value})}
+                      onChange={(e) => setCardData({...cardData, cvv: formatCVV(e.target.value)})}
                       required
                     />
                   </div>

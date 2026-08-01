@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { calculateDiff } from "../lib/utils/diff";
@@ -23,8 +24,12 @@ import ConfirmationModal from "../components/ConfirmationModal";
 export default function Configurations() {
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
+  const location = useLocation();
   const companyId = api.getCompanyId() || user?.company_id;
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState(() => {
+    const searchParams = new URLSearchParams(location.search);
+    return location.state?.tab || searchParams.get("tab") || "general";
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -47,10 +52,15 @@ export default function Configurations() {
     enabled: !!companyId,
     queryFn: () => api.get("companies", companyId as string) 
   });
-  const company = companyData || {};
+  const company = useMemo(() => companyData || {}, [companyData]);
 
   const [disableImages, setDisableImages] = useState(company.disable_product_images === "true" || company.disable_product_images === true);
   const [allowNegativeStock, setAllowNegativeStock] = useState(company.allow_negative_stock === "true" || company.allow_negative_stock === true);
+
+  const [notifyLowStock, setNotifyLowStock] = useState(company.notify_low_stock !== false && company.notify_low_stock !== "false");
+  const [notifyNewSale, setNotifyNewSale] = useState(company.notify_new_sale !== false && company.notify_new_sale !== "false");
+  const [notifyOverdue, setNotifyOverdue] = useState(company.notify_overdue_account !== false && company.notify_overdue_account !== "false");
+  const [notifyCommission, setNotifyCommission] = useState(company.notify_commission !== false && company.notify_commission !== "false");
 
   useEffect(() => {
     setTimeout(() => setDisableImages(company.disable_product_images === "true" || company.disable_product_images === true), 0);
@@ -59,6 +69,34 @@ export default function Configurations() {
   useEffect(() => {
     setTimeout(() => setAllowNegativeStock(company.allow_negative_stock === "true" || company.allow_negative_stock === true), 0);
   }, [company.allow_negative_stock]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setNotifyLowStock(company.notify_low_stock !== false && company.notify_low_stock !== "false");
+      setNotifyNewSale(company.notify_new_sale !== false && company.notify_new_sale !== "false");
+      setNotifyOverdue(company.notify_overdue_account !== false && company.notify_overdue_account !== "false");
+      setNotifyCommission(company.notify_commission !== false && company.notify_commission !== "false");
+    }, 0);
+  }, [company]);
+
+  const handleSendTestNotification = async () => {
+    try {
+      await api.post("notifications", {
+        company_id: companyId,
+        title: "Notificação de Teste",
+        message: "O sistema de notificações do ERP está ativo e operacional!",
+        type: "info",
+        link: "/Configuracoes",
+        read: false,
+        status: "unread",
+        created_at: new Date().toISOString()
+      });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success("Notificação de teste enviada com sucesso! Verifique o sininho no topo.");
+    } catch {
+      toast.error("Erro ao enviar notificação de teste.");
+    }
+  };
 
   
 
@@ -154,6 +192,13 @@ export default function Configurations() {
       if (user?.role === 'master') {
         data.disable_product_images = disableImages;
       }
+    }
+
+    if (activeTab === "notifications") {
+      data.notify_low_stock = notifyLowStock;
+      data.notify_new_sale = notifyNewSale;
+      data.notify_overdue_account = notifyOverdue;
+      data.notify_commission = notifyCommission;
     }
 
     if (activeTab === "fiscal") {
@@ -347,31 +392,76 @@ if (!canManage) {
 
               {activeTab === "notifications" && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-4 pb-4 border-b border-gray-50">
-                    <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
-                      <Bell size={24} />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-100">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3.5 bg-gradient-to-br from-orange-50 to-amber-100 text-orange-600 rounded-2xl shadow-sm border border-orange-100">
+                        <Bell size={26} className="text-orange-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-lg font-bold text-gray-900">Notificações do Sistema</h2>
+                          <span className="px-2.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full uppercase tracking-wider">Ativo</span>
+                        </div>
+                        <p className="text-sm text-gray-500">Gerencie alertas em tempo real de estoque, vendas e lançamentos financeiros.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-lg font-bold">Notificações</h2>
-                      <p className="text-sm text-gray-500">Alertas de estoque, vendas e financeiro.</p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSendTestNotification}
+                      className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl font-bold shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 active:scale-[0.98] transition-all text-xs flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer"
+                      title="Enviar uma notificação de teste para verificar a Central de Alertas"
+                    >
+                      <Bell size={16} className="animate-pulse" />
+                      Enviar Notificação de Teste
+                    </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
                     {[
-                      { id: "notify_low_stock", name: "Alerta de Estoque Baixo", desc: "Notificar quando um produto atingir o estoque mínimo." },
-                      { id: "notify_new_sale", name: "Nova Venda Realizada", desc: "Receber notificação a cada venda concluída." },
-                      { id: "notify_overdue_account", name: "Contas Vencidas", desc: "Alertar sobre contas a pagar/receber vencidas." }
+                      { 
+                        id: "notify_low_stock", 
+                        name: "Alerta de Estoque Baixo", 
+                        desc: "Notificar automaticamente no menu superior quando produtos atingirem ou ficarem abaixo do estoque mínimo.",
+                        checked: notifyLowStock,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNotifyLowStock(e.target.checked)
+                      },
+                      { 
+                        id: "notify_new_sale", 
+                        name: "Nova Venda Concluída", 
+                        desc: "Registrar notificação a cada venda realizada com sucesso no caixa/PDV.",
+                        checked: notifyNewSale,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNotifyNewSale(e.target.checked)
+                      },
+                      { 
+                        id: "notify_overdue_account", 
+                        name: "Contas Vencidas e Vencendo Hoje", 
+                        desc: "Alertar sobre contas a pagar e a receber com vencimento no dia ou em atraso.",
+                        checked: notifyOverdue,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNotifyOverdue(e.target.checked)
+                      },
+                      { 
+                        id: "notify_commission", 
+                        name: "Pagamento de Comissões", 
+                        desc: "Notificar quando houver fechamento ou pagamento de comissões de vendedores.",
+                        checked: notifyCommission,
+                        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNotifyCommission(e.target.checked)
+                      }
                     ].map(n => (
-                      <div key={n.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
-                        <div>
-                          <p className="font-bold text-gray-900">{n.name}</p>
-                          <p className="text-xs text-gray-500">{n.desc}</p>
+                      <label key={n.id} className="flex items-center justify-between p-4.5 bg-gray-50/70 hover:bg-orange-50/30 hover:border-orange-200/80 rounded-2xl transition-all cursor-pointer border border-gray-100 group shadow-sm">
+                        <div className="pr-4 space-y-0.5">
+                          <p className="font-bold text-gray-900 group-hover:text-orange-950 transition-colors">{n.name}</p>
+                          <p className="text-xs text-gray-500 leading-relaxed">{n.desc}</p>
                         </div>
-                        <div className="w-10 h-5 bg-gray-200 rounded-full relative cursor-pointer">
-                          <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full" />
+                        <div className="relative shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={n.checked}
+                            onChange={n.onChange}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 shadow-inner"></div>
                         </div>
-                      </div>
+                      </label>
                     ))}
                   </div>
                 </div>

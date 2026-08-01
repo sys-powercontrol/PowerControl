@@ -9,7 +9,7 @@ export const queryClient = new QueryClient({
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
       staleTime: 1000 * 60 * 5, // 5 minutes
       refetchOnWindowFocus: false,
-      retry: (failureCount, _error: any) => {
+      retry: (failureCount) => {
         if (!navigator.onLine) return false;
         return failureCount < 2;
       }

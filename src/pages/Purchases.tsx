@@ -70,8 +70,32 @@ export default function Purchases() {
   }, [suppliersData, currentCompanyId]);
 
   const bankAccounts = useMemo(() => {
-    if (!currentCompanyId) return bankAccountsData;
-    return bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+    let list = !currentCompanyId ? bankAccountsData : bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+
+    // Deduplicate the list by name, bank name and account number
+    const seen = new Set();
+    list = list.filter((a: any) => {
+      const key = `${a.name}-${a.bank_name || ''}-${a.account_number || ''}`.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Ensure Mercado Pago (API) is in the list
+    const hasMP = list.some((a: any) => a.id === "mercadopago_api" || a.name === "Mercado Pago (API)");
+    if (!hasMP && currentCompanyId) {
+      list = [...list, {
+        id: "mercadopago_api",
+        name: "Mercado Pago (API)",
+        bank_name: "Mercado Pago",
+        agency: "API",
+        account_number: "Integrada",
+        balance: 0,
+        company_id: currentCompanyId
+      }];
+    }
+
+    return list;
   }, [bankAccountsData, currentCompanyId]);
 
   const cashiers = useMemo(() => {

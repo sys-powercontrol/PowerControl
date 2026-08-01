@@ -349,7 +349,7 @@ if (!canView) {
             </h3>
           </div>
           <div className="h-[300px] w-full min-w-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={reportData.timelineData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -380,7 +380,7 @@ if (!canView) {
             Lucro por Categoria
           </h3>
           <div className="h-[300px] w-full min-w-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
                   data={reportData.categoryData}

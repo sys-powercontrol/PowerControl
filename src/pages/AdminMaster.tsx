@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import { 
   Crown, 
   Users, 
@@ -28,7 +30,10 @@ import {
   Power,
   Trash2,
   UserCheck,
-  UserX
+  UserX,
+  Copy,
+  Check,
+  ExternalLink
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -98,6 +103,110 @@ export default function AdminMaster() {
       toast.success("Ticket atualizado!");
     }
   });
+
+  const [isTestingMP, setIsTestingMP] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+  const { data: apiConfig, refetch: refetchConfig } = useQuery({
+    queryKey: ["api_configurations", "global"],
+    queryFn: async () => {
+      try {
+        const docRef = doc(db, "api_configurations", "global");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          return docSnap.data();
+        }
+      } catch (err) {
+        console.error("Error loading global api configs:", err);
+      }
+      return {
+        sefaz_production: "",
+        sefaz_homologation: "",
+        payment_token: "",
+        google_maps_key: "",
+        mercadopago_public_key: "",
+        mercadopago_access_token: "",
+        mercadopago_sandbox: true,
+        mercadopago_statement_descriptor: "POWERCONTROL",
+        mercadopago_enable_pix: true,
+        mercadopago_enable_card: true,
+        mercadopago_enable_boleto: true
+      };
+    },
+    enabled: activeTab === "APIs"
+  });
+
+  const saveApiConfigMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const docRef = doc(db, "api_configurations", "global");
+      await setDoc(docRef, {
+        ...data,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+
+      await api.log({
+        action: 'UPDATE',
+        entity: 'api_configurations',
+        entity_id: 'global',
+        description: `Atualizou as configurações globais de API`,
+        metadata: { ...data, payment_token: '***', google_maps_key: '***', mercadopago_access_token: '***' }
+      });
+    },
+    onSuccess: () => {
+      refetchConfig();
+      toast.success("Configurações de APIs salvas com sucesso!");
+    },
+    onError: (err: any) => {
+      toast.error(`Erro ao salvar configurações: ${err.message}`);
+    }
+  });
+
+  const handleApiConfigSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+    
+    const configData = {
+      sefaz_production: data.sefaz_production || "",
+      sefaz_homologation: data.sefaz_homologation || "",
+      payment_token: data.payment_token || "",
+      google_maps_key: data.google_maps_key || "",
+      mercadopago_public_key: data.mercadopago_public_key || "",
+      mercadopago_access_token: data.mercadopago_access_token || "",
+      mercadopago_sandbox: data.mercadopago_sandbox === "on",
+      mercadopago_statement_descriptor: (data.mercadopago_statement_descriptor as string || "POWERCONTROL").substring(0, 16).toUpperCase(),
+      mercadopago_enable_pix: data.mercadopago_enable_pix === "on",
+      mercadopago_enable_card: data.mercadopago_enable_card === "on",
+      mercadopago_enable_boleto: data.mercadopago_enable_boleto === "on"
+    };
+
+    saveApiConfigMutation.mutate(configData);
+  };
+
+  const handleTestMercadoPago = async (token: string) => {
+    if (!token) {
+      toast.error("Por favor, informe o Token de Acesso para testar!");
+      return;
+    }
+    setIsTestingMP(true);
+    try {
+      const response = await fetch("/api/payments/test-mp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token })
+      });
+      const resData = await response.json();
+      if (response.ok && resData.valid) {
+        toast.success("Conexão com Mercado Pago estabelecida com sucesso!");
+      } else {
+        toast.error(`Erro de conexão: ${resData.error || "Token inválido ou expirado"}`);
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao testar conexão: ${err.message}`);
+    } finally {
+      setIsTestingMP(false);
+    }
+  };
 
   const searchCEP = async () => {
     const cleanCEP = zipCode.replace(/\D/g, "");
@@ -491,7 +600,7 @@ if (currentUser?.role !== 'master') {
                 </div>
               </div>
               <div className="h-[300px] w-full min-w-0">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={revenueByDay}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis 
@@ -540,7 +649,7 @@ if (currentUser?.role !== 'master') {
                 </div>
               </div>
               <div className="h-[300px] w-full min-w-0 flex items-center">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={revenueByCompany}
@@ -1032,40 +1141,306 @@ if (currentUser?.role !== 'master') {
       )}
 
       {activeTab === "APIs" && (
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-              <Zap size={24} />
+        <div className="space-y-8">
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                <Zap size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Configurações Globais de API</h2>
+                <p className="text-sm text-gray-500">Configure as chaves e endpoints para todo o sistema.</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Configurações Globais de API</h2>
-              <p className="text-sm text-gray-500">Configure as chaves e endpoints para todo o sistema.</p>
-            </div>
-          </div>
 
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">SEFAZ Endpoint (Produção)</label>
-              <input type="text" placeholder="https://nfe.sefaz.gov.br/..." className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">SEFAZ Endpoint (Homologação)</label>
-              <input type="text" placeholder="https://hom.nfe.sefaz.gov.br/..." className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Token Gateway Pagamento</label>
-              <input type="password" placeholder="••••••••••••••••" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">API Key Google Maps</label>
-              <input type="password" placeholder="••••••••••••••••" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="md:col-span-2 pt-4">
-              <button type="button" onClick={() => toast.success("Configurações salvas!")} className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100">
-                Salvar Configurações
-              </button>
-            </div>
-          </form>
+            <form onSubmit={handleApiConfigSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">SEFAZ Endpoint (Produção)</label>
+                  <input 
+                    type="text" 
+                    name="sefaz_production"
+                    defaultValue={apiConfig?.sefaz_production || ""} 
+                    placeholder="https://nfe.sefaz.gov.br/..." 
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">SEFAZ Endpoint (Homologação)</label>
+                  <input 
+                    type="text" 
+                    name="sefaz_homologation"
+                    defaultValue={apiConfig?.sefaz_homologation || ""} 
+                    placeholder="https://hom.nfe.sefaz.gov.br/..." 
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">Token Gateway Pagamento</label>
+                  <input 
+                    type="password" 
+                    name="payment_token"
+                    defaultValue={apiConfig?.payment_token || ""} 
+                    placeholder="••••••••••••••••" 
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">API Key Google Maps</label>
+                  <input 
+                    type="password" 
+                    name="google_maps_key"
+                    defaultValue={apiConfig?.google_maps_key || ""} 
+                    placeholder="••••••••••••••••" 
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+              </div>
+
+              {/* Mercado Pago API Configuration Section */}
+              <div className="border-t border-gray-100 pt-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                      <svg className="h-7 w-auto shrink-0 select-none" viewBox="0 0 160 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="28.8" height="28.8" rx="14.4" fill="#009EE3"/>
+                        <path d="M18.5 11.5C18.0 11.0 17.2 11.0 16.7 11.4C16.2 11.8 15.9 12.4 16.0 13.0C16.0 13.1 15.9 13.2 15.8 13.2C15.8 13.2 15.7 13.2 15.7 13.2L14.0 12.0C13.7 11.7 13.2 11.7 12.8 12.0L10.4 14.0C9.5 14.8 9.5 16.1 10.4 16.9L12.6 18.7C13.0 19.0 13.5 19.0 13.8 18.7L15.3 17.5C15.4 17.4 15.5 17.4 15.6 17.5C15.6 17.5 15.6 17.6 15.6 17.6C15.6 18.4 16.2 19.1 17.0 19.2C17.7 19.3 18.4 19.0 18.8 18.4C19.3 17.7 19.3 16.8 18.7 16.1C18.9 15.9 19.0 15.6 19.0 15.3C19.0 15.0 18.8 14.7 18.6 14.5C18.9 14.1 19.1 13.6 19.0 13.1C19.0 12.6 18.8 12.1 18.5 11.5Z" fill="white"/>
+                        <text x="36" y="21" fill="#009EE3" fontSize="16" fontWeight="800" fontFamily="system-ui, -apple-system, sans-serif" letterSpacing="-0.4">mercado</text>
+                        <text x="105" y="21" fill="#002F6C" fontSize="16" fontWeight="800" fontFamily="system-ui, -apple-system, sans-serif" letterSpacing="-0.4">pago</text>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">Configuração da API Mercado Pago</h3>
+                      <p className="text-xs text-gray-500">Configure as chaves e preferências para o processamento automatizado de Pix, Cartão e Boletos.</p>
+                    </div>
+                  </div>
+
+                  {/* Integration Status Badge */}
+                  <div className="flex items-center gap-2">
+                    {apiConfig?.mercadopago_public_key && apiConfig?.mercadopago_access_token ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-200">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        Configurado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        Incompleto
+                      </span>
+                    )}
+
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border ${
+                      apiConfig?.mercadopago_sandbox ?? true
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}>
+                      {apiConfig?.mercadopago_sandbox ?? true ? "Modo Sandbox" : "Modo Produção"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Public Key */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700">Chave Pública (Public Key)</label>
+                    <input 
+                      type="text" 
+                      name="mercadopago_public_key"
+                      defaultValue={apiConfig?.mercadopago_public_key || ""} 
+                      placeholder="APP_USR-..." 
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm" 
+                    />
+                  </div>
+
+                  {/* Access Token */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700">Token de Acesso (Access Token)</label>
+                    <input 
+                      type="password" 
+                      id="mp_access_token_input"
+                      name="mercadopago_access_token"
+                      defaultValue={apiConfig?.mercadopago_access_token || ""} 
+                      placeholder="APP_USR-..." 
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm" 
+                    />
+                  </div>
+
+                  {/* Statement Descriptor */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700">Nome na Fatura (Statement Descriptor)</label>
+                    <input 
+                      type="text" 
+                      name="mercadopago_statement_descriptor"
+                      defaultValue={apiConfig?.mercadopago_statement_descriptor || "POWERCONTROL"} 
+                      maxLength={16}
+                      placeholder="Ex: POWERCONTROL" 
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm uppercase" 
+                    />
+                    <p className="text-[10px] text-gray-500">Máximo de 16 caracteres. Será impresso na fatura do cartão do cliente.</p>
+                  </div>
+
+                  {/* Sandbox Toggle */}
+                  <div className="flex items-center pt-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        name="mercadopago_sandbox" 
+                        defaultChecked={apiConfig?.mercadopago_sandbox ?? true} 
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300" 
+                      />
+                      <div>
+                        <span className="text-sm font-bold text-gray-700">Modo Sandbox (Testes)</span>
+                        <p className="text-xs text-gray-500 font-medium">Use credenciais de testes e simule pagamentos sem transações financeiras reais.</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Preferred Payment Methods */}
+                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                  <h4 className="text-sm font-bold text-gray-800">Métodos de Pagamento Habilitados</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label className="flex items-start gap-3 p-4 bg-white border border-gray-150 rounded-xl cursor-pointer hover:border-purple-200 transition-all select-none">
+                      <input 
+                        type="checkbox" 
+                        name="mercadopago_enable_pix" 
+                        defaultChecked={apiConfig?.mercadopago_enable_pix ?? true} 
+                        className="mt-1 w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-gray-300"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-gray-800 block">PIX (Instantâneo)</span>
+                        <span className="text-[10px] text-gray-500">Gera código QR Code e Copia/Cola</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-4 bg-white border border-gray-150 rounded-xl cursor-pointer hover:border-blue-200 transition-all select-none">
+                      <input 
+                        type="checkbox" 
+                        name="mercadopago_enable_card" 
+                        defaultChecked={apiConfig?.mercadopago_enable_card ?? true} 
+                        className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-gray-800 block">Cartão de Crédito</span>
+                        <span className="text-[10px] text-gray-500">Processamento em tempo real</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-4 bg-white border border-gray-150 rounded-xl cursor-pointer hover:border-green-200 transition-all select-none">
+                      <input 
+                        type="checkbox" 
+                        name="mercadopago_enable_boleto" 
+                        defaultChecked={apiConfig?.mercadopago_enable_boleto ?? true} 
+                        className="mt-1 w-4 h-4 text-green-600 rounded focus:ring-green-500 border-gray-300"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-gray-800 block">Boleto Bancário</span>
+                        <span className="text-[10px] text-gray-500">Compensação em até 48 horas</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Webhook & Notification Integration */}
+                <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 space-y-3">
+                  <h4 className="text-sm font-bold text-blue-900 flex items-center gap-1.5">
+                    <Zap size={16} /> URL do Webhook (Retorno Automático de Status)
+                  </h4>
+                  <p className="text-xs text-blue-800 leading-relaxed">
+                    Copie a URL abaixo e configure no seu Painel de Desenvolvedores do Mercado Pago (em Configurações de Webhooks) para garantir que as faturas no sistema sejam dadas como **Pagas** automaticamente quando o cliente fizer a transferência.
+                  </p>
+                  
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value={`${window.location.origin}/api/webhooks/mercadopago`} 
+                      className="flex-1 px-4 py-2 bg-white border border-blue-200 rounded-xl text-xs font-mono text-blue-950 focus:outline-none" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/mercadopago`);
+                        setCopiedWebhook(true);
+                        toast.success("URL do Webhook copiada para a área de transferência!");
+                        setTimeout(() => setCopiedWebhook(false), 3000);
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shrink-0"
+                    >
+                      {copiedWebhook ? <Check size={14} /> : <Copy size={14} />}
+                      {copiedWebhook ? "Copiado!" : "Copiar"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Connection Test and Integration Instructions */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-150">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-gray-800">Verificar Credenciais</h4>
+                    <p className="text-xs text-gray-500">Garanta que o token informado é capaz de falar com o Mercado Pago.</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isTestingMP}
+                    onClick={() => {
+                      const tokenInput = document.getElementById("mp_access_token_input") as HTMLInputElement;
+                      handleTestMercadoPago(tokenInput?.value || "");
+                    }}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 text-xs shadow-md shadow-blue-100"
+                  >
+                    {isTestingMP ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Validando com Mercado Pago...
+                      </>
+                    ) : (
+                      "Testar Conexão com MP"
+                    )}
+                  </button>
+                </div>
+
+                {/* Guide Instructions block */}
+                <details className="group border border-gray-200 rounded-2xl overflow-hidden bg-white">
+                  <summary className="flex items-center justify-between px-5 py-4 cursor-pointer select-none bg-gray-50 text-gray-800 font-bold text-xs hover:bg-gray-100 transition-colors">
+                    <span>Passo a Passo: Como obter suas chaves de API?</span>
+                    <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                  </summary>
+                  <div className="p-5 border-t border-gray-200 space-y-3.5 text-xs text-gray-600 leading-relaxed">
+                    <p className="font-semibold text-gray-800">Siga o roteiro para integrar em menos de 5 minutos:</p>
+                    <ol className="list-decimal list-inside space-y-2">
+                      <li>Acesse o <a href="https://developers.mercadopago.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold inline-flex items-center gap-0.5">Painel de Desenvolvedores do Mercado Pago <ExternalLink size={10} /></a>.</li>
+                      <li>Vá em <strong>Suas Aplicações</strong> ou crie uma nova aplicação (ex: PDV PowerControl).</li>
+                      <li>No menu lateral esquerdo, clique em <strong>Credenciais de Produção</strong> ou <strong>Credenciais de Teste (Sandbox)</strong>.</li>
+                      <li>Copie a <strong>Chave Pública (Public Key)</strong> e o <strong>Token de Acesso (Access Token)</strong> correspondentes e cole-os nos campos acima.</li>
+                      <li>No menu lateral, vá em <strong>Webhooks</strong> e clique em <strong>Criar nova notificação</strong>.</li>
+                      <li>Cole a URL de webhook acima no campo de endereço de retorno.</li>
+                      <li>Em eventos, assinale o tipo <strong>payment (pagamentos)</strong> para receber avisos de confirmação e clique em Salvar.</li>
+                    </ol>
+                  </div>
+                </details>
+              </div>
+
+              <div className="md:col-span-2 pt-6 border-t border-gray-100 flex justify-end">
+                <button 
+                  type="submit" 
+                  disabled={saveApiConfigMutation.isPending}
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-100 flex items-center gap-2"
+                >
+                  {saveApiConfigMutation.isPending ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} />
+                      Salvar Todas as Configurações
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

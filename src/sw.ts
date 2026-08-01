@@ -28,6 +28,7 @@ const STORE_SALES = "sales";
 const STORE_CLIENTS = "clients";
 const STORE_ACCOUNTS_PAYABLE = "accounts_payable";
 const STORE_PURCHASES = "purchases";
+const STORE_SALES_FAILED = "sales_failed_sync";
 
 const HEARTBEAT_INTERVAL = 60000; // 1 minute
 const BASE_BACKOFF = 2000; // 2 seconds
@@ -70,7 +71,7 @@ function shouldRetry(retryCount: number = 0, lastAttempt: number = 0): boolean {
 
 async function syncSales() {
   try {
-    const db = await openDB(DB_NAME, 2);
+    const db = await openDB(DB_NAME, 3);
     const pendingSales: PendingSale[] = await db.getAll(STORE_SALES);
 
     if (pendingSales.length === 0) return;
@@ -98,6 +99,8 @@ async function syncSales() {
         
         if (retries >= MAX_RETRIES) {
           console.error(`Venda ${sale.id} atingiu limite de tentativas e será abandonada.`);
+          const errMsg = error instanceof Error ? error.message : "Erro desconhecido";
+          await db.put(STORE_SALES_FAILED, { ...sale, error_reason: errMsg });
           await db.delete(STORE_SALES, sale.id);
           abandonedCount++;
         } else {
@@ -131,7 +134,7 @@ async function syncSales() {
 
 async function syncGenericEntities(storeName: string, processFunction: (entity: any) => Promise<void>) {
   try {
-    const db = await openDB(DB_NAME, 2);
+    const db = await openDB(DB_NAME, 3);
     const pendingEntities = await db.getAll(storeName);
 
     if (pendingEntities.length === 0) return;

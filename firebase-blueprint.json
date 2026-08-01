@@ -343,6 +343,22 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["company_id", "name", "bank_name"]
+    },
+    "ApiConfiguration": {
+      "title": "API Configuration",
+      "description": "Global API keys and configurations",
+      "type": "object",
+      "properties": {
+        "sefaz_production": { "type": "string" },
+        "sefaz_homologation": { "type": "string" },
+        "payment_token": { "type": "string" },
+        "google_maps_key": { "type": "string" },
+        "mercadopago_public_key": { "type": "string" },
+        "mercadopago_access_token": { "type": "string" },
+        "mercadopago_sandbox": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
@@ -368,6 +384,7 @@
     "certificates": { "schema": "Certificate", "description": "Digital certificates A1" },
     "notifications": { "schema": "Notification", "description": "System notifications" },
     "invoices": { "schema": "Invoice", "description": "Fiscal invoices" },
-    "support_tickets": { "schema": "SupportTicket", "description": "Support tickets" }
+    "support_tickets": { "schema": "SupportTicket", "description": "Support tickets" },
+    "api_configurations": { "schema": "ApiConfiguration", "description": "Global API keys and configurations" }
   }
 }

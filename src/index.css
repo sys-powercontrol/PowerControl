@@ -24,12 +24,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #E5E7EB;
+  background: #155dfc;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #D1D5DB;
+  background: #0f4ec4;
 }
 
 .no-scrollbar::-webkit-scrollbar {

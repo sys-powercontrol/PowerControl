@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useNavigate } from "react-router-dom";
+import { offlineStore } from "../lib/offlineStore";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 import { formatCurrency } from "../lib/currencyUtils";
 import { 
@@ -11,9 +13,11 @@ import {
   ChevronDown,
   Shield,
   Trash2,
-  FileText
+  FileText,
+  AlertTriangle,
+  RotateCcw
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import ExportButton from "../components/ExportButton";
@@ -23,11 +27,59 @@ type DateFilterType = "day" | "week" | "month" | "custom" | "all";
 
 export default function SalesHistory() {
   const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilterType>("day");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [failedSales, setFailedSales] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadFailedSales = async () => {
+      try {
+        const list = await offlineStore.getFailedSales();
+        setFailedSales(list);
+      } catch (err) {
+        console.error("Erro ao carregar vendas com falha offline:", err);
+      }
+    };
+    loadFailedSales();
+  }, []);
+
+  const handleRecoverSale = async (sale: any) => {
+    try {
+      const recoveryData = {
+        items: sale.items || [],
+        client_id: sale.saleData?.client_id || sale.client_id,
+        client_name: sale.saleData?.client_name || sale.client_name,
+        client_document: sale.saleData?.client_document || sale.client_document,
+        seller_id: sale.saleData?.seller_id || sale.seller_id,
+        seller_name: sale.saleData?.seller_name || sale.seller_name,
+        discount: sale.saleData?.discount || sale.discount,
+        payment_method: sale.saleData?.payment_method || sale.payment_method,
+      };
+      localStorage.setItem("pdv_recovered_sale", JSON.stringify(recoveryData));
+      
+      await offlineStore.deleteFailedSale(sale.id);
+      setFailedSales(prev => prev.filter(s => s.id !== sale.id));
+      
+      toast.success("Venda enviada para o caixa! Redirecionando...");
+      navigate("/Vender");
+    } catch {
+      toast.error("Erro ao recuperar venda.");
+    }
+  };
+
+  const handleDiscardFailedSale = async (id: string) => {
+    try {
+      await offlineStore.deleteFailedSale(id);
+      setFailedSales(prev => prev.filter(s => s.id !== id));
+      toast.success("Venda descartada com sucesso.");
+    } catch {
+      toast.error("Erro ao descartar venda.");
+    }
+  };
 
   const canView = hasPermission('sales.view') || user?.role === 'master';
   const canDelete = hasPermission('sales.delete') || user?.role === 'master' || user?.role === 'admin';
@@ -182,6 +234,69 @@ if (!canView) {
 
   return (
     <div className="space-y-8" id="sales-history-content">
+      {/* Failed Offline Sales (Recovery Center) */}
+      {failedSales.length > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-200 p-6 rounded-3xl space-y-4 hide-on-print">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-amber-900">Vendas Offline com Falha de Sincronismo</h2>
+              <p className="text-sm text-amber-700">
+                Estas vendas falharam ao sincronizar com o servidor devido a conflitos (ex: divergência de estoque ou validação). 
+                Você pode <strong>Recuperar a Venda</strong> para carregar os itens de volta no caixa, ajustar as quantidades ou produtos manualmente e tentar finalizar de novo.
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            {failedSales.map((sale: any) => (
+              <div key={sale.id} className="bg-white p-4 rounded-2xl border border-amber-100 shadow-sm flex flex-col justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full uppercase">
+                      Falha na Sincronização
+                    </span>
+                    <span className="text-xs text-gray-400 font-medium">
+                      {new Date(sale.timestamp || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800">
+                      Venda para: {sale.saleData?.client_name || sale.client_name || "Consumidor"}
+                    </h4>
+                    <p className="text-xs text-red-600 bg-red-50/50 p-2 rounded-lg border border-red-100 mt-1.5 flex items-start gap-1">
+                      <strong className="shrink-0">Motivo:</strong> <span>{sale.error_reason || "Erro desconhecido de validação"}</span>
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-500 space-y-1 pt-1">
+                    <p><strong>Itens:</strong> {sale.items?.map((it: any) => `${it.quantity}x ${it.name}`).join(", ") || "Sem itens"}</p>
+                    <p><strong>Total:</strong> {formatCurrency(sale.saleData?.total || sale.total || 0)} ({sale.saleData?.payment_method || sale.payment_method})</p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleRecoverSale(sale)}
+                    className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <RotateCcw size={14} /> Recuperar Venda
+                  </button>
+                  <button
+                    onClick={() => handleDiscardFailedSale(sale.id)}
+                    className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-colors"
+                    title="Descartar permanentemente"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Histórico de Vendas</h1>

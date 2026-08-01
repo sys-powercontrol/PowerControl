@@ -22,33 +22,119 @@ import {
 } from "recharts";
 import { Link } from "react-router-dom";
 
-const StatCard = ({ title, value, icon: Icon, color, subtitle, progress }: any) => (
-    <div className={`p-6 rounded-2xl bg-gradient-to-br ${color} text-white shadow-lg`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2 bg-white/20 rounded-lg">
+const StatCard = ({ title, value, icon: Icon, color, subtitle, progress }: any) => {
+  const getTheme = (col: string) => {
+    if (col.includes("green")) {
+      return {
+        cardBg: "bg-gradient-to-br from-white to-emerald-50/10 border border-emerald-100",
+        iconBg: "bg-emerald-500 text-white shadow-md shadow-emerald-100/50",
+        valueColor: "text-emerald-600",
+        waveColor: "#10b981",
+        type: "wave",
+      };
+    }
+    if (col.includes("orange")) {
+      return {
+        cardBg: "bg-gradient-to-br from-white to-orange-50/10 border border-orange-100",
+        iconBg: "bg-orange-500 text-white shadow-md shadow-orange-100/50",
+        valueColor: "text-orange-500",
+        waveColor: "#f97316",
+        type: "wave",
+      };
+    }
+    if (col.includes("blue")) {
+      return {
+        cardBg: "bg-gradient-to-br from-white to-blue-50/10 border border-blue-100",
+        iconBg: "bg-blue-600 text-white shadow-md shadow-blue-100/50",
+        valueColor: "text-blue-600",
+        waveColor: "#2563eb",
+        type: "wave",
+      };
+    }
+    if (col.includes("purple") || col.includes("violet")) {
+      return {
+        cardBg: "bg-gradient-to-br from-white to-violet-50/15 border border-violet-100",
+        iconBg: "bg-violet-600 text-white shadow-md shadow-violet-100/50",
+        valueColor: "text-violet-600",
+        type: "cash-register",
+      };
+    }
+    return {
+      cardBg: "bg-white border border-gray-100",
+      iconBg: "bg-gray-500 text-white",
+      valueColor: "text-gray-900",
+      type: "none",
+    };
+  };
+
+  const theme = getTheme(color);
+
+  return (
+    <div className={`p-6 rounded-[24px] relative overflow-hidden transition-all duration-300 hover:shadow-md ${theme.cardBg}`}>
+      <div className="flex items-center gap-4 z-10 relative">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${theme.iconBg}`}>
           <Icon size={24} />
         </div>
-      </div>
-      <h3 className="text-sm font-medium opacity-80">{title}</h3>
-      <p className="text-3xl font-bold mt-1">{value}</p>
-      {progress !== undefined ? (
-        <div className="mt-4 space-y-1">
-          <div className="flex justify-between text-[10px] opacity-80">
-            <span>Progresso da Meta</span>
-            <span>{Math.min(100, Math.round(progress))}%</span>
-          </div>
-          <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-white transition-all duration-500" 
-              style={{ width: `${Math.min(100, progress)}%` }}
-            />
-          </div>
+        <div className="flex-1 min-w-0 text-left">
+          <h3 className="text-sm font-semibold text-gray-500 tracking-tight leading-none">{title}</h3>
+          <p className={`text-2xl font-extrabold mt-1 tracking-tight leading-none ${theme.valueColor}`}>{value}</p>
+          
+          {progress !== undefined ? (
+            <div className="mt-3 space-y-1">
+              <div className="flex justify-between text-[10px] font-bold text-gray-500">
+                <span>Progresso da Meta</span>
+                <span className={theme.valueColor}>{Math.min(100, Math.round(progress))}%</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 ${color.includes("orange") ? "bg-orange-500" : "bg-blue-600"}`} 
+                  style={{ width: `${Math.min(100, progress)}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 mt-1.5 leading-none font-medium">{subtitle}</p>
+          )}
         </div>
-      ) : (
-        <p className="text-xs mt-2 opacity-70">{subtitle}</p>
+      </div>
+
+      {theme.type === "wave" && progress === undefined && (
+        <svg className="absolute bottom-0 left-0 right-0 w-full h-8 pointer-events-none select-none" viewBox="0 0 400 50" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id={`grad-${title.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={theme.waveColor} stopOpacity="0.08" />
+              <stop offset="100%" stopColor={theme.waveColor} stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path 
+            d="M 0 38 C 30 38, 50 15, 80 20 C 110 25, 130 42, 170 42 C 210 42, 240 18, 280 20 C 320 22, 350 38, 400 25 L 400 50 L 0 50 Z" 
+            fill={`url(#grad-${title.replace(/\s+/g, '')})`}
+          />
+          <path 
+            d="M 0 38 C 30 38, 50 15, 80 20 C 110 25, 130 42, 170 42 C 210 42, 240 18, 280 20 C 320 22, 350 38, 400 25" 
+            fill="none" 
+            stroke={theme.waveColor} 
+            strokeWidth="1.8" 
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
+
+      {theme.type === "cash-register" && (
+        <svg className="absolute -right-2 -bottom-2 w-24 h-24 text-violet-500/10 pointer-events-none select-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+          <path d="M4 19h16a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1Z" />
+          <path d="M6 14V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6" />
+          <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+          <path d="M12 14v4" />
+          <path d="M9 17h6" />
+          <circle cx="8" cy="11" r="0.75" />
+          <circle cx="12" cy="11" r="0.75" />
+          <circle cx="16" cy="11" r="0.75" />
+        </svg>
       )}
     </div>
   );
+};
 
 export default function SellerDashboard() {
   const { user } = useAuth();
@@ -184,7 +270,7 @@ export default function SellerDashboard() {
             <h2 className="font-bold text-lg">Meu Desempenho (7 dias)</h2>
           </div>
           <div className="h-[300px] w-full min-w-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9CA3AF'}} />

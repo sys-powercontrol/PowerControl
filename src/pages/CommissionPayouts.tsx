@@ -91,10 +91,30 @@ export default function CommissionPayouts() {
         description: `Pagamento de comissão realizado para ${sale.seller_name} - Venda #${sale.id.substr(0, 8).toUpperCase()}`,
         metadata: { amount: sale.commission_amount }
       });
+
+      // 4. Create Notification
+      try {
+        const companyData: any = queryClient.getQueryData(["company", currentCompanyId]);
+        if (!companyData || (companyData.notify_commission !== false && companyData.notify_commission !== "false")) {
+          await api.post("notifications", {
+            company_id: currentCompanyId,
+            title: "Comissão Paga",
+            message: `Pagamento de comissão de R$ ${Number(sale.commission_amount || 0).toFixed(2)} registrado para ${sale.seller_name}.`,
+            type: "info",
+            link: "/Comissoes",
+            read: false,
+            status: "unread",
+            created_at: new Date().toISOString()
+          });
+        }
+      } catch {
+        // Silently handle
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
       toast.success("Pagamento de comissão registrado!");
     },
     onError: (error: any) => {

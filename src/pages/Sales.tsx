@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { inventory } from "../lib/inventory";
 import { fiscal, FiscalOperation } from "../lib/fiscal";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import { 
   ShoppingCart, 
   User, 
@@ -18,7 +20,8 @@ import {
   Package,
   Lock,
   CreditCard,
-  FileText
+  FileText,
+  ReceiptText
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +33,23 @@ import { subDays } from "date-fns";
 import { PaymentGateway } from "../components/Sales/PaymentGateway";
 import { offlineStore } from "../lib/offlineStore";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { fiscalApi } from "../services/fiscalApi";
+
+function getOfflineId() {
+  return "offline-" + Date.now();
+}
+
+function getSimulatedReference(saleId: string) {
+  return `sim_${saleId}_${Date.now()}`;
+}
+
+function getRandomNumber(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function getRandomAccessKey() {
+  return Array.from({length: 44}, () => Math.floor(Math.random() * 10)).join("");
+}
 
 export default function Sales() {
   const { user, hasPermission } = useAuth();
@@ -50,6 +70,135 @@ export default function Sales() {
   const [activeTab, setActiveTab] = useState<"items" | "cart">("items");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hasPending, setHasPending] = useState(false);
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isEmittingNfce, setIsEmittingNfce] = useState(false);
+  const [nfceUrl, setNfceUrl] = useState<string | null>(null);
+  const [nfceErrorMsg, setNfceErrorMsg] = useState<string | null>(null);
+
+  const validateCheckout = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    if (!selectedClient) {
+      errors.client = "Selecione um cliente.";
+    }
+    if (!selectedSeller) {
+      errors.seller = "Selecione um vendedor.";
+    }
+    if (cart.length === 0) {
+      errors.cart = "O carrinho está vazio.";
+    }
+    
+    if (paymentMethod === "Dinheiro" && !selectedCashier) {
+      errors.cashier = "Selecione o caixa destino.";
+    }
+    
+    if (["PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"].includes(paymentMethod) && !selectedBankAccount) {
+      errors.bankAccount = "Selecione a conta bancária destino.";
+    }
+    
+    if (["A Prazo", "Fiado"].includes(paymentMethod)) {
+      if (!dueDate) {
+        errors.dueDate = "Selecione a data de vencimento.";
+      } else {
+        const dDate = new Date(dueDate + "T00:00:00");
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        if (dDate < today) {
+          errors.dueDate = "O vencimento não pode ser no passado.";
+        }
+      }
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const emitNfceMutation = useMutation({
+    mutationFn: async () => {
+      if (!lastSale) throw new Error("Nenhuma venda concluída para emitir");
+      
+      const client = clients.find((c: any) => c.id === lastSale.client_id) || { name: lastSale.client_name };
+      
+      if (!company?.fiscal_token) {
+        const simulatedReference = getSimulatedReference(lastSale.id);
+        const accessKey = getRandomAccessKey();
+        const simulatedInvoice = {
+          sale_id: lastSale.id,
+          type: "NFCe",
+          client_name: lastSale.client_name,
+          client_document: lastSale.client_document || "Consumidor Final",
+          company_id: currentCompanyId,
+          number: getRandomNumber(10000, 100000),
+          series: "001",
+          total: lastSale.total,
+          status: "Emitida",
+          emission_date: new Date().toISOString(),
+          reference: simulatedReference,
+          protocol: "135150000000000",
+          access_key: accessKey,
+          pdf_url: `https://www.nfe.fazenda.gov.br/portal/consultaRecipiente.aspx?chave=${accessKey}`,
+          xml_url: ""
+        };
+        const docRef = await api.post("invoices", simulatedInvoice) as any;
+        return { ...simulatedInvoice, id: docRef.id };
+      }
+
+      const fiscalConfig = {
+        token: company.fiscal_token,
+        environment: company.fiscal_environment || "sandbox",
+        provider: company.fiscal_provider || "FocusNFe"
+      };
+
+      const result = await fiscalApi.emit(fiscalConfig as any, {
+        sale_id: lastSale.id,
+        type: "NFCe",
+        client,
+        items: lastSale.items,
+        total: lastSale.total,
+        company
+      });
+
+      const invoiceData = {
+        sale_id: lastSale.id,
+        type: "NFCe",
+        company_id: currentCompanyId,
+        number: result.protocol ? parseInt(result.protocol.slice(-6)) : getRandomNumber(10000, 100000),
+        series: "001",
+        client_name: lastSale.client_name,
+        client_document: lastSale.client_document || "Consumidor Final",
+        total: lastSale.total,
+        status: result.status === "processando" ? "Pendente" : "Emitida",
+        emission_date: new Date().toISOString(),
+        reference: result.reference,
+        protocol: result.protocol,
+        access_key: result.access_key,
+        pdf_url: (result as any).pdf_url || `https://www.nfe.fazenda.gov.br/portal/consultaRecipiente.aspx?chave=${result.access_key}`,
+        xml_url: (result as any).xml_url
+      };
+
+      const docRef = await api.post("invoices", invoiceData) as any;
+      return { ...invoiceData, id: docRef.id };
+    },
+    onMutate: () => {
+      setIsEmittingNfce(true);
+      setNfceErrorMsg(null);
+      setNfceUrl(null);
+    },
+    onSuccess: (invoice: any) => {
+      setIsEmittingNfce(false);
+      toast.success("Nota Fiscal emitida com sucesso!");
+      if (invoice.pdf_url) {
+        setNfceUrl(invoice.pdf_url);
+      }
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+    onError: (err: any) => {
+      setIsEmittingNfce(false);
+      setNfceErrorMsg(err.message || "Erro desconhecido ao emitir NFC-e");
+      toast.error(`Falha na emissão: ${err.message}`);
+    }
+  });
 
   useEffect(() => {
     const checkPending = async () => {
@@ -103,7 +252,7 @@ export default function Sales() {
     queryFn: () => api.get("cashiers"),
     enabled: !!currentCompanyId
   });
-  const { data: bankAccountsData = [] } = useQuery({ 
+  const { data: bankAccountsData = [], isSuccess: isBankAccountsSuccess } = useQuery({ 
     queryKey: ["bankAccounts", currentCompanyId], 
     queryFn: () => api.get("bankAccounts"),
     enabled: !!currentCompanyId
@@ -114,30 +263,49 @@ export default function Sales() {
     enabled: !!currentCompanyId
   });
 
-  const products = useMemo(() => {
-    if (!currentCompanyId) return productsData;
-    return productsData.filter((item: any) => item.company_id === currentCompanyId);
-  }, [productsData, currentCompanyId]);
+  const products = !currentCompanyId 
+    ? productsData 
+    : productsData.filter((item: any) => item.company_id === currentCompanyId);
 
-  const services = useMemo(() => {
-    if (!currentCompanyId) return servicesData;
-    return servicesData.filter((item: any) => item.company_id === currentCompanyId);
-  }, [servicesData, currentCompanyId]);
+  const services = !currentCompanyId 
+    ? servicesData 
+    : servicesData.filter((item: any) => item.company_id === currentCompanyId);
 
-  const clients = useMemo(() => {
-    if (!currentCompanyId) return clientsData;
-    return clientsData.filter((item: any) => item.company_id === currentCompanyId);
-  }, [clientsData, currentCompanyId]);
+  const clients = !currentCompanyId 
+    ? clientsData 
+    : clientsData.filter((item: any) => item.company_id === currentCompanyId);
 
-  const cashiers = useMemo(() => {
-    if (!currentCompanyId) return cashiersData;
-    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
-  }, [cashiersData, currentCompanyId]);
+  const cashiers = !currentCompanyId 
+    ? cashiersData 
+    : cashiersData.filter((item: any) => item.company_id === currentCompanyId);
 
-  const bankAccounts = useMemo(() => {
-    const list = !currentCompanyId 
+  const bankAccounts = (() => {
+    let list = !currentCompanyId 
       ? bankAccountsData 
       : bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
+
+    // Deduplicate the list by name, bank name and account number to prevent UI cluttering from old duplicate entries
+    const seen = new Set();
+    list = list.filter((a: any) => {
+      const key = `${a.name}-${a.bank_name || ''}-${a.account_number || ''}`.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Ensure Mercado Pago (API) is in the list
+    const hasMP = list.some((a: any) => a.id === "mercadopago_api" || a.name === "Mercado Pago (API)");
+    if (!hasMP && currentCompanyId) {
+      list = [...list, {
+        id: "mercadopago_api",
+        name: "Mercado Pago (API)",
+        bank_name: "Mercado Pago",
+        agency: "API",
+        account_number: "Integrada",
+        balance: 0,
+        company_id: currentCompanyId
+      }];
+    }
 
     if (list.length === 0 && currentCompanyId) {
       return [{
@@ -148,50 +316,81 @@ export default function Sales() {
         account_number: "12345-6",
         balance: 0,
         company_id: currentCompanyId
+      }, {
+        id: "mercadopago_api",
+        name: "Mercado Pago (API)",
+        bank_name: "Mercado Pago",
+        agency: "API",
+        account_number: "Integrada",
+        balance: 0,
+        company_id: currentCompanyId
       }];
     }
     return list;
-  }, [bankAccountsData, currentCompanyId]);
+  })();
 
-  // Auto-create default bank account in Firestore if none exists
+  // Auto-create default bank account and Mercado Pago (API) account in Firestore if missing
   useEffect(() => {
-    if (currentCompanyId && bankAccountsData.length === 0) {
-      const createDefaultAccount = async () => {
-        try {
-          await api.post("bankAccounts", {
-            name: "Banco Padrão (PIX)",
-            bank_name: "Banco do Brasil",
-            agency: "0001",
-            account_number: "12345-6",
-            balance: 0,
-            active: true,
-            company_id: currentCompanyId,
-            created_at: new Date().toISOString()
-          });
-          queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-        } catch (err) {
-          console.error("Error creating default bank account:", err);
-        }
-      };
-      createDefaultAccount();
-    }
-  }, [bankAccountsData, currentCompanyId, queryClient]);
+    if (isBankAccountsSuccess && currentCompanyId) {
+      const hasDefault = bankAccountsData.some((a: any) => a.name === "Banco Padrão (PIX)" || a.id === "default_bank_account");
+      const hasMP = bankAccountsData.some((a: any) => a.id === "mercadopago_api" || a.name === "Mercado Pago (API)");
 
-  const sellers = useMemo(() => {
-    if (!currentCompanyId) return sellersData;
-    return sellersData.filter((item: any) => item.company_id === currentCompanyId);
-  }, [sellersData, currentCompanyId]);
+      if (!hasDefault || !hasMP) {
+        const createMissingAccounts = async () => {
+          let shouldRefetch = false;
+          try {
+            if (!hasDefault) {
+              await setDoc(doc(db, "bankAccounts", "default_bank_account"), {
+                name: "Banco Padrão (PIX)",
+                bank_name: "Banco do Brasil",
+                agency: "0001",
+                account_number: "12345-6",
+                balance: 0,
+                active: true,
+                company_id: currentCompanyId,
+                created_at: new Date().toISOString()
+              }, { merge: true });
+              shouldRefetch = true;
+            }
+            if (!hasMP) {
+              await setDoc(doc(db, "bankAccounts", "mercadopago_api"), {
+                name: "Mercado Pago (API)",
+                bank_name: "Mercado Pago",
+                agency: "API",
+                account_number: "Integrada",
+                balance: 0,
+                active: true,
+                company_id: currentCompanyId,
+                created_at: new Date().toISOString()
+              }, { merge: true });
+              shouldRefetch = true;
+            }
+            if (shouldRefetch) {
+              queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+            }
+          } catch (err) {
+            console.error("Error creating default bank accounts:", err);
+          }
+        };
+        createMissingAccounts();
+      }
+    }
+  }, [isBankAccountsSuccess, bankAccountsData, currentCompanyId, queryClient]);
+
+  const sellers = !currentCompanyId 
+    ? sellersData 
+    : sellersData.filter((item: any) => item.company_id === currentCompanyId);
 
   const [selectedBankAccount, setSelectedBankAccount] = useState<any>(null);
 
-  const hasOpenCashier = useMemo(() => {
+  const hasOpenCashier = (() => {
     const today = getTodayBR();
     return cashiers.some((c: any) => 
       c.status === "Aberto" && 
       c.opened_by_id === user?.id &&
       c.opened_at?.startsWith(today)
     );
-  }, [cashiers, user?.id]);
+  })();
 
   // Auto-select the open cashier if there is only one
   useEffect(() => {
@@ -223,6 +422,49 @@ export default function Sales() {
   });
 
   const company = companyData;
+
+  // Load recovered failed sync sale
+  useEffect(() => {
+    const recovered = localStorage.getItem("pdv_recovered_sale");
+    if (recovered) {
+      try {
+        const sale = JSON.parse(recovered);
+        setTimeout(() => {
+          if (sale.items && sale.items.length > 0) {
+            setCart(sale.items);
+          }
+          if (sale.client_id) {
+            const client = clients.find((c: any) => c.id === sale.client_id);
+            if (client) {
+              setSelectedClient(client);
+            } else if (sale.client_name) {
+              setSelectedClient({ id: sale.client_id, name: sale.client_name, document: sale.client_document || "" });
+            }
+          }
+          if (sale.seller_id) {
+            const seller = sellers.find((s: any) => s.id === sale.seller_id);
+            if (seller) {
+              setSelectedSeller(seller);
+            } else if (sale.seller_name) {
+              setSelectedSeller({ id: sale.seller_id, name: sale.seller_name });
+            }
+          }
+          if (typeof sale.discount === "number") {
+            setDiscount(sale.discount);
+          }
+          if (sale.payment_method) {
+            setPaymentMethod(sale.payment_method);
+          }
+          setActiveTab("cart"); // Automatically focus cart tab for review/adjustments!
+          toast.success("Venda recuperada carregada no carrinho! Ajuste os itens ou quantidades se necessário.");
+        }, 0);
+      } catch (e) {
+        console.error("Erro ao carregar venda recuperada:", e);
+      } finally {
+        localStorage.removeItem("pdv_recovered_sale");
+      }
+    }
+  }, [clients, sellers]);
 
   const filteredItems = useMemo(() => {
     const p = products.map((item: any) => ({ ...item, type: 'product' }));
@@ -325,7 +567,13 @@ export default function Sales() {
       // Therefore, the totalFiscalValue is just the sum of item.taxes.total_value.
       const totalFiscalValue = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_value, 0);
       
-      const commissionAmount = (totalFiscalValue * (selectedSeller.commission_rate || 0)) / 100;
+      const commissionAmount = itemsWithTaxes.reduce((acc, item) => {
+        const itemVal = item.taxes?.total_value ?? (item.price * item.quantity - (item.discount_amount || 0));
+        const rate = (item.commission_rate !== undefined && item.commission_rate !== null && item.commission_rate !== "")
+          ? Number(item.commission_rate)
+          : (selectedSeller?.commission_rate || 0);
+        return acc + (itemVal * rate) / 100;
+      }, 0);
 
       if (isNaN(totalFiscalValue) || totalFiscalValue < 0) {
         throw new Error("Valor total da venda inválido.");
@@ -355,7 +603,7 @@ export default function Sales() {
 
       if (!navigator.onLine) {
         await offlineStore.saveSale(saleData, itemsWithTaxes, user);
-        return { id: "offline-" + Date.now(), ...saleData, isOffline: true };
+        return { id: getOfflineId(), ...saleData, isOffline: true };
       }
 
       const sale = await inventory.processSale(saleData, itemsWithTaxes, user);
@@ -367,6 +615,26 @@ export default function Sales() {
         description: `Finalizou venda #${sale.id.substr(0, 8).toUpperCase()} para ${selectedClient.name}`,
         metadata: { total, paymentMethod }
       });
+
+      try {
+        const companyData: any = queryClient.getQueryData(["company", user?.company_id]);
+        if (!companyData || (companyData.notify_new_sale !== false && companyData.notify_new_sale !== "false")) {
+          api.post("notifications", {
+            company_id: user?.company_id,
+            title: "Nova Venda Realizada",
+            message: `Venda #${sale.id.substr(0, 8).toUpperCase()} (R$ ${saleData.total.toFixed(2)}) realizada para ${selectedClient.name}.`,
+            type: "success",
+            link: "/HistoricoVendas",
+            read: false,
+            status: "unread",
+            created_at: new Date().toISOString()
+          }).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["notifications"] });
+          }).catch(() => {});
+        }
+      } catch {
+        // Silently handle
+      }
       
       return sale;
     },
@@ -494,8 +762,11 @@ if (!canCreate) {
               <User size={16} /> Cliente *
             </label>
             <select 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-              onChange={(e) => setSelectedClient(clients.find((c: any) => c.id === e.target.value))}
+              className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${validationErrors.client ? "border-red-500 focus:ring-red-500" : "border-gray-100"}`}
+              onChange={(e) => {
+                setSelectedClient(clients.find((c: any) => c.id === e.target.value));
+                setValidationErrors(prev => ({ ...prev, client: "" }));
+              }}
               value={selectedClient?.id || ""}
             >
               <option value="">Selecione um cliente...</option>
@@ -503,6 +774,9 @@ if (!canCreate) {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            {validationErrors.client && (
+              <p className="text-xs text-red-500 mt-1">{validationErrors.client}</p>
+            )}
           </div>
 
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
@@ -510,8 +784,11 @@ if (!canCreate) {
               <User size={16} /> Vendedor *
             </label>
             <select 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-              onChange={(e) => setSelectedSeller(sellers.find((s: any) => s.id === e.target.value))}
+              className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${validationErrors.seller ? "border-red-500 focus:ring-red-500" : "border-gray-100"}`}
+              onChange={(e) => {
+                setSelectedSeller(sellers.find((s: any) => s.id === e.target.value));
+                setValidationErrors(prev => ({ ...prev, seller: "" }));
+              }}
               value={selectedSeller?.id || ""}
             >
               <option value="">Selecione um vendedor...</option>
@@ -519,6 +796,9 @@ if (!canCreate) {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+            {validationErrors.seller && (
+              <p className="text-xs text-red-500 mt-1">{validationErrors.seller}</p>
+            )}
           </div>
         </div>
 
@@ -627,7 +907,14 @@ if (!canCreate) {
       {/* Sidebar Summary */}
       <div className={`space-y-6 ${activeTab !== "cart" ? "hidden lg:block" : ""}`}>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 sticky top-8">
-          <h2 className="font-bold text-xl">Resumo</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="font-bold text-xl">Resumo</h2>
+            {validationErrors.cart && (
+              <span className="text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg">
+                {validationErrors.cart}
+              </span>
+            )}
+          </div>
 
           <div className="space-y-4">
             <div>
@@ -635,7 +922,10 @@ if (!canCreate) {
               <select 
                 className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+                onChange={(e) => {
+                  setPaymentMethod(e.target.value);
+                  setValidationErrors({});
+                }}
               >
                 <option value="Dinheiro">Dinheiro</option>
                 <option value="Cartão de Crédito">Cartão de Crédito</option>
@@ -651,10 +941,11 @@ if (!canCreate) {
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Caixa Destino *</label>
                 <select 
-                  className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`w-full mt-1 px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${validationErrors.cashier ? "border-red-500 focus:ring-red-500" : "border-gray-100"}`}
                   onChange={(e) => {
                     const cashier = cashiers.find((c: any) => c.id === e.target.value);
                     setSelectedCashier(cashier || null);
+                    setValidationErrors(prev => ({ ...prev, cashier: "" }));
                   }}
                   value={selectedCashier?.id || ""}
                 >
@@ -663,15 +954,19 @@ if (!canCreate) {
                     <option key={c.id} value={c.id}>{c.name} ({formatCurrency(c.balance || 0)})</option>
                   ))}
                 </select>
+                {validationErrors.cashier && (
+                  <p className="text-xs text-red-500 mt-1">{validationErrors.cashier}</p>
+                )}
               </div>
             ) : (paymentMethod === "PIX" || paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito" || paymentMethod === "Boleto") ? (
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Conta Bancária Destino *</label>
                 <select 
-                  className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`w-full mt-1 px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${validationErrors.bankAccount ? "border-red-500 focus:ring-red-500" : "border-gray-100"}`}
                   onChange={(e) => {
                     const account = bankAccounts.find((a: any) => a.id === e.target.value);
                     setSelectedBankAccount(account || null);
+                    setValidationErrors(prev => ({ ...prev, bankAccount: "" }));
                   }}
                   value={selectedBankAccount?.id || ""}
                 >
@@ -680,6 +975,9 @@ if (!canCreate) {
                     <option key={a.id} value={a.id}>{a.name} ({formatCurrency(a.balance || 0)})</option>
                   ))}
                 </select>
+                {validationErrors.bankAccount && (
+                  <p className="text-xs text-red-500 mt-1">{validationErrors.bankAccount}</p>
+                )}
               </div>
             ) : null}
 
@@ -688,11 +986,17 @@ if (!canCreate) {
                 <label className="text-xs font-bold text-gray-500 uppercase">Data de Vencimento *</label>
                 <input 
                   type="date" 
-                  className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`w-full mt-1 px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${validationErrors.dueDate ? "border-red-500 focus:ring-red-500" : "border-gray-100"}`}
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={(e) => {
+                    setDueDate(e.target.value);
+                    setValidationErrors(prev => ({ ...prev, dueDate: "" }));
+                  }}
                   required
                 />
+                {validationErrors.dueDate && (
+                  <p className="text-xs text-red-500 mt-1">{validationErrors.dueDate}</p>
+                )}
               </div>
             )}
 
@@ -744,8 +1048,8 @@ if (!canCreate) {
             {paymentMethod === "PIX" && (
               <button 
                 onClick={() => {
-                  if (!selectedBankAccount) {
-                    toast.error("Selecione a conta bancária de destino antes de gerar o QR Code!");
+                  if (!validateCheckout()) {
+                    toast.error("Preencha todos os campos obrigatórios antes de prosseguir!");
                     return;
                   }
                   setShowPaymentGateway(true);
@@ -759,8 +1063,8 @@ if (!canCreate) {
             {(paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito") && (
               <button 
                 onClick={() => {
-                  if (!selectedBankAccount) {
-                    toast.error("Selecione a conta bancária de destino antes de iniciar o pagamento!");
+                  if (!validateCheckout()) {
+                    toast.error("Preencha todos os campos obrigatórios antes de prosseguir!");
                     return;
                   }
                   setShowPaymentGateway(true);
@@ -772,7 +1076,13 @@ if (!canCreate) {
               </button>
             )}
             <button 
-              onClick={() => finalizeSale.mutate()}
+              onClick={() => {
+                if (!validateCheckout()) {
+                  toast.error("Preencha todos os campos obrigatórios marcados em vermelho.");
+                  return;
+                }
+                finalizeSale.mutate();
+              }}
               disabled={finalizeSale.isPending || (paymentMethod === "PIX" && !showPaymentGateway) || ((paymentMethod === "Cartão de Crédito" || paymentMethod === "Cartão de Débito") && !showPaymentGateway)}
               className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-lg shadow-green-100 disabled:opacity-50"
             >
@@ -800,7 +1110,13 @@ if (!canCreate) {
           </button>
         ) : (
           <button 
-            onClick={() => finalizeSale.mutate()}
+            onClick={() => {
+              if (!validateCheckout()) {
+                toast.error("Preencha todos os campos obrigatórios.");
+                return;
+              }
+              finalizeSale.mutate();
+            }}
             disabled={finalizeSale.isPending || cart.length === 0}
             className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
           >
@@ -856,22 +1172,50 @@ if (!canCreate) {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="space-y-3 pt-4">
+                {nfceUrl ? (
+                  <button 
+                    onClick={() => window.open(nfceUrl, '_blank')}
+                    className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors"
+                  >
+                    <FileText size={20} /> Ver DANFE (NFC-e)
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => emitNfceMutation.mutate()}
+                    disabled={isEmittingNfce}
+                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                  >
+                    <ReceiptText size={20} /> {isEmittingNfce ? "Emitindo NFC-e..." : "Emitir NFC-e Rápida"}
+                  </button>
+                )}
+
+                {nfceErrorMsg && (
+                  <p className="text-xs text-red-500 bg-red-50 p-2 rounded-xl text-center">{nfceErrorMsg}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => printReceipt(lastSale, company)}
+                    className="py-3 bg-gray-100 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
+                  >
+                    <Printer size={20} /> Recibo 80mm
+                  </button>
+                  <button 
+                    onClick={() => printA4Quote(lastSale, company)}
+                    className="py-3 bg-blue-50 text-blue-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
+                  >
+                    <FileText size={20} /> Orçamento A4
+                  </button>
+                </div>
+
                 <button 
-                  onClick={() => printReceipt(lastSale, company)}
-                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
-                >
-                  <Printer size={20} /> Recibo 80mm
-                </button>
-                <button 
-                  onClick={() => printA4Quote(lastSale, company)}
-                  className="flex-1 py-3 bg-blue-50 text-blue-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
-                >
-                  <FileText size={20} /> Orçamento A4
-                </button>
-                <button 
-                  onClick={() => setShowReceipt(false)}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+                  onClick={() => {
+                    setShowReceipt(false);
+                    setNfceUrl(null);
+                    setNfceErrorMsg(null);
+                  }}
+                  className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors"
                 >
                   Fechar
                 </button>

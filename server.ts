@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import axios from "axios";
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { adminDb, adminStorage } from "./src/lib/firebase-admin";
+import firebaseConfig from "./firebase-applet-config.json";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,49 @@ async function startServer() {
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  async function getMercadoPagoAccessToken(): Promise<string | undefined> {
+    try {
+      const configDoc = await adminDb.collection("api_configurations").doc("global").get();
+      if (configDoc.exists) {
+        const configData = configDoc.data();
+        if (configData?.mercadopago_access_token) {
+          return configData.mercadopago_access_token;
+        }
+      }
+    } catch {
+      // If adminDb receives PERMISSION_DENIED or lacks credentials, try public REST API
+      try {
+        const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${firebaseConfig.firestoreDatabaseId}/documents/api_configurations/global?key=${firebaseConfig.apiKey}`;
+        const resp = await axios.get(url, { timeout: 3000 });
+        const token = resp.data?.fields?.mercadopago_access_token?.stringValue;
+        if (token) return token;
+      } catch {
+        // Fallback silently
+      }
+    }
+    return process.env.MERCADOPAGO_ACCESS_TOKEN;
+  }
+
+  app.post("/api/payments/test-mp", async (req, res) => {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ valid: false, error: "Missing token" });
+    }
+    try {
+      const client = new MercadoPagoConfig({ accessToken: token });
+      const paymentClient = new Payment(client);
+      await paymentClient.search({
+        options: {
+          limit: 1
+        }
+      });
+      res.json({ valid: true });
+    } catch (e: any) {
+      console.error("Test MP connection error:", e);
+      res.status(400).json({ valid: false, error: e.message || "Token inválido" });
+    }
   });
 
   // Real-structured Payment Gateway (Simulated for now)
@@ -36,7 +80,7 @@ async function startServer() {
     const methodLower = (method || "").toString().toLowerCase();
     
     if (methodLower === "pix") {
-      const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+      const accessToken = await getMercadoPagoAccessToken();
       
       if (accessToken && !accessToken.includes("placeholder") && !accessToken.includes("YOUR_")) {
         try {
@@ -146,7 +190,7 @@ async function startServer() {
     }
 
     if ((payment as any).isMercadoPago && payment.status === "PENDING") {
-      const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+      const accessToken = await getMercadoPagoAccessToken();
       if (accessToken) {
         try {
           const client = new MercadoPagoConfig({ accessToken });
@@ -193,7 +237,7 @@ async function startServer() {
       const { type, data } = req.body;
       if ((type === "payment" || req.query.topic === "payment") && (data?.id || req.query.id)) {
         const paymentId = String(data?.id || req.query.id);
-        const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+        const accessToken = await getMercadoPagoAccessToken();
         if (accessToken) {
           const client = new MercadoPagoConfig({ accessToken });
           const paymentClient = new Payment(client);
@@ -400,6 +444,48 @@ async function startServer() {
       res.status(500).json({ error: "Internal error" });
     }
   });
+
+  // Manifest & Service Worker routing for seamless development & production
+  app.get(["/manifest.webmanifest", "/manifest.json"], (req, res) => {
+    res.setHeader("Content-Type", "application/manifest+json");
+    res.json({
+      name: "PowerControl ERP",
+      short_name: "PowerControl",
+      description: "Sistema de Gestão Empresarial e PDV Inteligente",
+      theme_color: "#2563eb",
+      background_color: "#ffffff",
+      display: "standalone",
+      orientation: "portrait",
+      icons: [
+        {
+          src: "/icon.svg",
+          sizes: "192x192",
+          type: "image/svg+xml",
+          purpose: "any"
+        },
+        {
+          src: "/icon.svg",
+          sizes: "512x512",
+          type: "image/svg+xml",
+          purpose: "any"
+        },
+        {
+          src: "/icon.svg",
+          sizes: "512x512",
+          type: "image/svg+xml",
+          purpose: "maskable"
+        }
+      ]
+    });
+  });
+
+  if (process.env.NODE_ENV !== "production") {
+    // Rewrite /sw.js to /dev-sw.js in development to ensure seamless compatibility with Vite PWA dev options
+    app.get("/sw.js", (req, res, next) => {
+      req.url = "/dev-sw.js";
+      next();
+    });
+  }
 
 // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
