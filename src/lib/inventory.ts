@@ -517,5 +517,120 @@ export const inventory = {
 
       return { id: purchaseRef.id, ...finalPurchaseData };
     });
+  },
+
+  async reverseSaleStock(sale: any, userContext?: User) {
+    const user = userContext || (await api.get<User>("me")) as User;
+    if (!user) throw new Error("Usuário não autenticado");
+
+    const items = sale?.items || [];
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    return runTransaction(db, async (transaction) => {
+      const productDocs = new Map<string, any>();
+      const componentDocs = new Map<string, any>();
+
+      // 1. READ ALL PRODUCT DOCS & COMPONENT DOCS FIRST
+      for (const item of items) {
+        if (item.type === 'service' || !item.id) continue;
+
+        if (!productDocs.has(item.id)) {
+          const productRef = doc(db, "products", item.id);
+          const productDoc = await transaction.get(productRef);
+          if (productDoc.exists()) {
+            productDocs.set(item.id, productDoc);
+            const productData = productDoc.data();
+            if (productData.bom_items && Array.isArray(productData.bom_items) && productData.bom_items.length > 0) {
+              for (const bomItem of productData.bom_items) {
+                if (bomItem.product_id && !componentDocs.has(bomItem.product_id)) {
+                  const compRef = doc(db, "products", bomItem.product_id);
+                  const compDoc = await transaction.get(compRef);
+                  if (compDoc.exists()) {
+                    componentDocs.set(bomItem.product_id, compDoc);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 2. PERFORM ALL WRITES (RETURN STOCK)
+      const stockUpdates = new Map<string, number>();
+
+      for (const item of items) {
+        if (item.type === 'service' || !item.id) continue;
+
+        const productDoc = productDocs.get(item.id);
+        if (!productDoc) continue;
+
+        const productData = productDoc.data();
+        const itemQty = Number(item.quantity) || 1;
+
+        if (productData.bom_items && Array.isArray(productData.bom_items) && productData.bom_items.length > 0) {
+          for (const bomItem of productData.bom_items) {
+            const compDoc = componentDocs.get(bomItem.product_id);
+            if (!compDoc) continue;
+
+            const compData = compDoc.data();
+            const compPrevStock = stockUpdates.has(bomItem.product_id)
+              ? stockUpdates.get(bomItem.product_id)!
+              : (compData.stock_quantity || 0);
+
+            const totalCompQty = (Number(bomItem.quantity) || 1) * itemQty;
+            const compCurrentStock = compPrevStock + totalCompQty;
+            stockUpdates.set(bomItem.product_id, compCurrentStock);
+
+            const compRef = doc(db, "products", bomItem.product_id);
+            transaction.update(compRef, { stock_quantity: compCurrentStock });
+
+            // Record movement for component
+            const compMovementRef = doc(collection(db, "inventory_movements"));
+            transaction.set(compMovementRef, {
+              product_id: bomItem.product_id,
+              product_name: bomItem.product_name || compData.name || "Componente",
+              company_id: sale.company_id || user.company_id,
+              type: 'IN',
+              reason: 'SALE_CANCEL',
+              quantity: totalCompQty,
+              previous_stock: compPrevStock,
+              current_stock: compCurrentStock,
+              reference_id: sale.id,
+              reconciliation_id: sale.id,
+              user_id: user.id,
+              user_name: user.full_name || user.email || "Sistema",
+              timestamp: serverTimestamp()
+            });
+          }
+        } else {
+          const previous_stock = stockUpdates.has(item.id)
+            ? stockUpdates.get(item.id)!
+            : (productData.stock_quantity || 0);
+
+          const current_stock = previous_stock + itemQty;
+          stockUpdates.set(item.id, current_stock);
+
+          const productRef = doc(db, "products", item.id);
+          transaction.update(productRef, { stock_quantity: current_stock });
+
+          const movementRef = doc(collection(db, "inventory_movements"));
+          transaction.set(movementRef, {
+            product_id: item.id,
+            product_name: item.name || productData.name || "Produto",
+            company_id: sale.company_id || user.company_id,
+            type: 'IN',
+            reason: 'SALE_CANCEL',
+            quantity: itemQty,
+            previous_stock,
+            current_stock,
+            reference_id: sale.id,
+            reconciliation_id: sale.id,
+            user_id: user.id,
+            user_name: user.full_name || user.email || "Sistema",
+            timestamp: serverTimestamp()
+          });
+        }
+      }
+    });
   }
 };

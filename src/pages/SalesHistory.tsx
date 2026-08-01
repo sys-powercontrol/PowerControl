@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import ExportButton from "../components/ExportButton";
 import { printReceipt, printA4Quote } from "../lib/utils/print";
+import { inventory } from "../lib/inventory";
 
 type DateFilterType = "day" | "week" | "month" | "custom" | "all";
 
@@ -148,20 +149,41 @@ export default function SalesHistory() {
         // We revert the payment logic
         await reverseSalePayment(dbSale);
         
-        // Also if needed, we'd revert the AR if it was a prazo but that's handled manually
+        // Revert accountsReceivable if "A Prazo" or "Fiado"
+        if (dbSale.payment_method === "A Prazo" || dbSale.payment_method === "Fiado") {
+          try {
+            const receivables = await api.get("accountsReceivable") as any[];
+            const rel = receivables.find((r: any) => r.sale_id === id || r.reconciliation_id === id);
+            if (rel) {
+              await api.put("accountsReceivable", rel.id, { status: "Cancelada" });
+            }
+          } catch (e) {
+            console.error("Erro ao cancelar contas a receber:", e);
+          }
+        }
+
+        // Return stock quantities to inventory
+        await inventory.reverseSaleStock(dbSale);
+
         // We then set status to "Cancelada"
         await api.put("sales", id, { status: "Cancelada" });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory_movements"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
       toast.success("Venda cancelada com sucesso!");
       setIsDetailsModalOpen(false);
       setIsCancelModalOpen(false);
       setSaleToCancel(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao cancelar venda.");
     }
   });
 
@@ -171,21 +193,41 @@ export default function SalesHistory() {
   const deleteSaleMutation = useMutation({
     mutationFn: async (id: string) => {
       const dbSale = sales.find((s: any) => s.id === id);
-      if (dbSale && dbSale.status !== "Cancelada") {
-        const { reverseSalePayment } = await import("../lib/finance");
-        await reverseSalePayment(dbSale);
+      if (dbSale) {
+        if (dbSale.status !== "Cancelada") {
+          const { reverseSalePayment } = await import("../lib/finance");
+          await reverseSalePayment(dbSale);
+          await inventory.reverseSaleStock(dbSale);
+        }
+
+        try {
+          const receivables = await api.get("accountsReceivable") as any[];
+          const rels = receivables.filter((r: any) => r.sale_id === id || r.reconciliation_id === id);
+          for (const rel of rels) {
+            await api.delete("accountsReceivable", rel.id);
+          }
+        } catch (e) {
+          console.error("Erro ao remover contas a receber vinculadas:", e);
+        }
+
+        return api.delete("sales", id);
       }
-      return api.delete("sales", id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory_movements"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-      toast.success("Venda excluída com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
+      toast.success("Venda e registros vinculados excluídos com sucesso!");
       setIsDetailsModalOpen(false);
       setIsDeleteModalOpen(false);
       setSaleToDelete(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao excluir venda.");
     }
   });
 
