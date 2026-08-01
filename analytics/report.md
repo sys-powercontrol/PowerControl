@@ -1,83 +1,84 @@
 # Relatório de Análise do Sistema - Funcionalidades Pendentes
-> **Data e Hora de Geração:** 31/07/2026 às 19:59:23 (Horário de Brasília - BRT)
+> **Data e Hora de Geração:** 01/08/2026 às 09:41:00 (Horário de Brasília - BRT)
 
 ---
 
 ## 1. Resumo Executivo
 
-Este relatório apresenta uma análise técnica minuciosa da aplicação **PowerControl ERP**, focando **exclusivamente nas finalizações e refinamentos de funcionalidades existentes** que possuem fluxos incompletos, retornos simulados/fallback ou integrações pendentes.
+Este relatório apresenta uma análise técnica detalhada do sistema **PowerControl ERP**, focando **exclusivamente nas finalizações e refinamentos de funcionalidades existentes** que contam com fluxos incompletos, retornos simulados/fallback ou integrações pendentes.
 
-**Escopo:** Não foram incluídas novas funcionalidades ou módulos não solicitados. Todas as pendências catalogadas referem-se estritamente à consolidação das rotinas existentes de Vendas/PDV, Financeiro, Fiscal, Estoque/Compras, Comissões e Administração.
+**Escopo do Relatório:**
+Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendências catalogadas referem-se estritamente à consolidação e finalização dos fluxos de trabalho já existentes na plataforma: Vendas & PDV (sincronização offline e confirmações de pagamento), Financeiro (recorrência, baixa em lote e auto-matching de extrato OFX), Fiscal (reprocessamento de notas pendentes e exportação em lote de XML/DANFE), Estoque & Compras (dedução proporcional de ficha técnica e atualização de custo médio), e Pessoas & RBAC (integração financeira de comissões e aplicação estrita de permissões de acesso).
 
 ---
 
 ## 2. Diagnóstico Geral por Módulo
 
 ### 2.1. Módulo de Vendas, PDV e Sincronização Offline
-* **Gateway de Pagamento e Webhooks (MercadoPago / PIX / Cartão):**
-  * *Estado Atual:* `server.ts` e `PaymentGateway.tsx` possuem polling e simulação de pagamento com fallback para transações sem token real configurado.
-  * *Pendência de Finalização:* Tratar a confirmação assíncrona por Webhook real quando as chaves de API estão ativas, garantindo a baixa automática da venda sem dependência exclusiva de polling no frontend.
-* **Fila de Sincronização Offline (`offlineStore.ts` & `sw.ts`):**
-  * *Estado Atual:* O Service Worker e o IndexedDB registram vendas offline no canal `sync-sales`.
-  * *Pendência de Finalização:* Tratar conflitos de estoque ao sincronizar vendas pendentes armazenadas offline no momento em que a conexão é reestabelecida, garantindo que o estoque não fique negativo e alertando o operador em caso de divergência.
-* **Impressão de Comprovante de Venda:**
-  * *Estado Atual:* `Sales.tsx` permite finalizar a venda e disparar impressão.
-  * *Pendência de Finalização:* Padronização e parametrização do layout para impressoras térmicas não-fiscais (80mm / 58mm) com corte de papel e formatação limpa do comprovante de venda.
+* **Fila de Sincronização Offline (`offlineStore.ts` / `sw.ts` / `Sales.tsx`):**
+  * *Estado Atual:* O Service Worker e o IndexedDB registram vendas efetuadas offline na fila de sincronização (`sync-sales`).
+  * *Pendência de Finalização:* Implementação da validação e tratamento de conflito de estoque ao sincronizar vendas salvas offline assim que a conexão é restabelecida, evitando saldos negativos e sinalizando divergências via notificação ao operador.
+* **Gateway de Pagamento e Webhooks (`server.ts` / `src/serverApp.ts` / `PaymentGateway.tsx`):**
+  * *Estado Atual:* Integração com Mercado Pago (PIX e Cartão) com resposta assíncrona baseada em polling de status.
+  * *Pendência de Finalização:* Tratamento nativo e finalização da confirmação de pagamentos via Webhooks reais, permitindo a transição automática da venda para "Aprovada/Concluída" em tempo real sem depender apenas de requisições ativas do cliente frontend.
+* **Impressão de Comprovante de Venda (`Sales.tsx` / `print.ts`):**
+  * *Estado Atual:* Emissão de comprovante em layout padrão de tela/impressora.
+  * *Pendência de Finalização:* Parametrização e otimização do layout para impressoras térmicas não-fiscais (80mm e 58mm) com formatação limpa e comandos de corte.
 
 ---
 
 ### 2.2. Módulo Financeiro e Conciliação Bancária
 * **Contas a Pagar e Receber (`AccountsPayable.tsx` / `AccountsReceivable.tsx`):**
-  * *Estado Atual:* Telas de lançamento, baixas, estornos e cálculo de atrasos funcionam com persistência no Firestore.
+  * *Estado Atual:* Telas de lançamento, baixas individuais e estornos funcionam com persistência no Firestore.
   * *Pendência de Finalização:* 
-    1. Tratamento automático de recorrências (geração mensal/semanal automática das próximas parcelas ao liquidar ou no primeiro dia do mês).
-    2. Liquidação em lote (baixa simultânea de múltiplos títulos selecionados).
+    1. Geração automática das próximas parcelas para contas configuradas como recorrentes após a liquidação ou na mudança de ciclo.
+    2. Ação de baixa/liquidação em lote de múltiplos títulos selecionados simultaneamente via tabela.
 * **Conciliação Bancária e Extrato OFX (`OFXImporter.tsx` / `BankReconciliation.tsx`):**
-  * *Estado Atual:* O parser OFX nativo lê arquivos `.ofx` sem dependência externa instável e mapeia as transações.
-  * *Pendência de Finalização:* Algoritmo de cruzamento automático por valor, data próxima (janela de ±3 dias) e número do documento/FITID com lançamentos do Contas a Pagar/Receber para atalhos de reconciliação em 1 clique.
+  * *Estado Atual:* Parser nativo de arquivos `.ofx` que converte extratos em lançamentos legíveis.
+  * *Pendência de Finalização:* Algoritmo de cruzamento automático (auto-matching) ponderando valor exato, janela de datas (±3 dias) e número de documento/FITID para oferecer sugestões de liquidação/conciliação em 1 clique.
 
 ---
 
 ### 2.3. Módulo Fiscal e Emissão NFe/NFCe
-* **Integração com Provedores Fiscais (`fiscalApi.ts` / `Fiscal.tsx`):**
-  * *Estado Atual:* Suporte a FocusNFe e WebmaniaBR para envio e consulta de NFe/NFCe.
+* **Gestão de Notas Fiscais e Provedores Fiscais (`fiscalApi.ts` / `Fiscal.tsx`):**
+  * *Estado Atual:* Envio e consulta individual de notas fiscais via FocusNFe e WebmaniaBR.
   * *Pendência de Finalização:*
-    1. Fila de reprocessamento e consulta periódica automática para notas com status `Pendente` na SEFAZ (evitando que fiquem presas em lote sem atualização de status).
-    2. Exportação e download em lote dos arquivos XML e DANFE (PDF) compactados em arquivo ZIP para contabilidade.
+    1. Fila de reprocessamento e checagem periódica automática de notas com status `Pendente` na SEFAZ.
+    2. Exportação e download em lote dos arquivos XML e DANFE (PDF) compactados em arquivo `.zip` para a contabilidade.
 
 ---
 
 ### 2.4. Módulo de Estoque, Compras e Ficha Técnica (BOM)
-* **Composição de Produtos / Engenharia de Produto (`BOMBuilder.tsx`):**
-  * *Estado Atual:* Interface de montagem da estrutura de insumos/matérias-primas por produto acabado.
-  * *Pendência de Finalização:* Baixa automática proporcional do estoque de insumos/matérias-primas no momento da venda ou ordem de produção do produto acabado, bem como recálculo automático do Custo Médio do produto final baseado nos componentes.
-* **Entrada de Compras e Histórico (`Purchases.tsx` / `PurchaseHistory.tsx`):**
-  * *Estado Atual:* Cadastro e lançamento de compras.
-  * *Pendência de Finalização:* Atualização automática do estoque e do Preço Médio de Custo do produto no recebimento, gerando simultaneamente as parcelas do Contas a Pagar conforme a condição de pagamento informada.
+* **Engenharia de Produto / Ficha Técnica (`BOMBuilder.tsx` / `inventory.ts`):**
+  * *Estado Atual:* Criação de estruturas de insumos/matérias-primas e vincular ao produto acabado.
+  * *Pendência de Finalização:* Baixa automática proporcional do estoque de matérias-primas e insumos componentes durante a venda de produtos acabados com BOM, além da atualização do Custo Médio do produto acabado com base na variação dos custos dos seus insumos.
+* **Entrada de Compras e Custo Médio (`Purchases.tsx` / `PurchaseHistory.tsx`):**
+  * *Estado Atual:* Registro de compras e atualização manual de estoque.
+  * *Pendência de Finalização:* Recálculo automático do Preço Médio de Custo no recebimento da compra e criação automática das obrigações no Contas a Pagar com base nas condições financeiras pactuadas.
 
 ---
 
 ### 2.5. Módulo de Pessoas, Comissões e RBAC
 * **Pagamento de Comissões (`CommissionPayouts.tsx`):**
-  * *Estado Atual:* Listagem e calculo de comissões por vendedor.
-  * *Pendência de Finalização:* Vinculação direta da baixa da comissão com a criação automática de uma despesa/saída no Contas a Pagar e Caixa da empresa.
-* **Controle de Acesso e Permissões (`Employees.tsx` / `Configurations.tsx`):**
-  * *Estado Atual:* Interface de configuração de níveis de acesso (Admin, Gerente, Vendedor, Caixa).
-  * *Pendência de Finalização:* Aplicação estrita da verificação de permissões nas rotas de navegação no `Layout.tsx` e bloqueio de ações críticas (ex: cancelar venda, aplicar desconto acima do limite, estornar caixa).
+  * *Estado Atual:* Cálculo e listagem do extrato de comissões por vendedor.
+  * *Pendência de Finalização:* Integração direta no pagamento da comissão gerando lançamento de saída/despesa no Contas a Pagar e no Caixa.
+* **Controle de Acesso e Permissões (`Layout.tsx` / `Configurations.tsx` / `Employees.tsx`):**
+  * *Estado Atual:* Estrutura de papéis e permissões no Firestore (`role` / `permissions`).
+  * *Pendência de Finalização:* Aplicação estrita de regras de acesso no menu de navegação e guardas de rota no `Layout.tsx`, bloqueando acessos diretos por URL e ações restritas para usuários sem permissão adequada.
 
 ---
 
 ## 3. Matriz de Priorização das Finalizações
 
-| Módulo | Item Pendente | Impacto | Complexidade |
-| :--- | :--- | :--- | :--- |
-| **Vendas & Offline** | Tratamento de conflitos de estoque na sincronização PWA | Alto | Média |
-| **Vendas & Offline** | Webhook de confirmação assíncrona PIX/Cartão | Alto | Média |
-| **Financeiro** | Recorrência e Baixa em Lote no Contas a Pagar/Receber | Alto | Baixa |
-| **Financeiro** | Auto-matching na Conciliação Bancária OFX | Médio | Média |
-| **Fiscal** | Reprocessamento automático de NFe/NFCe pendente e Download de XMLs em Lote | Alto | Média |
-| **Estoque & Compras** | Dedução automática de BOM e atualização de Custo Médio em Compras | Alto | Média |
-| **Pessoas & RBAC** | Integração da baixa de comissões no Contas a Pagar e Controle de Permissões no Layout | Médio | Baixa |
+| ID | Módulo | Item Pendente | Impacto | Complexidade |
+| :--- | :--- | :--- | :--- | :--- |
+| **FIN-01** | **Vendas & Offline** | Resolução de conflitos de estoque no sync PWA offline | Alto | Média |
+| **FIN-02** | **Vendas & Offline** | Webhooks e confirmação em tempo real de pagamento | Alto | Média |
+| **FIN-03** | **Financeiro** | Recorrência e baixa em lote no Contas a Pagar e Receber | Alto | Baixa |
+| **FIN-04** | **Financeiro** | Algoritmo de auto-matching de extrato OFX | Médio | Média |
+| **FIN-05** | **Fiscal** | Fila de reprocessamento e download de XML/DANFE em ZIP | Alto | Média |
+| **FIN-06** | **Estoque & Compras** | Dedução automática de BOM e recálculo de custo médio | Alto | Média |
+| **FIN-07** | **Pessoas & RBAC** | Baixa financeira de comissão e controle estrito no Layout | Médio | Baixa |
 
 ---
-*Relatório concluído sem introdução de novas funcionalidades.*
+*Relatório de análise gerado estritamente para finalização das rotinas existentes, sem criação de novas telas ou módulos não solicitados.*

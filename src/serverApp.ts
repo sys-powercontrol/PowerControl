@@ -1,69 +1,23 @@
 import express from "express";
 import axios from "axios";
-import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { adminDb, adminStorage } from "./lib/firebase-admin";
-import firebaseConfig from "../firebase-applet-config.json";
 
 export const app = express();
 
 app.use(express.json());
-
-async function getMercadoPagoAccessToken(): Promise<string | undefined> {
-  try {
-    const configDoc = await adminDb.collection("api_configurations").doc("global").get();
-    if (configDoc.exists) {
-      const configData = configDoc.data();
-      if (configData?.mercadopago_access_token) {
-        return configData.mercadopago_access_token;
-      }
-    }
-  } catch {
-    // If adminDb receives PERMISSION_DENIED or lacks credentials, try public REST API
-    try {
-      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${firebaseConfig.firestoreDatabaseId}/documents/api_configurations/global?key=${firebaseConfig.apiKey}`;
-      const resp = await axios.get(url, { timeout: 3000 });
-      const token = resp.data?.fields?.mercadopago_access_token?.stringValue;
-      if (token) return token;
-    } catch {
-      // Fallback silently
-    }
-  }
-  return process.env.MERCADOPAGO_ACCESS_TOKEN;
-}
 
 // API Routes
 app.get(["/api/health", "/health"], (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post(["/api/payments/test-mp", "/payments/test-mp"], async (req, res) => {
-  const { token } = req.body;
-  if (!token) {
-    return res.status(400).json({ valid: false, error: "Missing token" });
-  }
-  try {
-    const client = new MercadoPagoConfig({ accessToken: token });
-    const paymentClient = new Payment(client);
-    await paymentClient.search({
-      options: {
-        limit: 1
-      }
-    });
-    res.json({ valid: true });
-  } catch (e: any) {
-    console.error("Test MP connection error:", e);
-    res.status(400).json({ valid: false, error: e.message || "Token inválido" });
-  }
-});
-
-// Real-structured Payment Gateway (Simulated / MercadoPago)
+// Real-structured Payment Gateway (Simulated)
 const activePayments = new Map<string, { 
   status: string; 
   amount: number; 
   method: string; 
   expiresAt: number; 
   isMock?: boolean; 
-  isMercadoPago?: boolean; 
   createdAt?: number;
 }>();
 
@@ -72,55 +26,7 @@ app.post(["/api/payments/create", "/payments/create"], async (req, res) => {
   const methodLower = (method || "").toString().toLowerCase();
   
   if (methodLower === "pix") {
-    const accessToken = await getMercadoPagoAccessToken();
-    
-    if (accessToken && !accessToken.includes("placeholder") && !accessToken.includes("YOUR_")) {
-      try {
-        const client = new MercadoPagoConfig({ accessToken });
-        const paymentClient = new Payment(client);
-
-        const response = await paymentClient.create({
-          body: {
-            transaction_amount: Number(amount),
-            description: 'Venda PDV PowerControl',
-            payment_method_id: 'pix',
-            payer: {
-              email: 'cliente@powercontrol.com',
-              first_name: 'Cliente',
-              last_name: 'PDV'
-            }
-          }
-        });
-
-        const id = response.id!.toString();
-        const qrCode = response.point_of_interaction?.transaction_data?.qr_code;
-        const qrCodeBase64 = response.point_of_interaction?.transaction_data?.qr_code_base64;
-
-        activePayments.set(id, {
-          status: "PENDING",
-          amount,
-          method,
-          expiresAt: Date.now() + 30 * 60 * 1000,
-          isMercadoPago: true,
-          createdAt: Date.now()
-        } as any);
-
-        return res.json({
-          id,
-          status: "PENDING",
-          amount,
-          expiresAt: Date.now() + 30 * 60 * 1000,
-          qr_code: qrCode,
-          qr_code_base64: qrCodeBase64
-        });
-      } catch (error) {
-        console.error("MercadoPago erro, falling back to simulated PIX payment:", error);
-      }
-    } else {
-      console.warn("MERCADOPAGO_ACCESS_TOKEN not configured or placeholder. Using simulated PIX payment.");
-    }
-
-    // Simulated PIX Payment Fallback
+    // Simulated PIX Payment
     const id = "mock_pix_" + Math.random().toString(36).substring(7);
     const expiresAt = Date.now() + 30 * 60 * 1000;
     
@@ -181,27 +87,6 @@ app.get(["/api/payments/status/:id", "/payments/status/:id"], async (req, res) =
     }
   }
 
-  if ((payment as any).isMercadoPago && payment.status === "PENDING") {
-    const accessToken = await getMercadoPagoAccessToken();
-    if (accessToken) {
-      try {
-        const client = new MercadoPagoConfig({ accessToken });
-        const paymentClient = new Payment(client);
-        const response = await paymentClient.get({ id: Number(id) });
-        
-        if (response.status === "approved") {
-          payment.status = "CONFIRMED";
-          activePayments.set(id, payment);
-        } else if (response.status === "cancelled" || response.status === "rejected") {
-          payment.status = "EXPIRED";
-          activePayments.set(id, payment);
-        }
-      } catch (e) {
-        console.error("Erro consultando status MP:", e);
-      }
-    }
-  }
-
   res.json(payment);
 });
 
@@ -221,62 +106,6 @@ app.post(["/api/payments/confirm-card", "/payments/confirm-card"], (req, res) =>
   }, 2000);
 
   res.json({ status: "PROCESSING", message: "Seu pagamento está sendo processado." });
-});
-
-// Mercado Pago Webhook
-app.post(["/api/webhooks/mercadopago", "/webhooks/mercadopago"], async (req, res) => {
-  try {
-    const { type, data } = req.body;
-    if ((type === "payment" || req.query.topic === "payment") && (data?.id || req.query.id)) {
-      const paymentId = String(data?.id || req.query.id);
-      const accessToken = await getMercadoPagoAccessToken();
-      if (accessToken) {
-        const client = new MercadoPagoConfig({ accessToken });
-        const paymentClient = new Payment(client);
-        const response = await paymentClient.get({ id: Number(paymentId) });
-        
-        let finalStatus = "";
-
-        if (response.status === "approved") {
-          finalStatus = "CONFIRMED";
-          const existing = activePayments.get(paymentId);
-          if (existing) {
-            existing.status = "CONFIRMED";
-            activePayments.set(paymentId, existing);
-          } else {
-            activePayments.set(paymentId, {
-              status: "CONFIRMED",
-              amount: response.transaction_amount || 0,
-              method: "pix",
-              expiresAt: Date.now() + 30 * 60 * 1000
-            });
-          }
-        } else if (response.status === "cancelled" || response.status === "rejected") {
-          finalStatus = "EXPIRED";
-          const existing = activePayments.get(paymentId);
-          if (existing) {
-            existing.status = "EXPIRED";
-            activePayments.set(paymentId, existing);
-          }
-        }
-
-        if (finalStatus) {
-          const salesSnapshot = await adminDb.collection("sales").where("payment_id", "==", paymentId).get();
-          if (!salesSnapshot.empty) {
-             const batch = adminDb.batch();
-             salesSnapshot.docs.forEach(doc => {
-               batch.update(doc.ref, { payment_status: finalStatus, updated_at: new Date().toISOString() });
-             });
-             await batch.commit();
-          }
-        }
-      }
-    }
-    res.status(200).json({ status: "ok" });
-  } catch (e) {
-    console.error("Mercado Pago webhook error:", e);
-    res.status(500).json({ error: "Internal error" });
-  }
 });
 
 // FocusNFe Webhook

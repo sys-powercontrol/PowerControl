@@ -293,20 +293,6 @@ export default function Sales() {
       return true;
     });
 
-    // Ensure Mercado Pago (API) is in the list
-    const hasMP = list.some((a: any) => a.id === "mercadopago_api" || a.name === "Mercado Pago (API)");
-    if (!hasMP && currentCompanyId) {
-      list = [...list, {
-        id: "mercadopago_api",
-        name: "Mercado Pago (API)",
-        bank_name: "Mercado Pago",
-        agency: "API",
-        account_number: "Integrada",
-        balance: 0,
-        company_id: currentCompanyId
-      }];
-    }
-
     if (list.length === 0 && currentCompanyId) {
       return [{
         id: "default_bank_account",
@@ -316,58 +302,30 @@ export default function Sales() {
         account_number: "12345-6",
         balance: 0,
         company_id: currentCompanyId
-      }, {
-        id: "mercadopago_api",
-        name: "Mercado Pago (API)",
-        bank_name: "Mercado Pago",
-        agency: "API",
-        account_number: "Integrada",
-        balance: 0,
-        company_id: currentCompanyId
       }];
     }
     return list;
   })();
 
-  // Auto-create default bank account and Mercado Pago (API) account in Firestore if missing
+  // Auto-create default bank account in Firestore if missing
   useEffect(() => {
     if (isBankAccountsSuccess && currentCompanyId) {
       const hasDefault = bankAccountsData.some((a: any) => a.name === "Banco Padrão (PIX)" || a.id === "default_bank_account");
-      const hasMP = bankAccountsData.some((a: any) => a.id === "mercadopago_api" || a.name === "Mercado Pago (API)");
 
-      if (!hasDefault || !hasMP) {
+      if (!hasDefault) {
         const createMissingAccounts = async () => {
-          let shouldRefetch = false;
           try {
-            if (!hasDefault) {
-              await setDoc(doc(db, "bankAccounts", "default_bank_account"), {
-                name: "Banco Padrão (PIX)",
-                bank_name: "Banco do Brasil",
-                agency: "0001",
-                account_number: "12345-6",
-                balance: 0,
-                active: true,
-                company_id: currentCompanyId,
-                created_at: new Date().toISOString()
-              }, { merge: true });
-              shouldRefetch = true;
-            }
-            if (!hasMP) {
-              await setDoc(doc(db, "bankAccounts", "mercadopago_api"), {
-                name: "Mercado Pago (API)",
-                bank_name: "Mercado Pago",
-                agency: "API",
-                account_number: "Integrada",
-                balance: 0,
-                active: true,
-                company_id: currentCompanyId,
-                created_at: new Date().toISOString()
-              }, { merge: true });
-              shouldRefetch = true;
-            }
-            if (shouldRefetch) {
-              queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-            }
+            await setDoc(doc(db, "bankAccounts", "default_bank_account"), {
+              name: "Banco Padrão (PIX)",
+              bank_name: "Banco do Brasil",
+              agency: "0001",
+              account_number: "12345-6",
+              balance: 0,
+              active: true,
+              company_id: currentCompanyId,
+              created_at: new Date().toISOString()
+            }, { merge: true });
+            queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
           } catch (err) {
             console.error("Error creating default bank accounts:", err);
           }

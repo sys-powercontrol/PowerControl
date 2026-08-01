@@ -57,20 +57,6 @@ export default function BankAccounts() {
       return true;
     });
 
-    // Ensure Mercado Pago (API) is in the list
-    const hasMP = list.some((a: any) => a.id === "mercadopago_api" || a.name === "Mercado Pago (API)");
-    if (!hasMP && currentCompanyId) {
-      list = [...list, {
-        id: "mercadopago_api",
-        name: "Mercado Pago (API)",
-        bank_name: "Mercado Pago",
-        agency: "API",
-        account_number: "Integrada",
-        balance: 0,
-        company_id: currentCompanyId
-      }];
-    }
-
     return list;
   }, [accountsData, currentCompanyId]);
 

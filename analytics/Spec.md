@@ -1,108 +1,99 @@
 # Especificação Técnica de Finalização de Funcionalidades (Spec.md)
-> **Data e Hora de Geração:** 31/07/2026 às 19:59:23 (Horário de Brasília - BRT)
+> **Data e Hora de Geração:** 01/08/2026 às 09:41:00 (Horário de Brasília - BRT)
 
 ---
 
 ## 1. Visão Geral da Especificação
 
-Esta especificação detalha os requisitos de sistema, comportamento e componentes necessários para a **finalização completa das funcionalidades já existentes no PowerControl ERP**, conforme levantado no relatório `/analytics/report.md`.
+Esta especificação técnica detalha os requisitos funcionais, comportamentos esperados (behaviors) e componentes envolvidos no processo de **finalização das funcionalidades já presentes no PowerControl ERP**, com base no diagnóstico mapeado em `/analytics/report.md`.
 
 ---
 
-## 2. Especificações por Módulo
+## 2. Especificação Detalhada dos Módulos
 
 ### 2.1. Módulo Vendas e Sincronização Offline (PDV / PWA)
 
-#### **ESPEC-01: Tratamento de Conflitos e Baixa de Estoque no Sync Offline**
-* **Página:** `Sales.tsx` / `src/lib/offlineStore.ts`
+#### **ESPEC-01: Validação de Estudo e Resolução de Conflitos no Sync Offline**
+* **Páginas / Arquivos:** `src/pages/Sales.tsx`, `src/lib/offlineStore.ts`, `src/sw.ts`
 * **Comportamento (Behavior):**
-  * Quando o navegador recupera a conexão à internet, a fila `sync-sales` em `offlineStore.ts` processa sequencialmente as vendas represadas.
-  * Para cada venda offline, o sistema valida se a quantidade em estoque no Firestore atende aos itens da venda.
-  * Se o estoque for suficiente, realiza a baixa do estoque e altera o status da venda para `Concluída`.
-  * Se o estoque for insuficiente para algum item, altera o status da venda sincronizada para `Pendente de Estoque` e notifica o usuário via `NotificationCenter` com detalhes da divergência.
-* **Componentes Impactados:**
-  * `src/lib/offlineStore.ts` (Função `syncPendingSales`)
-  * `src/components/NotificationCenter.tsx` (Notificação de alerta de estoque insuficiente pós-sync)
+  * Quando o navegador recupera a conexão à internet, a função `syncPendingSales` em `offlineStore.ts` lê a fila de vendas pendentes no IndexedDB.
+  * Para cada venda, consulta o saldo atualizado do produto no Firestore.
+  * Caso o saldo em estoque seja suficiente, efetua o abate e atualiza o status da venda para `Concluída`.
+  * Caso o estoque atual seja menor que a quantidade da venda offline, altera o status da venda para `Pendente de Estoque` e emite um alerta no `NotificationCenter`.
+* **Componentes / Módulos:**
+  * `src/lib/offlineStore.ts` (Atualização do fluxo de sincronização)
+  * `src/components/NotificationCenter.tsx` (Emissão de alerta de divergência de estoque)
 
-#### **ESPEC-02: Webhook e Confirmação Assíncrona de Pagamentos (PIX / Cartão)**
-* **Página:** `server.ts` / `src/components/Sales/PaymentGateway.tsx`
+#### **ESPEC-02: Confirmação Assíncrona de Pagamentos por Webhook (PIX / Cartão)**
+* **Páginas / Arquivos:** `src/serverApp.ts`, `src/components/Sales/PaymentGateway.tsx`
 * **Comportamento (Behavior):**
-  * O servidor backend em `server.ts` processa as notificações recebidas na rota `/api/payments/webhook`.
-  * Atualiza o registro da cobrança no banco de dados para `APPROVED` ou `REJECTED`.
-  * O componente `PaymentGateway.tsx` reage à mudança de status do pagamento emitindo evento de sucesso para conclusão automática da transação no PDV.
-* **Componentes Impactados:**
-  * `server.ts` (Endpoint `/api/payments/webhook`)
-  * `src/components/Sales/PaymentGateway.tsx` (Hook de listener / SSE / polling inteligente)
+  * O servidor Node.js/Express em `serverApp.ts` recebe e valida o payload enviado pelo gateway de pagamento na rota `/api/webhooks/mercadopago`.
+  * O webhook localiza a venda/cobrança no Firestore através do `payment_id` e atualiza seu status para `CONFIRMED` ou `REJECTED`.
+  * O componente `PaymentGateway.tsx` escuta a atualização da transação e conclui a venda na interface sem necessidade de intervenção manual do operador.
+* **Componentes / Módulos:**
+  * `src/serverApp.ts` (Endpoint de recebimento de webhook)
+  * `src/components/Sales/PaymentGateway.tsx` (Atualização reativa de status)
 
 ---
 
 ### 2.2. Módulo Financeiro e Conciliação Bancária
 
-#### **ESPEC-03: Recorrência e Liquidação em Lote no Contas a Pagar e Receber**
-* **Página:** `AccountsPayable.tsx` & `AccountsReceivable.tsx`
+#### **ESPEC-03: Lançamentos Recorrentes e Liquidação em Lote**
+* **Páginas / Arquivos:** `src/pages/AccountsPayable.tsx`, `src/pages/AccountsReceivable.tsx`
 * **Comportamento (Behavior):**
-  * **Recorrência:** Ao marcar uma conta recorrente como `Paga`/`Recebida`, o sistema gera automaticamente o lançamento referente ao próximo período (mensal/semanal), mantendo histórico do título original.
-  * **Liquidação em Lote:** Permite selecionar múltiplas contas através de checkboxes na tabela e executar a ação "Dar Baixa em Selecionados", informando conta bancária/caixa e data de pagamento únicas para o lote.
-* **Componentes Impactados:**
-  * `src/pages/AccountsPayable.tsx`
-  * `src/pages/AccountsReceivable.tsx`
-  * `src/components/ui/` (Checkbox de seleção global na tabela)
+  * **Recorrência:** Ao quitar uma conta cadastrada com periodicidade (mensal/semanal), o sistema agenda ou lança automaticamente a cobrança do próximo período com data de vencimento ajustada.
+  * **Liquidação em Lote:** Adiciona caixas de seleção (checkboxes) na listagem das contas. Ao selecionar múltiplos títulos e clicar em "Liquidar Selecionados", exibe modal para confirmação de conta bancária, forma de pagamento e data de baixa comum.
+* **Componentes / Módulos:**
+  * `src/pages/AccountsPayable.tsx` (Checkbox de tabela e barra de ações em lote)
+  * `src/pages/AccountsReceivable.tsx` (Seleção e liquidação em lote)
 
-#### **ESPEC-04: Auto-Matching Inteligente na Conciliação Bancária OFX**
-* **Página:** `BankReconciliation.tsx` / `OFXImporter.tsx`
+#### **ESPEC-04: Auto-Matching Inteligente no Extrato OFX**
+* **Páginas / Arquivos:** `src/pages/BankReconciliation.tsx`, `src/components/Financial/OFXImporter.tsx`
 * **Comportamento (Behavior):**
-  * Ao importar um arquivo `.ofx`, o sistema compara cada item do extrato com os lançamentos pendentes em Contas a Pagar/Receber.
-  * O critério de correspondência avalia:
-    1. Valor exato.
-    2. Data de vencimento/pagamento em janela de ±3 dias.
-    3. Documento / Descrição similar.
-  * Transações com correspondência exata exibem um selo verde "Correspondência Encontrada" com botão de conciliação em 1 clique.
-* **Componentes Impactados:**
-  * `src/components/Financial/OFXImporter.tsx`
-  * `src/pages/BankReconciliation.tsx`
+  * Durante a leitura do arquivo `.ofx`, o algoritmo compara o valor e a data de cada transação bancária com os títulos pendentes em Contas a Pagar/Receber.
+  * Para correspondências com tolerância de até ±3 dias e valor idêntico, destaca a linha com indicação visual "Sugestão de Conciliação" e botão "Conciliar em 1 clique".
+* **Componentes / Módulos:**
+  * `src/components/Financial/OFXImporter.tsx` (Lógica de pareamento de transações)
+  * `src/pages/BankReconciliation.tsx` (Exibição e confirmação rápida)
 
 ---
 
 ### 2.3. Módulo Fiscal (NFe e NFCe)
 
-#### **ESPEC-05: Reprocessamento de Pendências e Exportação de XMLs em Lote**
-* **Página:** `Fiscal.tsx` / `src/services/fiscalApi.ts`
+#### **ESPEC-05: Fila de Reprocessamento SEFAZ e Download de XML/DANFE em Lote**
+* **Páginas / Arquivos:** `src/pages/Fiscal.tsx`, `src/services/fiscalApi.ts`
 * **Comportamento (Behavior):**
-  * **Reprocessamento:** Notas fiscais no status `Pendente` possuem botão de "Consultar Status na SEFAZ" e rotina periódica de verificação de lote.
-  * **Download em Lote:** Na tela Fiscal, um filtro de período permite selecionar notas emitidas e baixar um arquivo `.zip` contendo os XMLs autorizados e seus respectivos DANFEs em PDF para a contabilidade.
-* **Componentes Impactados:**
-  * `src/pages/Fiscal.tsx`
-  * `src/services/fiscalApi.ts`
+  * **Reprocessamento:** Notas que permanecem no status `Pendente` passam por uma consulta periódica ao provedor fiscal para atualização automática assim que a SEFAZ autoriza ou rejeita o lote.
+  * **Download em Lote (.ZIP):** Inclui botão na tela `Fiscal.tsx` para selecionar o mês/ano e realizar o download compactado de todos os XMLs e DANFEs (PDFs) autorizados do período.
+* **Componentes / Módulos:**
+  * `src/pages/Fiscal.tsx` (Ações de reprocessamento e botão de exportação compactada)
+  * `src/services/fiscalApi.ts` (Método de geração do pacote ZIP)
 
 ---
 
 ### 2.4. Módulo de Estoque, Compras e Ficha Técnica (BOM)
 
-#### **ESPEC-06: Dedução Automática de BOM e Atualização de Custo Médio em Compras**
-* **Página:** `BOMBuilder.tsx`, `Products.tsx`, `Purchases.tsx`
+#### **ESPEC-06: Dedução Proporcional de Insumos (BOM) e Custo Médio na Compra**
+* **Páginas / Arquivos:** `src/components/BOMBuilder.tsx`, `src/lib/inventory.ts`, `src/pages/Purchases.tsx`
 * **Comportamento (Behavior):**
-  * **Ficha Técnica (BOM):** Ao vender um produto configurado com ficha técnica, o sistema abate o estoque das matérias-primas e insumos componentes proporcionalmente à quantidade vendida.
-  * **Preço Médio de Custo em Compras:** Ao dar entrada em uma compra em `Purchases.tsx`, o sistema calcula o novo custo médio do produto:
-    $$\text{Custo Médio Novo} = \frac{(\text{Estoque Antigo} \times \text{Custo Antigo}) + (\text{Qtd Comprada} \times \text{Preço Comprado})}{\text{Estoque Antigo} + \text{Qtd Comprada}}$$
-  * Ao confirmar o recebimento da compra, insere automaticamente as parcelas de pagamento no Contas a Pagar.
-* **Componentes Impactados:**
-  * `src/lib/inventory.ts`
-  * `src/components/BOMBuilder.tsx`
-  * `src/pages/Purchases.tsx`
+  * **Abate de Insumos (BOM):** Quando uma venda de um produto composto é confirmada, o sistema deduce o estoque de cada um dos insumos cadastrados em sua ficha técnica na proporção definida.
+  * **Atualização do Custo Médio:** Ao dar entrada em uma nota de compra em `Purchases.tsx`, o sistema calcula e atualiza o Custo Médio ponderado do produto e gera as respectivas parcelas no Contas a Pagar.
+* **Componentes / Módulos:**
+  * `src/lib/inventory.ts` (Cálculo de custo médio e baixa de insumos por BOM)
+  * `src/pages/Purchases.tsx` (Finalização de compra e integração financeira)
 
 ---
 
 ### 2.5. Módulo de Pessoas, Comissões e RBAC
 
-#### **ESPEC-07: Integração Financeira de Comissões e Aplicação Estrita de Permissões**
-* **Página:** `CommissionPayouts.tsx`, `Layout.tsx`, `Configurations.tsx`
+#### **ESPEC-07: Baixa Financeira de Comissões e Aplicação Estrita de RBAC**
+* **Páginas / Arquivos:** `src/pages/CommissionPayouts.tsx`, `src/components/Layout.tsx`, `src/lib/permissions.ts`
 * **Comportamento (Behavior):**
-  * **Baixa de Comissões:** Ao efetuar o pagamento da comissão de um vendedor em `CommissionPayouts.tsx`, o sistema gera uma transação de saída no caixa selecionado com a categoria "Despesa com Comissões".
-  * **Aplicação de RBAC:** O menu lateral em `Layout.tsx` oculta e restringe o acesso às páginas conforme o perfil do usuário logado (`role` / `permissions`), redirecionando para `/404` ou exibindo toast de acesso não autorizado caso o usuário tente acessar via URL direta.
-* **Componentes Impactados:**
-  * `src/pages/CommissionPayouts.tsx`
-  * `src/components/Layout.tsx`
-  * `src/pages/Configurations.tsx`
+  * **Lançamento de Comissão no Financeiro:** Ao realizar a baixa do pagamento de comissão a um vendedor, registra a saída no Contas a Pagar / Caixa com a categoria "Despesas com Comissões".
+  * **Aplicação de RBAC no Layout:** O menu de navegação e as rotas em `Layout.tsx` filtram visualmente os links e bloqueiam o acesso a URLs restritas conforme a função (`role`) do usuário autenticado.
+* **Componentes / Módulos:**
+  * `src/pages/CommissionPayouts.tsx` (Geração de movimentação financeira)
+  * `src/components/Layout.tsx` (Guarda de rotas e filtragem dinâmica de menu)
 
 ---
-*Especificação de finalizações concluída com sucesso.*
+*Especificação desenvolvida exclusivamente para a finalização dos componentes e fluxos existentes.*
