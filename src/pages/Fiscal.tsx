@@ -80,6 +80,34 @@ export default function Fiscal() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
   const [isExportingXmlZip, setIsExportingXmlZip] = useState(false);
+  const [isSyncingPending, setIsSyncingPending] = useState(false);
+
+  const handleSyncPendingInvoices = async () => {
+    const pendingInvoices = invoices.filter(
+      (i) => i.status === "Pendente" || i.status === "Aguardando" || i.status === "Processando"
+    );
+
+    if (pendingInvoices.length === 0) {
+      toast.info("Nenhuma nota fiscal pendente de reprocessamento/sincronização.");
+      return;
+    }
+
+    setIsSyncingPending(true);
+    toast.info(`Sincronizando ${pendingInvoices.length} nota(s) pendente(s)...`);
+
+    let updatedCount = 0;
+    for (const inv of pendingInvoices) {
+      try {
+        await checkStatusMutation.mutateAsync(inv);
+        updatedCount++;
+      } catch (err) {
+        console.warn(`Erro ao sincronizar nota #${inv.number}:`, err);
+      }
+    }
+
+    toast.success(`Sincronização concluída! ${updatedCount} nota(s) consultada(s).`);
+    setIsSyncingPending(false);
+  };
 
   const handleExportXmlZip = async () => {
     const emittedInvoices = filteredInvoices.filter(
@@ -405,6 +433,15 @@ if (!canManage) {
           >
             <Download size={18} className={isExportingXmlZip ? "animate-bounce" : ""} />
             {isExportingXmlZip ? "Exportando..." : "XMLs (ZIP)"}
+          </button>
+          <button
+            onClick={handleSyncPendingInvoices}
+            disabled={isSyncingPending}
+            className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-bold hover:bg-amber-100 transition-all text-xs sm:text-sm disabled:opacity-50"
+            title="Consultar e reprocessar notas fiscais com status pendente"
+          >
+            <Clock size={18} className={isSyncingPending ? "animate-spin" : ""} />
+            {isSyncingPending ? "Sincronizando..." : "Sincronizar Pendentes"}
           </button>
           <Link 
             to="/Certificado"

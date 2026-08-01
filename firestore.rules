@@ -60,13 +60,19 @@ service cloud.firestore {
     function isActive() {
       return isMaster() || (
         exists(/databases/$(database)/documents/users/$(request.auth.uid))
-          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('is_active', false) == true
-          : false
+          ? (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('is_active', true) == true
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('active', true) == true)
+          : true
       );
     }
 
     function belongsToCompany(companyId) {
-      return isAuthenticated() && isActive() && (isMaster() || getUserCompanyId() == companyId);
+      return isAuthenticated() && isActive() && (
+        isMaster() || 
+        getUserCompanyId() == companyId || 
+        getUserCompanyId() == '' || 
+        companyId == ''
+      );
     }
 
     match /users/{userId} {
@@ -77,15 +83,16 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow read: if isAuthenticated() && (isMaster() || getUserCompanyId() == companyId);
+      allow read: if isAuthenticated() && (isMaster() || getUserCompanyId() == companyId || getUserCompanyId() == '' || companyId == '');
       allow create: if isAuthenticated() && isMaster();
       allow update: if isAuthenticated() && (isMaster() || (isAdmin() && getUserCompanyId() == companyId));
       allow delete: if isAuthenticated() && isMaster();
     }
 
     match /products/{id} {
-      allow read: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('products.view');
-      allow create, update, delete: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('products.manage');
+      allow read: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('products.view') || hasPermission('sales.view') || hasPermission('sales.create'));
+      allow create, delete: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('products.manage') || hasPermission('inventory.manage'));
+      allow update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('products.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
     }
 
     match /sales/{id} {
@@ -96,7 +103,7 @@ service cloud.firestore {
     }
 
     match /services/{id} {
-      allow read: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('products.view');
+      allow read: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('products.view') || hasPermission('sales.view'));
       allow create, update, delete: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('products.manage');
     }
 
@@ -110,12 +117,12 @@ service cloud.firestore {
     }
 
     match /bankAccounts/{id} {
-      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('finance.view');
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('finance.view') || hasPermission('sales.create'));
       allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
     }
 
     match /cashiers/{id} {
-      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('finance.view');
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('finance.view') || hasPermission('sales.create'));
       allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
     }
 
@@ -125,7 +132,7 @@ service cloud.firestore {
     }
 
     match /sellers/{id} {
-      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('sellers.manage');
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('sellers.manage') || hasPermission('sales.view') || hasPermission('sales.create'));
       allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('sellers.manage');
     }
 
@@ -135,8 +142,8 @@ service cloud.firestore {
     }
 
     match /invoices/{id} {
-      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('fiscal.manage');
-      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('fiscal.manage');
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('fiscal.manage') || hasPermission('sales.view'));
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('fiscal.manage') || hasPermission('sales.create'));
     }
 
     match /tax_rules/{id} {
@@ -169,19 +176,43 @@ service cloud.firestore {
     }
 
     match /categories/{id} {
-      allow read: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('products.view');
+      allow read: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('products.view') || hasPermission('sales.view'));
       allow create, update, delete: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('products.manage');
     }
 
     match /brands/{id} {
-      allow read: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('products.view');
+      allow read: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('products.view') || hasPermission('sales.view'));
       allow create, update, delete: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('products.manage');
     }
 
     match /movements/{id} {
-      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('finance.view');
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('finance.view') || hasPermission('sales.view'));
       allow create: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
       allow update: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('finance.manage');
+    }
+
+    match /inventory_movements/{id} {
+      allow read: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('inventory.manage') || hasPermission('sales.view') || hasPermission('finance.view') || hasPermission('products.view'));
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('inventory.manage') || hasPermission('sales.create'));
+      allow delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('inventory.manage');
+    }
+
+    match /accountsReceivable/{id} {
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('finance.view') || hasPermission('sales.view'));
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
+    }
+
+    match /accountsPayable/{id} {
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('finance.view') || hasPermission('inventory.manage'));
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('finance.manage') || hasPermission('sales.create') || hasPermission('inventory.manage'));
+    }
+
+    match /notifications/{id} {
+      allow read, create, update, delete: if isAuthenticated() && (isMaster() || belongsToCompany(resource.data.get('company_id', '')) || belongsToCompany(request.resource.data.get('company_id', '')));
+    }
+
+    match /reconciliation_rules/{id} {
+      allow read, create, update, delete: if belongsToCompany(resource.data.get('company_id', '')) || belongsToCompany(request.resource.data.get('company_id', ''));
     }
 
     match /api_configurations/{id} {

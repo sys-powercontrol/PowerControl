@@ -79,6 +79,7 @@ export default function CommissionPayouts() {
         due_date: getTodayBR(),
         status: "Pago",
         payment_date: new Date().toISOString(),
+        category_name: "Comissões de Vendas",
         supplier: sale.seller_name, // Using seller as supplier for tracking
         created_at: new Date().toISOString()
       });

@@ -1,14 +1,14 @@
 # Relatório de Análise do Sistema - Funcionalidades Pendentes
-> **Data e Hora de Geração:** 01/08/2026 às 09:41:00 (Horário de Brasília - BRT)
+> **Data e Hora de Geração:** 01/08/2026 às 10:19:00 (Horário de Brasília - BRT)
 
 ---
 
 ## 1. Resumo Executivo
 
-Este relatório apresenta uma análise técnica detalhada do sistema **PowerControl ERP**, focando **exclusivamente nas finalizações e refinamentos de funcionalidades existentes** que contam com fluxos incompletos, retornos simulados/fallback ou integrações pendentes.
+Este relatório apresenta uma análise técnica detalhada do sistema **PowerControl ERP**, focando **exclusivamente nas finalizações e refinamentos de funcionalidades existentes** que contam com fluxos incompletos, retornos simulados/fallback ou integrações pendentes no estado atual da base de código.
 
 **Escopo do Relatório:**
-Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendências catalogadas referem-se estritamente à consolidação e finalização dos fluxos de trabalho já existentes na plataforma: Vendas & PDV (sincronização offline e confirmações de pagamento), Financeiro (recorrência, baixa em lote e auto-matching de extrato OFX), Fiscal (reprocessamento de notas pendentes e exportação em lote de XML/DANFE), Estoque & Compras (dedução proporcional de ficha técnica e atualização de custo médio), e Pessoas & RBAC (integração financeira de comissões e aplicação estrita de permissões de acesso).
+Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendências catalogadas referem-se estritamente à consolidação e finalização dos fluxos de trabalho já presentes na plataforma: Vendas & PDV (validação de saldo e resolução de conflitos de estoque na sincronização offline), Financeiro (recorrência, baixa em lote e auto-matching de extrato OFX), Fiscal (reprocessamento de notas pendentes e exportação em lote de XML/DANFE em arquivo compactado), Estoque & Compras (dedução proporcional de ficha técnica BOM e atualização de custo médio ponderado nas compras), e Pessoas & RBAC (integração financeira do pagamento de comissões e aplicação estrita das permissões de acesso e guardas de rota no Layout).
 
 ---
 
@@ -16,14 +16,8 @@ Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendênc
 
 ### 2.1. Módulo de Vendas, PDV e Sincronização Offline
 * **Fila de Sincronização Offline (`offlineStore.ts` / `sw.ts` / `Sales.tsx`):**
-  * *Estado Atual:* O Service Worker e o IndexedDB registram vendas efetuadas offline na fila de sincronização (`sync-sales`).
-  * *Pendência de Finalização:* Implementação da validação e tratamento de conflito de estoque ao sincronizar vendas salvas offline assim que a conexão é restabelecida, evitando saldos negativos e sinalizando divergências via notificação ao operador.
-* **Gateway de Pagamento e Webhooks (`server.ts` / `src/serverApp.ts` / `PaymentGateway.tsx`):**
-  * *Estado Atual:* Integração com Mercado Pago (PIX e Cartão) com resposta assíncrona baseada em polling de status.
-  * *Pendência de Finalização:* Tratamento nativo e finalização da confirmação de pagamentos via Webhooks reais, permitindo a transição automática da venda para "Aprovada/Concluída" em tempo real sem depender apenas de requisições ativas do cliente frontend.
-* **Impressão de Comprovante de Venda (`Sales.tsx` / `print.ts`):**
-  * *Estado Atual:* Emissão de comprovante em layout padrão de tela/impressora.
-  * *Pendência de Finalização:* Parametrização e otimização do layout para impressoras térmicas não-fiscais (80mm e 58mm) com formatação limpa e comandos de corte.
+  * *Estado Atual:* O Service Worker e o IndexedDB registram as vendas efetuadas offline na fila de sincronização (`sync-sales`).
+  * *Pendência de Finalização:* Implementação da validação e tratamento de conflito de estoque ao sincronizar vendas salvas offline assim que a conexão é restabelecida, evitando saldos negativos e sinalizando divergências via notificação ao operador no `NotificationCenter`.
 
 ---
 
@@ -34,8 +28,8 @@ Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendênc
     1. Geração automática das próximas parcelas para contas configuradas como recorrentes após a liquidação ou na mudança de ciclo.
     2. Ação de baixa/liquidação em lote de múltiplos títulos selecionados simultaneamente via tabela.
 * **Conciliação Bancária e Extrato OFX (`OFXImporter.tsx` / `BankReconciliation.tsx`):**
-  * *Estado Atual:* Parser nativo de arquivos `.ofx` que converte extratos em lançamentos legíveis.
-  * *Pendência de Finalização:* Algoritmo de cruzamento automático (auto-matching) ponderando valor exato, janela de datas (±3 dias) e número de documento/FITID para oferecer sugestões de liquidação/conciliação em 1 clique.
+  * *Estado Atual:* Parser nativo de arquivos `.ofx` que converte extratos bancários em lançamentos legíveis.
+  * *Pendência de Finalização:* Algoritmo de cruzamento automático (auto-matching) ponderando valor exato, janela de datas (±3 dias) e número de documento/descrição para oferecer sugestões de liquidação/conciliação em 1 clique.
 
 ---
 
@@ -44,16 +38,16 @@ Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendênc
   * *Estado Atual:* Envio e consulta individual de notas fiscais via FocusNFe e WebmaniaBR.
   * *Pendência de Finalização:*
     1. Fila de reprocessamento e checagem periódica automática de notas com status `Pendente` na SEFAZ.
-    2. Exportação e download em lote dos arquivos XML e DANFE (PDF) compactados em arquivo `.zip` para a contabilidade.
+    2. Exportação e download em lote dos arquivos XML e DANFE (PDF) compactados em arquivo `.zip` para envio à contabilidade.
 
 ---
 
 ### 2.4. Módulo de Estoque, Compras e Ficha Técnica (BOM)
 * **Engenharia de Produto / Ficha Técnica (`BOMBuilder.tsx` / `inventory.ts`):**
-  * *Estado Atual:* Criação de estruturas de insumos/matérias-primas e vincular ao produto acabado.
+  * *Estado Atual:* Criação de estruturas de insumos/matérias-primas e vínculo com o produto acabado.
   * *Pendência de Finalização:* Baixa automática proporcional do estoque de matérias-primas e insumos componentes durante a venda de produtos acabados com BOM, além da atualização do Custo Médio do produto acabado com base na variação dos custos dos seus insumos.
 * **Entrada de Compras e Custo Médio (`Purchases.tsx` / `PurchaseHistory.tsx`):**
-  * *Estado Atual:* Registro de compras e atualização manual de estoque.
+  * *Estado Atual:* Registro de compras e atualização de estoque.
   * *Pendência de Finalização:* Recálculo automático do Preço Médio de Custo no recebimento da compra e criação automática das obrigações no Contas a Pagar com base nas condições financeiras pactuadas.
 
 ---
@@ -73,12 +67,11 @@ Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendênc
 | ID | Módulo | Item Pendente | Impacto | Complexidade |
 | :--- | :--- | :--- | :--- | :--- |
 | **FIN-01** | **Vendas & Offline** | Resolução de conflitos de estoque no sync PWA offline | Alto | Média |
-| **FIN-02** | **Vendas & Offline** | Webhooks e confirmação em tempo real de pagamento | Alto | Média |
-| **FIN-03** | **Financeiro** | Recorrência e baixa em lote no Contas a Pagar e Receber | Alto | Baixa |
-| **FIN-04** | **Financeiro** | Algoritmo de auto-matching de extrato OFX | Médio | Média |
-| **FIN-05** | **Fiscal** | Fila de reprocessamento e download de XML/DANFE em ZIP | Alto | Média |
-| **FIN-06** | **Estoque & Compras** | Dedução automática de BOM e recálculo de custo médio | Alto | Média |
-| **FIN-07** | **Pessoas & RBAC** | Baixa financeira de comissão e controle estrito no Layout | Médio | Baixa |
+| **FIN-02** | **Financeiro** | Recorrência e baixa em lote no Contas a Pagar e Receber | Alto | Baixa |
+| **FIN-03** | **Financeiro** | Algoritmo de auto-matching de extrato OFX | Médio | Média |
+| **FIN-04** | **Fiscal** | Fila de reprocessamento e download de XML/DANFE em ZIP | Alto | Média |
+| **FIN-05** | **Estoque & Compras** | Dedução automática de BOM e recálculo de custo médio | Alto | Média |
+| **FIN-06** | **Pessoas & RBAC** | Baixa financeira de comissão e controle estrito no Layout | Médio | Baixa |
 
 ---
 *Relatório de análise gerado estritamente para finalização das rotinas existentes, sem criação de novas telas ou módulos não solicitados.*
