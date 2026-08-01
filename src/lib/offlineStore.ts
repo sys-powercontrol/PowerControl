@@ -119,11 +119,53 @@ export const offlineStore = {
       } catch (error: any) {
         console.error("Erro ao sincronizar venda offline:", error);
         const errMsg = error?.message || "Erro desconhecido";
+        const companyId = sale.saleData?.company_id || sale.userContext?.company_id || api.getCompanyId();
+
+        if (errMsg.toLowerCase().includes("estoque insuficiente") || errMsg.toLowerCase().includes("insuficiente")) {
+          try {
+            const fallbackSale = {
+              ...sale.saleData,
+              status: "Pendente de Estoque",
+              error_reason: errMsg,
+              items: sale.items,
+              company_id: companyId,
+              created_at: new Date(sale.timestamp || Date.now()).toISOString(),
+              is_offline_sync: true
+            };
+            const created = await api.post("sales", fallbackSale);
+            await api.log({
+              action: 'CREATE',
+              entity: 'sales',
+              entity_id: created.id || sale.id,
+              description: `Venda Offline Sincronizada com Pendência de Estoque #${(created.id || sale.id).substr(0, 8).toUpperCase()}`,
+              metadata: { isOfflineSync: true, status: "Pendente de Estoque", timestamp: sale.timestamp }
+            }, sale.userContext);
+
+            if (companyId) {
+              await api.post("notifications", {
+                company_id: companyId,
+                title: "Divergência de Estoque (Venda Offline)",
+                message: `Venda para ${sale.saleData?.client_name || "Consumidor"} gravada como "Pendente de Estoque": ${errMsg}`,
+                type: "warning",
+                link: "/HistoricoVendas",
+                read: false,
+                status: "unread",
+                created_at: new Date().toISOString()
+              });
+            }
+
+            await db.delete(STORE_SALES, sale.id);
+            failCount++;
+            continue;
+          } catch (pendingErr) {
+            console.error("Erro ao registrar venda pendente de estoque:", pendingErr);
+          }
+        }
+
         await db.put(STORE_SALES_FAILED, { ...sale, error_reason: errMsg });
         await db.delete(STORE_SALES, sale.id);
         failCount++;
 
-        const companyId = sale.saleData?.company_id || sale.userContext?.company_id;
         if (companyId) {
           try {
             await api.post("notifications", {
@@ -133,6 +175,7 @@ export const offlineStore = {
               type: "error",
               link: "/HistoricoVendas",
               read: false,
+              status: "unread",
               created_at: new Date().toISOString()
             });
           } catch (nErr) {

@@ -1,14 +1,14 @@
 # Relatório de Análise do Sistema - Funcionalidades Pendentes
-> **Data e Hora de Geração:** 01/08/2026 às 10:19:00 (Horário de Brasília - BRT)
+> **Data e Hora de Geração:** 01/08/2026 às 11:37:00 (Horário de Brasília - BRT)
 
 ---
 
 ## 1. Resumo Executivo
 
-Este relatório apresenta uma análise técnica detalhada do sistema **PowerControl ERP**, focando **exclusivamente nas finalizações e refinamentos de funcionalidades existentes** que contam com fluxos incompletos, retornos simulados/fallback ou integrações pendentes no estado atual da base de código.
+Este relatório apresenta uma análise técnica detalhada do sistema **PowerControl ERP**, focando **exclusivamente nas finalizações e refinamentos de funcionalidades existentes** que contam com fluxos incompletos, retornos simulados ou validações pendentes no estado atual da base de código.
 
 **Escopo do Relatório:**
-Não foram incluídas novas funcionalidades ou módulos novos. Todas as pendências catalogadas referem-se estritamente à consolidação e finalização dos fluxos de trabalho já presentes na plataforma: Vendas & PDV (validação de saldo e resolução de conflitos de estoque na sincronização offline), Financeiro (recorrência, baixa em lote e auto-matching de extrato OFX), Fiscal (reprocessamento de notas pendentes e exportação em lote de XML/DANFE em arquivo compactado), Estoque & Compras (dedução proporcional de ficha técnica BOM e atualização de custo médio ponderado nas compras), e Pessoas & RBAC (integração financeira do pagamento de comissões e aplicação estrita das permissões de acesso e guardas de rota no Layout).
+Não são propostas novas telas ou novos módulos. Todas as pendências catalogadas referem-se à consolidação das rotinas de negócio já existentes na plataforma: Vendas & PDV (validação de saldo e resolução de conflitos de estoque na sincronização offline), Financeiro (recorrência, baixa em lote e auto-matching de extrato OFX), Fiscal (reprocessamento de notas pendentes e exportação em lote de XML/DANFE em arquivo compactado), Estoque & Compras (dedução proporcional de ficha técnica BOM e atualização de custo médio ponderado nas compras), e Pessoas & RBAC (integração financeira do pagamento de comissões e aplicação estrita das permissões de acesso e guardas de rota no Layout).
 
 ---
 

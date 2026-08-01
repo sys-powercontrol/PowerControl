@@ -3,24 +3,29 @@ import { formatBR } from "./dateUtils";
 import { db } from "./firebase";
 import { doc, runTransaction, collection, serverTimestamp } from "firebase/firestore";
 
-export type Frequency = "WEEKLY" | "MONTHLY" | "YEARLY";
+export type Frequency = "WEEKLY" | "MONTHLY" | "YEARLY" | "Semanal" | "Mensal" | "Anual";
 
-export function calculateNextDueDate(currentDueDate: string, frequency: Frequency): string {
-  const date = parseISO(currentDueDate);
+export function calculateNextDueDate(currentDueDate: string, frequency?: Frequency | string): string {
+  if (!currentDueDate) return formatBR(new Date(), "yyyy-MM-dd");
+  const date = parseISO(currentDueDate.includes("T") ? currentDueDate : currentDueDate + "T12:00:00");
   let nextDate: Date;
 
-  switch (frequency) {
+  const freq = (frequency || "").toString().toUpperCase();
+
+  switch (freq) {
     case "WEEKLY":
+    case "SEMANAL":
       nextDate = addWeeks(date, 1);
       break;
-    case "MONTHLY":
-      nextDate = addMonths(date, 1);
-      break;
     case "YEARLY":
+    case "ANUAL":
       nextDate = addYears(date, 1);
       break;
+    case "MONTHLY":
+    case "MENSAL":
     default:
       nextDate = addMonths(date, 1);
+      break;
   }
 
   return formatBR(nextDate, "yyyy-MM-dd");

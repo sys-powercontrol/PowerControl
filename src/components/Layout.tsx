@@ -250,9 +250,49 @@ export default function Layout() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Only redirect non-master users if pending approval or if they don't have a company
+  // Route permission guard
+  const currentRouteConfig = (() => {
+    for (const item of menuItems) {
+      if (item.path === location.pathname) {
+        return { 
+          permission: item.permission, 
+          requiresSystemAdmin: item.requiresSystemAdmin, 
+          requiresAdmin: item.requiresAdmin,
+          requiresCompany: item.requiresCompany 
+        };
+      }
+      if (item.submenu) {
+        for (const sub of item.submenu) {
+          if (sub.path === location.pathname) {
+            return { 
+              permission: sub.permission, 
+              requiresSystemAdmin: false, 
+              requiresAdmin: sub.requiresAdmin,
+              requiresCompany: item.requiresCompany 
+            };
+          }
+        }
+      }
+    }
+    return null;
+  })();
+
+  // Redirect non-master users if pending approval or if they don't have a company
   if (user && user.role !== 'master' && (!user.is_active || !hasCompany) && location.pathname !== "/MeuPerfil" && location.pathname !== "/Suporte") {
     return <Navigate to="/MeuPerfil" replace />;
+  }
+
+  // Redirect users who navigate directly to a route they lack permissions for
+  if (user && user.role !== 'master' && currentRouteConfig) {
+    if (currentRouteConfig.requiresSystemAdmin) {
+      return <Navigate to="/" replace />;
+    }
+    if (currentRouteConfig.requiresAdmin && !isUserAdmin) {
+      return <Navigate to="/" replace />;
+    }
+    if (currentRouteConfig.permission && !hasPermission(currentRouteConfig.permission)) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return (
