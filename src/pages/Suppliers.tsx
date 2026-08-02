@@ -12,7 +12,10 @@ import {
   Phone,
   MapPin,
   Shield,
-  Loader2
+  Loader2,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -183,32 +186,56 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Fornecedores</h1>
           <p className="text-gray-500">Gerencie seus parceiros de suprimentos.</p>
         </div>
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch">
           <ExportButton 
             data={filteredSuppliers} 
             filename="fornecedores" 
             format="xlsx" 
             headers={supplierExportHeaders} 
-            className="w-full justify-center text-sm"
-          />
+            className="bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-emerald-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileSpreadsheet className="text-emerald-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+          </ExportButton>
+
           <ExportButton 
             data={filteredSuppliers} 
             filename="fornecedores" 
             format="pdf" 
             title="Relatório de Fornecedores"
             headers={supplierExportHeaders} 
-            className="w-full justify-center text-sm"
-          />
+            className="bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-rose-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileText className="text-rose-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+          </ExportButton>
+
           <button 
             onClick={() => {
               setEditingSupplier(null);
               setFetchedData({});
               setIsModalOpen(true);
             }}
-            className="col-span-2 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200"
+            className="col-span-2 sm:col-span-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold shadow-md shadow-blue-500/20 transition-all text-xs sm:text-sm cursor-pointer min-h-[48px] w-full h-full"
           >
-            <Plus size={20} />
-            Novo Fornecedor
+            <Plus size={18} className="text-white shrink-0" />
+            <span className="truncate">Novo Fornecedor</span>
           </button>
         </div>
       </div>

@@ -18,7 +18,10 @@ import {
   CalendarClock,
   Trash2,
   Edit,
-  RotateCcw
+  RotateCcw,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculateNextDueDate, Frequency } from "../lib/finance";
@@ -478,7 +481,7 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Contas a Receber</h1>
           <p className="text-gray-500">Gestão de recebimentos e faturamento.</p>
         </div>
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch">
           <ExportButton 
             data={filteredAccounts} 
             filename={`contas-receber-${activeTab.toLowerCase()}`} 
@@ -492,8 +495,20 @@ if (!canView) {
               status: 'Status',
               receipt_date: 'Data Recebimento'
             }}
-            className="w-full justify-center text-sm"
-          />
+            className="bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-emerald-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileSpreadsheet className="text-emerald-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+          </ExportButton>
+
           <ExportButton 
             data={filteredAccounts} 
             filename={`contas-receber-${activeTab.toLowerCase()}`} 
@@ -507,14 +522,26 @@ if (!canView) {
               status: 'Status',
               receipt_date: 'Data Recebimento'
             }}
-            className="w-full justify-center text-sm"
-          />
+            className="bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-rose-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileText className="text-rose-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+          </ExportButton>
+
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="col-span-2 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-shadow shadow-lg shadow-green-200"
+            className="col-span-2 sm:col-span-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold shadow-md shadow-emerald-500/20 transition-all text-xs sm:text-sm cursor-pointer min-h-[48px] w-full h-full"
           >
-            <Plus size={20} />
-            Nova Conta
+            <Plus size={18} className="text-white shrink-0" />
+            <span className="truncate">Nova Conta</span>
           </button>
         </div>
       </div>

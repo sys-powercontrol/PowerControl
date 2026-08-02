@@ -14,7 +14,9 @@ import {
   ArrowRight,
   Package,
   Printer,
-  FileText
+  FileText,
+  ChevronRight,
+  FileSpreadsheet
 } from "lucide-react";
 import { 
   BarChart, 
@@ -176,27 +178,45 @@ if (!canView) {
           <h1 className="text-2xl font-bold text-gray-900">Relatório de Giro e Reposição</h1>
           <p className="text-gray-500">Análise de velocidade de vendas e sugestões de compra baseadas em demanda.</p>
         </div>
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+        <div className="grid grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch hide-on-print">
           <button 
             onClick={() => window.print()}
-            className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm hide-on-print"
+            className="bg-slate-50/80 hover:bg-slate-100/90 border border-slate-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-slate-800 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
             title="Imprimir Relatório"
           >
-            <Printer size={18} />
-            <span>Imprimir</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-slate-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <Printer className="text-slate-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Ação</p>
+                <p className="text-xs sm:text-sm font-bold text-slate-700 leading-tight truncate">Imprimir</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
           </button>
+
           <button 
             onClick={() => exportToPdf({ 
               elementId: 'turnover-report-content', 
               filename: 'Relatorio-Giro-Reposicao', 
               title: 'Relatório de Giro e Reposição',
             })}
-            className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm hide-on-print"
+            className="bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-rose-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
             title="Exportar como PDF"
           >
-            <FileText size={16} />
-            <span>PDF</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileText className="text-rose-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
           </button>
+
           <ExportButton 
             data={reportData.map((item: any) => ({
               ...item,
@@ -207,7 +227,7 @@ if (!canView) {
             filename="relatorio-giro-reposicao" 
             format="xlsx" 
             title="Relatório de Giro e Reposição"
-            className="w-full sm:w-auto justify-center shadow-sm border border-green-200 text-sm"
+            className="bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-emerald-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
             headers={{
               name: 'Produto',
               stock_quantity: 'Estoque Atual',
@@ -218,29 +238,18 @@ if (!canView) {
               suggestedPurchase: 'Sugestão de Compra',
               daysOfStock: 'Dias de Estoque'
             }}
-          />
-          <ExportButton 
-            data={reportData.map((item: any) => ({
-              ...item,
-              dailyAvg30: Number(item.dailyAvg30).toFixed(2).replace('.', ','),
-              suggestedPurchase: Number(item.suggestedPurchase).toFixed(2).replace('.', ','),
-              daysOfStock: Number(item.daysOfStock).toFixed(0)
-            }))} 
-            filename="relatorio-giro-reposicao" 
-            format="csv" 
-            title="Relatório de Giro e Reposição"
-            className="w-full sm:w-auto justify-center shadow-sm border border-gray-200 text-sm"
-            headers={{
-              name: 'Produto',
-              stock_quantity: 'Estoque Atual',
-              min_stock: 'Estoque Mínimo',
-              sales30: 'Vendas (30d)',
-              sales90: 'Vendas (90d)',
-              dailyAvg30: 'Média Diária',
-              suggestedPurchase: 'Sugestão de Compra',
-              daysOfStock: 'Dias de Estoque'
-            }}
-          />
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileSpreadsheet className="text-emerald-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+          </ExportButton>
         </div>
       </div>
 

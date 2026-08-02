@@ -17,7 +17,9 @@ import {
   Shield,
   Info,
   Printer,
-  FileText
+  FileText,
+  ChevronRight,
+  FileSpreadsheet
 } from "lucide-react";
 import { 
   BarChart, 
@@ -239,27 +241,45 @@ if (!canView) {
               Personalizado
             </button>
           </div>
-          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto hide-on-print">
+          <div className="grid grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch hide-on-print">
             <button 
               onClick={() => window.print()}
-              className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm"
+              className="bg-slate-50/80 hover:bg-slate-100/90 border border-slate-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-slate-800 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
               title="Imprimir Relatório"
             >
-              <Printer size={18} />
-              <span>Imprimir</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-white/90 border border-slate-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Printer className="text-slate-600" size={17} />
+                </div>
+                <div className="text-left truncate">
+                  <p className="text-[10px] font-semibold text-slate-500 leading-tight">Ação</p>
+                  <p className="text-xs sm:text-sm font-bold text-slate-700 leading-tight truncate">Imprimir</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
             </button>
+
             <button 
               onClick={() => exportToPdf({ 
                 elementId: 'dre-report-content', 
                 filename: 'DRE-Simplificado', 
                 title: 'DRE Simplificado',
               })}
-              className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 font-bold text-sm"
+              className="bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-rose-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
               title="Exportar como PDF"
             >
-              <FileText size={16} />
-              <span>PDF</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                  <FileText className="text-rose-600" size={17} />
+                </div>
+                <div className="text-left truncate">
+                  <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                  <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
             </button>
+
             <ExportButton 
               data={dreData.detailedMovements.map((item: any) => ({
                 ...item,
@@ -268,7 +288,7 @@ if (!canView) {
               filename="DRE-Movimentacoes" 
               format="xlsx" 
               title="DRE - Movimentações"
-              className="w-full sm:w-auto justify-center shadow-sm border border-green-200 text-sm"
+              className="bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-emerald-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
               headers={{
                 tipo: 'Tipo',
                 data: 'Data',
@@ -276,24 +296,18 @@ if (!canView) {
                 valor: 'Valor',
                 forma_pagamento: 'Forma de Pagto'
               }}
-            />
-            <ExportButton 
-              data={dreData.detailedMovements.map((item: any) => ({
-                ...item,
-                valor: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor)
-              }))} 
-              filename="DRE-Movimentacoes" 
-              format="csv" 
-              title="DRE - Movimentações"
-              className="w-full sm:w-auto justify-center shadow-sm border border-gray-200 text-sm"
-              headers={{
-                tipo: 'Tipo',
-                data: 'Data',
-                descricao: 'Descrição',
-                valor: 'Valor',
-                forma_pagamento: 'Forma de Pagto'
-              }}
-            />
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                  <FileSpreadsheet className="text-emerald-600" size={17} />
+                </div>
+                <div className="text-left truncate">
+                  <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                  <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+            </ExportButton>
           </div>
         </div>
       </div>

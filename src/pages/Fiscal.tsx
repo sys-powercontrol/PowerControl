@@ -14,7 +14,10 @@ import {
   Clock,
   Printer,
   XCircle,
-  Shield
+  Shield,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import NfeStatusBadge, { NfeStatus } from "../components/NfeStatusBadge";
@@ -409,53 +412,80 @@ if (!canManage) {
           <h1 className="text-2xl font-bold text-gray-900">Fiscal (NF-e / NFC-e)</h1>
           <p className="text-gray-500">Emissão e controle de Notas Fiscais Eletrônicas.</p>
         </div>
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:items-center gap-3 w-full lg:w-auto min-w-0 items-stretch">
           <ExportButton 
             data={filteredInvoices} 
             filename="notas-fiscais" 
             format="xlsx" 
             headers={invoiceExportHeaders} 
-            className="w-full justify-center text-sm"
-          />
+            className="bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-emerald-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileSpreadsheet className="text-emerald-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+          </ExportButton>
+
           <ExportButton 
             data={filteredInvoices} 
             filename="notas-fiscais" 
             format="pdf" 
             title="Relatório de Notas Fiscais"
             headers={invoiceExportHeaders} 
-            className="w-full justify-center text-sm"
-          />
+            className="bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-rose-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                <FileText className="text-rose-600" size={17} />
+              </div>
+              <div className="text-left truncate">
+                <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+          </ExportButton>
+
           <button
             onClick={handleExportXmlZip}
             disabled={isExportingXmlZip}
-            className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold hover:bg-emerald-100 transition-all text-xs sm:text-sm disabled:opacity-50"
+            className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 text-slate-700 font-bold transition-all text-xs sm:text-sm disabled:opacity-50 min-h-[48px] w-full h-full cursor-pointer"
             title="Exportar todos os XMLs emitidos compactados em arquivo ZIP"
           >
-            <Download size={18} className={isExportingXmlZip ? "animate-bounce" : ""} />
-            {isExportingXmlZip ? "Exportando..." : "XMLs (ZIP)"}
+            <Download size={18} className={isExportingXmlZip ? "animate-bounce text-emerald-600 shrink-0" : "text-slate-600 shrink-0"} />
+            <span className="truncate">{isExportingXmlZip ? "Exportando..." : "XMLs (ZIP)"}</span>
           </button>
+
           <button
             onClick={handleSyncPendingInvoices}
             disabled={isSyncingPending}
-            className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-bold hover:bg-amber-100 transition-all text-xs sm:text-sm disabled:opacity-50"
+            className="bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold transition-all text-xs sm:text-sm disabled:opacity-50 min-h-[48px] w-full h-full cursor-pointer"
             title="Consultar e reprocessar notas fiscais com status pendente"
           >
-            <Clock size={18} className={isSyncingPending ? "animate-spin" : ""} />
-            {isSyncingPending ? "Sincronizando..." : "Sincronizar Pendentes"}
+            <Clock size={18} className={isSyncingPending ? "animate-spin text-amber-600 shrink-0" : "text-amber-600 shrink-0"} />
+            <span className="truncate">{isSyncingPending ? "Sincronizando..." : "Sincronizar"}</span>
           </button>
+
           <Link 
             to="/Certificado"
-            className="col-span-1 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all text-xs sm:text-sm"
+            className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold transition-all text-xs sm:text-sm min-h-[48px] w-full h-full"
           >
-            <Shield size={20} className="text-blue-600" />
-            Certificado Digital
+            <Shield size={18} className="text-blue-600 shrink-0" />
+            <span className="truncate">Certificado</span>
           </Link>
+
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="col-span-1 sm:col-span-1 w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200 text-xs sm:text-sm"
+            className="col-span-2 sm:col-span-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold shadow-md shadow-blue-500/20 transition-all text-xs sm:text-sm cursor-pointer min-h-[48px] w-full h-full"
           >
-            <Plus size={20} />
-            Emitir Nova Nota
+            <Plus size={18} className="text-white shrink-0" />
+            <span className="truncate">Emitir Nova Nota</span>
           </button>
         </div>
       </div>

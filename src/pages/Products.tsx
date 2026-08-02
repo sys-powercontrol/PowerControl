@@ -366,7 +366,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:flex lg:items-center gap-3 w-full lg:w-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto min-w-0 items-stretch">
             {activeTab === "Produtos" && (
               <>
                 <ExportButton 
@@ -374,18 +374,18 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                   filename="produtos" 
                   format="xlsx" 
                   headers={productExportHeaders} 
-                  className="bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-2xl p-3 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-emerald-900 transition-all cursor-pointer shadow-2xs group"
+                  className="bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-emerald-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
-                      <FileSpreadsheet className="text-emerald-600" size={20} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                      <FileSpreadsheet className="text-emerald-600" size={17} />
                     </div>
-                    <div className="text-left">
-                      <p className="text-[11px] font-semibold text-slate-500 leading-tight">Exportar</p>
-                      <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight">Excel</p>
+                    <div className="text-left truncate">
+                      <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                      <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel</p>
                     </div>
                   </div>
-                  <ChevronRight size={18} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                  <ChevronRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
                 </ExportButton>
 
                 <ExportButton 
@@ -394,31 +394,31 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                   format="pdf" 
                   title="Relatório de Produtos"
                   headers={productExportHeaders} 
-                  className="bg-rose-50/70 hover:bg-rose-100/80 border border-rose-200/80 rounded-2xl p-3 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-rose-900 transition-all cursor-pointer shadow-2xs group"
+                  className="bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-rose-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
-                      <FileText className="text-rose-600" size={20} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                      <FileText className="text-rose-600" size={17} />
                     </div>
-                    <div className="text-left">
-                      <p className="text-[11px] font-semibold text-slate-500 leading-tight">Exportar</p>
-                      <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight">PDF</p>
+                    <div className="text-left truncate">
+                      <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                      <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF</p>
                     </div>
                   </div>
-                  <ChevronRight size={18} className="text-rose-500 group-hover:translate-x-0.5 transition-transform" />
+                  <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
                 </ExportButton>
 
                 <button 
                   onClick={() => setIsLabelModalOpen(true)}
-                  className="bg-purple-50/70 hover:bg-purple-100/80 border border-purple-200/80 rounded-2xl p-3 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-purple-900 transition-all cursor-pointer shadow-2xs group"
+                  className="bg-purple-50/80 hover:bg-purple-100/90 border border-purple-200/80 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 text-purple-900 transition-all cursor-pointer shadow-2xs group min-h-[48px] w-full h-full"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-white/90 border border-purple-200/60 flex items-center justify-center shrink-0 shadow-2xs">
-                      <Tag className="text-purple-600" size={20} />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white/90 border border-purple-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                      <Tag className="text-purple-600" size={17} />
                     </div>
-                    <span className="text-xs sm:text-sm font-bold text-purple-900">Etiquetas</span>
+                    <span className="text-xs sm:text-sm font-bold text-purple-900 truncate">Etiquetas</span>
                   </div>
-                  <ChevronRight size={18} className="text-purple-500 group-hover:translate-x-0.5 transition-transform" />
+                  <ChevronRight size={16} className="text-purple-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
                 </button>
               </>
             )}
@@ -435,10 +435,10 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                   if (activeTab === "Categorias") { setEditingCategory(null); setIsCategoryModalOpen(true); }
                   if (activeTab === "Marcas") { setEditingBrand(null); setIsBrandModalOpen(true); }
                 }}
-                className={`${activeTab === "Produtos" ? "col-span-2 sm:col-span-1 lg:w-auto" : "col-span-2"} bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl px-5 py-3.5 flex items-center justify-center gap-2.5 font-bold shadow-lg shadow-blue-500/25 transition-all text-sm shrink-0 cursor-pointer`}
+                className={`${activeTab === "Produtos" ? "" : "col-span-2 sm:col-span-1 lg:w-48"} bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold shadow-md shadow-blue-500/20 transition-all text-xs sm:text-sm cursor-pointer min-h-[48px] w-full h-full`}
               >
-                <Plus size={20} className="text-white" />
-                <span>
+                <Plus size={18} className="text-white shrink-0" />
+                <span className="truncate">
                   {activeTab === "Produtos" && "Novo Produto"}
                   {activeTab === "Categorias" && "Nova Categoria"}
                   {activeTab === "Marcas" && "Nova Marca"}
