@@ -497,13 +497,13 @@ export default function Layout() {
             </Link>
           </>
         )}
-        <Link to="/MeuPerfil" className={cn("flex flex-col items-center p-2", isActive("/MeuPerfil") ? "text-blue-600" : "text-gray-500")}>
-          <User size={24} />
-          <span className="text-[10px] mt-1">Perfil</span>
+        <Link to="/Produtos" className={cn("flex flex-col items-center p-2", isActive("/Produtos") ? "text-blue-600" : "text-gray-500")}>
+          <Package size={24} />
+          <span className="text-[10px] mt-1">Catálogo</span>
         </Link>
-        <Link to="/Suporte" className={cn("flex flex-col items-center p-2", isActive("/Suporte") ? "text-blue-600" : "text-gray-500")}>
-          <HelpCircle size={24} />
-          <span className="text-[10px] mt-1">Suporte</span>
+        <Link to="/ContasPagar" className={cn("flex flex-col items-center p-2", isActive("/ContasPagar") ? "text-blue-600" : "text-gray-500")}>
+          <Wallet size={24} />
+          <span className="text-[10px] mt-1">Financeiro</span>
         </Link>
         <button 
           onClick={() => setIsMobileMenuOpen(true)}

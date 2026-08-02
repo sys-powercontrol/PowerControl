@@ -1,74 +1,51 @@
-# Especificação Técnica de Finalização de Funcionalidades (Spec)
-> **Data e Hora de Geração:** 01/08/2026 às 11:37:00 (Horário de Brasília - BRT)
+# Especificação Técnica de Finalizações (Spec)
+
+**Data e Hora de Geração (Horário de Brasília):** 02/08/2026 13:27:47 BRT
 
 ---
 
-## 1. Módulo: Vendas & PWA Offline Sync (`/Sales` & `/offlineStore`)
-
-### 1.1. Escopo de Comportamento (Behavior)
-* Ao restabelecer a conexão de rede, o Service Worker / `offlineStore` deve tentar sincronizar as vendas em fila no IndexedDB.
-* Caso um item da venda offline não possua saldo em estoque suficiente no Firestore no momento do sync:
-  1. A venda deve ser gravada com o status `"Pendente de Estoque"`.
-  2. Um registro de alerta deve ser inserido na coleção `notifications` para avisar o administrador no `NotificationCenter`.
-  3. Se houver estoque, a baixa de estoque e o faturamento devem ocorrer normalmente.
+## 1. Escopo e Objetivos
+Esta especificação descreve em detalhes técnicos as alterações de comportamento, regras de negócio e componentes/páginas necessários para concluir 100% das funcionalidades pendentes mapeadas no relatório de análise do sistema.
 
 ---
 
-## 2. Módulo: Financeiro & Recorrência (`/AccountsPayable`, `/AccountsReceivable`)
+## 2. Especificações por Módulo
 
-### 2.1. Escopo de Comportamento (Behavior & Components)
-* **Geração Automática de Próxima Parcela:**
-  * Ao dar baixa em uma conta configurada como `is_recurring: true` e `recurrence_period` (`Mensal`, `Anual`, etc.), o sistema deve gerar automaticamente a próxima ocorrência no Firestore para o mês/período subsequente com status `"Pendente"`.
-* **Baixa/Liquidação em Lote:**
-  * Disponibilizar botão de ação em lote na barra superior da tabela quando um ou mais registros forem selecionados via checkbox (`selectedIds`).
-  * Modal de liquidação em lote solicitando Conta Bancária/Caixa de destino, Data de Pagamento/Recebimento e Forma de Pagamento para liquidar todos os selecionados simultaneamente.
+### SPEC-01: Resiliência e Transacionalidade de Sincronização Offline de Vendas
+- **Páginas e Módulos:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/lib/offlineStore.ts`
+- **Comportamento Esperado:**
+  - Persistir vendas realizadas sem conexão no IndexedDB/LocalStorage.
+  - Ao detectar o retorno da conectividade via listener de rede, disparar a sincronização em lote utilizando transações atômicas no Firestore (`runTransaction`).
+  - Sincronizar simultaneamente a criação do registro de venda, baixa no estoque (`inventory_movements`), movimentação no livro caixa (`movements`) e criação de título em `accountsReceivable`.
+  - Exibir badge indicador visual no histórico de vendas informando o status de sincronização (`Sincronizado` / `Pendente`).
 
----
+### SPEC-02: Gerenciamento e Liquidação de Recorrências Financeiras
+- **Páginas e Módulos:** `src/pages/AccountsPayable.tsx`, `src/pages/AccountsReceivable.tsx`, `src/lib/finance.ts`
+- **Comportamento Esperado:**
+  - Permitir alteração ou liquidação de títulos recorrentes oferecendo escolha entre atualizar apenas a parcela selecionada ou aplicar a alteração em cascata às parcelas futuras.
+  - Interromper a geração automática de novos lançamentos assim que atingida a data de término ou a quantidade máxima de parcelas estipulada.
 
-## 3. Módulo: Conciliação Bancária OFX (`/BankReconciliation` & `/OFXImporter`)
+### SPEC-03: Algoritmo de Match Automático e Baixa via OFX
+- **Páginas e Módulos:** `src/pages/BankReconciliation.tsx`, `src/components/Financial/OFXImporter.tsx`
+- **Comportamento Esperado:**
+  - Implementar algoritmo para cruzamento de dados de extrato OFX com lançamentos abertos no sistema, considerando aproximação de data (±3 dias), correspondência exata de valor e similaridade de descrição/documento.
+  - Atribuir uma pontuação de confiança (*Score de Match*) para cada sugestão de conciliação.
+  - Permitir a conciliação e baixa em lote das transações confirmadas pelo usuário com alteração do status para `Conciliado`.
 
-### 3.1. Escopo de Comportamento (Behavior & Components)
-* **Algoritmo de Auto-Matching de Transações OFX:**
-  * Para cada transação importada do extrato OFX, buscar lançamentos no `accountsPayable` ou `accountsReceivable` com base em:
-    1. **Combinação Exata de Valor:** Transação com mesmo valor numérico (Crédito/Débito).
-    2. **Janela Temporala (±3 Dias):** Data do vencimento/pagamento no intervalo de 3 dias antes ou depois da data da transação do extrato.
-  * Exibir uma badge de relevância ("95% Match", "Correspondente") e um botão de confirmação em 1 clique para realizar a baixa automática do título correspondente.
+### SPEC-04: Compactação Mensal de XMLs Fiscais e Reprocessamento de Contingência
+- **Páginas e Módulos:** `src/pages/Fiscal.tsx`, `src/lib/fiscal.ts`
+- **Comportamento Esperado:**
+  - Permitir seleção de mês/ano para geração e download de um pacote ZIP contendo todos os arquivos XML das NF-e / NFC-e autorizadas no período.
+  - Implementar opção de reprocessamento e re-autorização para notas fiscais armazenadas com status pendente ou em contingência.
 
----
+### SPEC-05: Atualização em Cascata de Custos em Ficha Técnica (BOM)
+- **Páginas e Módulos:** `src/pages/Products.tsx`, `src/lib/inventory.ts`
+- **Comportamento Esperado:**
+  - Sempre que o custo de uma matéria-prima/insumo for atualizado (via entrada de nota de compra ou ajuste manual), recalcular automaticamente o `cost_price` de todos os produtos acabados que contenham esse insumo na sua lista de componentes (`bom_items`).
+  - Registrar no histórico as alterações de custo decorrentes do recalculo.
 
-## 4. Módulo: Fiscal & Reprocessamento NFe (`/Fiscal`)
-
-### 4.1. Escopo de Comportamento (Behavior & Components)
-* **Fila de Sincronização / Reprocessamento de Status:**
-  * Botão "Sincronizar Pendentes" na página Fiscal que consulta todas as notas com status `Pendente`, `Aguardando` ou `Processando` na API fiscal e atualiza o estado e a chave de acesso no Firestore.
-* **Exportação Compactada em ZIP:**
-  * Botão "Exportar XMLs (ZIP)" que compacta os arquivos XML das notas emitidas no período selecionado utilizando `JSZip` e dispara o download do arquivo `notas_fiscais_periodo.zip`.
-
----
-
-## 5. Módulo: Estoque, Compras e Ficha Técnica / BOM (`/BOMBuilder`, `/inventory`, `/Purchases`)
-
-### 5.1. Escopo de Comportamento (Behavior & Components)
-* **Dedução de Insumos da Ficha Técnica (BOM):**
-  * Na rotina `processInventoryForSale`, verificar se o produto vendido possui uma lista de componentes/ingredientes associados (`bom`).
-  * Em caso afirmativo, realizar também o lançamento de saída de estoque para cada componente proporcionalmente à quantidade vendida.
-* **Custo Médio Ponderado e Contas a Pagar na Compra:**
-  * Na confirmação da entrada de uma compra em `Purchases.tsx`:
-    1. Calcular o novo Custo Médio Ponderado do produto:
-       $$\text{Custo Médio Novo} = \frac{(\text{Qtd Atual} \times \text{Custo Atual}) + (\text{Qtd Comprada} \times \text{Preço Comprado})}{\text{Qtd Atual} + \text{Qtd Comprada}}$$
-    2. Atualizar o campo `cost_price` do produto no Firestore.
-    3. Criar automaticamente o lançamento correspondente no `accountsPayable`.
-
----
-
-## 6. Módulo: Pessoas, Comissões e RBAC (`/CommissionPayouts`, `/Layout`)
-
-### 6.1. Escopo de Comportamento (Behavior & Components)
-* **Baixa Financeira de Comissões:**
-  * Ao clicar em "Pagar Comissão" em `CommissionPayouts.tsx`, registrar a transação financeira no `accountsPayable` com a categoria "Comissões de Vendas" e criar a respectiva movimentação de saída no caixa/banco selecionado.
-* **Validação Estrita de Permissões no Layout:**
-  * Garantir que o `Layout.tsx` oculte itens de menu que o usuário logado não possui permissão para acessar com base em `user.permissions` / `user.role`.
-  * Redirecionar usuários sem permissão que tentem acessar rotas protegidas diretamente via URL.
-
----
-*Documento de Especificação Técnica gerado com foco estrito nas pendências identificadas.*
+### SPEC-06: Estorno e Integração Financeira de Comissões
+- **Páginas e Módulos:** `src/pages/CommissionPayouts.tsx`, `src/pages/SalesHistory.tsx`
+- **Comportamento Esperado:**
+  - Na liquidação de comissões de vendedores em `CommissionPayouts.tsx`, criar automaticamente uma saída financeira vinculada em `accountsPayable`.
+  - Em casos de cancelamento ou exclusão de vendas no histórico, recalcular a comissão do vendedor e alterar o status da comissão para `Cancelada`.

@@ -165,8 +165,14 @@ export default function SalesHistory() {
         // Return stock quantities to inventory
         await inventory.reverseSaleStock(dbSale);
 
-        // We then set status to "Cancelada"
-        await api.put("sales", id, { status: "Cancelada" });
+        // Cancel commission
+        const commissionUpdates: Record<string, any> = { status: "Cancelada" };
+        if (dbSale.commission_amount > 0) {
+          commissionUpdates.commission_status = "cancelled";
+        }
+
+        // We then set status to "Cancelada" and update commission_status
+        await api.put("sales", id, commissionUpdates);
       }
     },
     onSuccess: () => {

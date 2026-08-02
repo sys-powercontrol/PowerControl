@@ -13,7 +13,16 @@ import {
   Trash2, 
   Tag, 
   Award,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText,
+  ShoppingCart,
+  Zap,
+  ShieldCheck,
+  Cloud,
+  TrendingUp,
+  Box
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -335,62 +344,242 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{activeTab}</h1>
-          <p className="text-gray-500">
-            {activeTab === "Produtos" && "Gerencie seu estoque e catálogo."}
-            {activeTab === "Categorias" && "Organize seus produtos por categorias."}
-            {activeTab === "Marcas" && "Gerencie as marcas dos seus produtos."}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-          {activeTab === "Produtos" && (
-            <>
-              <ExportButton 
-                data={filteredProducts} 
-                filename="produtos" 
-                format="xlsx" 
-                headers={productExportHeaders} 
-                className="w-full justify-center text-sm"
-              />
-              <ExportButton 
-                data={filteredProducts} 
-                filename="produtos" 
-                format="pdf" 
-                title="Relatório de Produtos"
-                headers={productExportHeaders} 
-                className="w-full justify-center text-sm"
-              />
+      {/* Top Banner Card matching reference layout */}
+      <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm space-y-6">
+        {/* Top Header Row */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 via-indigo-50 to-blue-200 border border-blue-200/60 flex items-center justify-center shadow-inner relative shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl shadow-md flex items-center justify-center transform -rotate-3">
+                <Package className="text-white" size={22} />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{activeTab}</h1>
+              <p className="text-slate-500 text-sm mt-0.5">
+                {activeTab === "Produtos" && (
+                  <>Gerencie seu estoque e catálogo de produtos com <span className="text-blue-600 font-semibold">mais eficiência.</span></>
+                )}
+                {activeTab === "Categorias" && "Organize seus produtos por categorias de forma simples."}
+                {activeTab === "Marcas" && "Gerencie as marcas dos seus produtos de forma organizada."}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:flex lg:items-center gap-3 w-full lg:w-auto">
+            {activeTab === "Produtos" && (
+              <>
+                <ExportButton 
+                  data={filteredProducts} 
+                  filename="produtos" 
+                  format="xlsx" 
+                  headers={productExportHeaders} 
+                  className="bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-2xl p-3 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-emerald-900 transition-all cursor-pointer shadow-2xs group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-white/90 border border-emerald-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                      <FileSpreadsheet className="text-emerald-600" size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[11px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                      <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight">Excel</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                </ExportButton>
+
+                <ExportButton 
+                  data={filteredProducts} 
+                  filename="produtos" 
+                  format="pdf" 
+                  title="Relatório de Produtos"
+                  headers={productExportHeaders} 
+                  className="bg-rose-50/70 hover:bg-rose-100/80 border border-rose-200/80 rounded-2xl p-3 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-rose-900 transition-all cursor-pointer shadow-2xs group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-white/90 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                      <FileText className="text-rose-600" size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[11px] font-semibold text-slate-500 leading-tight">Exportar</p>
+                      <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight">PDF</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-rose-500 group-hover:translate-x-0.5 transition-transform" />
+                </ExportButton>
+
+                <button 
+                  onClick={() => setIsLabelModalOpen(true)}
+                  className="bg-purple-50/70 hover:bg-purple-100/80 border border-purple-200/80 rounded-2xl p-3 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-purple-900 transition-all cursor-pointer shadow-2xs group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-white/90 border border-purple-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                      <Tag className="text-purple-600" size={20} />
+                    </div>
+                    <span className="text-xs sm:text-sm font-bold text-purple-900">Etiquetas</span>
+                  </div>
+                  <ChevronRight size={18} className="text-purple-500 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </>
+            )}
+
+            {canManage && (
               <button 
-                onClick={() => setIsLabelModalOpen(true)}
-                className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-shadow shadow-sm text-sm"
+                onClick={() => { 
+                  if (activeTab === "Produtos") { 
+                    setEditingProduct(null); 
+                    setImageBase64(null); 
+                    setBomItems([]);
+                    setIsModalOpen(true); 
+                  }
+                  if (activeTab === "Categorias") { setEditingCategory(null); setIsCategoryModalOpen(true); }
+                  if (activeTab === "Marcas") { setEditingBrand(null); setIsBrandModalOpen(true); }
+                }}
+                className={`${activeTab === "Produtos" ? "col-span-2 sm:col-span-1 lg:w-auto" : "col-span-2"} bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl px-5 py-3.5 flex items-center justify-center gap-2.5 font-bold shadow-lg shadow-blue-500/25 transition-all text-sm shrink-0 cursor-pointer`}
               >
-                <Tag size={20} className="text-blue-600" />
-                Etiquetas
+                <Plus size={20} className="text-white" />
+                <span>
+                  {activeTab === "Produtos" && "Novo Produto"}
+                  {activeTab === "Categorias" && "Nova Categoria"}
+                  {activeTab === "Marcas" && "Nova Marca"}
+                </span>
               </button>
-            </>
-          )}
-          {canManage && (
-            <button 
-              onClick={() => { 
-                if (activeTab === "Produtos") { 
-                  setEditingProduct(null); 
-                  setImageBase64(null); 
-                  setBomItems([]);
-                  setIsModalOpen(true); 
-                }
-                if (activeTab === "Categorias") { setEditingCategory(null); setIsCategoryModalOpen(true); }
-                if (activeTab === "Marcas") { setEditingBrand(null); setIsBrandModalOpen(true); }
-              }}
-              className={`${activeTab === "Produtos" ? "col-span-2 sm:col-span-1" : "col-span-2"} w-full sm:w-auto justify-center flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-shadow shadow-lg shadow-blue-200 text-sm`}
-            >
-              <Plus size={20} />
-              {activeTab === "Produtos" && "Novo Produto"}
-              {activeTab === "Categorias" && "Nova Categoria"}
-              {activeTab === "Marcas" && "Nova Marca"}
-            </button>
-          )}
+            )}
+          </div>
+        </div>
+
+        {/* Middle Feature Banner */}
+        <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/70 border border-blue-100/80 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+          <div className="space-y-4 max-w-xl z-10">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-white border border-blue-100 shadow-md flex items-center justify-center text-blue-600 shrink-0">
+                <ShoppingCart size={26} />
+              </div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-slate-800">Tudo organizado, sempre disponível</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Cadastre, edite e acompanhe seus produtos de maneira rápida e intuitiva.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <span className="bg-white/90 border border-blue-100/80 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1.5">
+                <Zap size={14} className="text-blue-500 fill-blue-500" /> Rápido
+              </span>
+              <span className="bg-white/90 border border-emerald-100/80 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-500" /> Seguro
+              </span>
+              <span className="bg-white/90 border border-purple-100/80 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1.5">
+                <Cloud size={14} className="text-purple-500" /> Na nuvem
+              </span>
+            </div>
+          </div>
+
+          <div className="relative w-full md:w-72 h-32 flex items-center justify-center shrink-0">
+            <div className="absolute inset-0 bg-radial from-blue-200/40 to-transparent rounded-full blur-2xl -z-0"></div>
+            <svg className="w-full h-full relative z-10 max-h-32 drop-shadow-md" viewBox="0 0 280 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="140" cy="120" rx="110" ry="16" fill="#E2E8F0" opacity="0.6"/>
+              <ellipse cx="140" cy="116" rx="90" ry="12" fill="#FFFFFF"/>
+              
+              <rect x="110" y="55" width="55" height="45" rx="4" fill="#3B82F6"/>
+              <path d="M110 55 L137.5 45 L165 55 L137.5 65 Z" fill="#60A5FA"/>
+              <path d="M137.5 65 L165 55 L165 100 L137.5 100 Z" fill="#2563EB"/>
+              <rect x="142" y="80" width="12" height="10" fill="#FFFFFF" opacity="0.8" rx="1"/>
+
+              <rect x="95" y="80" width="35" height="28" rx="3" fill="#60A5FA"/>
+              <path d="M95 80 L112.5 72 L130 80 L112.5 86 Z" fill="#93C5FD"/>
+              <path d="M112.5 86 L130 80 L130 108 L112.5 108 Z" fill="#3B82F6"/>
+
+              <rect x="160" y="30" width="48" height="70" rx="6" fill="#FFFFFF" stroke="#93C5FD" strokeWidth="2"/>
+              <rect x="176" y="24" width="16" height="10" rx="3" fill="#3B82F6"/>
+              
+              <circle cx="170" cy="48" r="4" fill="#60A5FA"/>
+              <path d="M168 48 L170 50 L173 46" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/>
+              <rect x="178" y="46" width="22" height="3" rx="1.5" fill="#CBD5E1"/>
+
+              <circle cx="170" cy="62" r="4" fill="#3B82F6"/>
+              <path d="M168 62 L170 64 L173 60" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/>
+              <rect x="178" y="60" width="22" height="3" rx="1.5" fill="#94A3B8"/>
+
+              <circle cx="170" cy="76" r="4" fill="#2563EB"/>
+              <path d="M168 76 L170 78 L173 74" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/>
+              <rect x="178" y="74" width="22" height="3" rx="1.5" fill="#94A3B8"/>
+
+              <circle cx="170" cy="90" r="4" fill="#1D4ED8"/>
+              <path d="M168 90 L170 92 L173 88" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/>
+              <rect x="178" y="88" width="18" height="3" rx="1.5" fill="#CBD5E1"/>
+
+              <path d="M215 95 C225 80, 220 65, 212 60 C210 75, 205 85, 215 95 Z" fill="#34D399"/>
+              <path d="M218 95 C228 85, 230 75, 224 70 C220 80, 215 90, 218 95 Z" fill="#10B981"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Bottom Metrics Bar */}
+        <div className="bg-slate-50/60 border border-slate-100 rounded-2xl p-4 sm:p-5 grid grid-cols-2 lg:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/60">
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-2">
+            <div className="w-12 h-12 rounded-2xl bg-blue-100/70 border border-blue-200/50 flex items-center justify-center shrink-0 text-blue-600">
+              <Package size={22} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500">Produtos cadastrados</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-lg sm:text-xl font-extrabold text-slate-900">{products.length.toLocaleString('pt-BR')}</span>
+                <span className="text-[11px] font-bold text-blue-600 bg-blue-100/80 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                  <TrendingUp size={10} /> 12%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100/70 border border-emerald-200/50 flex items-center justify-center shrink-0 text-emerald-600">
+              <Tag size={22} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500">Categorias</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-lg sm:text-xl font-extrabold text-slate-900">{categories.length.toLocaleString('pt-BR')}</span>
+                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-100/80 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                  <TrendingUp size={10} /> 8%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
+            <div className="w-12 h-12 rounded-2xl bg-purple-100/70 border border-purple-200/50 flex items-center justify-center shrink-0 text-purple-600">
+              <Box size={22} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500">Estoque total</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  {products.reduce((acc: number, p: any) => acc + (Number(p.stock_quantity) || 0), 0).toLocaleString('pt-BR')}
+                </span>
+                <span className="text-[11px] font-bold text-purple-600 bg-purple-100/80 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                  <TrendingUp size={10} /> 15%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100/70 border border-amber-200/50 flex items-center justify-center shrink-0 text-amber-600">
+              <TrendingUp size={22} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500">Produtos em destaque</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  {products.filter((p: any) => (p.stock_quantity || 0) > 0).length.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-[11px] font-bold text-amber-600 bg-amber-100/80 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                  <TrendingUp size={10} /> 6%
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

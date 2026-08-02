@@ -13,6 +13,7 @@ interface ExportButtonProps {
   title?: string;
   headers?: Record<string, string>;
   className?: string;
+  children?: React.ReactNode;
   summaryBlocks?: {
     label: string;
     value: string;
@@ -27,6 +28,7 @@ export default function ExportButton({
   title, 
   headers,
   className,
+  children,
   summaryBlocks
 }: ExportButtonProps) {
   
@@ -225,10 +227,14 @@ export default function ExportButton({
   return (
     <button
       onClick={handleExport}
-      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${bgColor} ${className}`}
+      className={className || `flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${bgColor}`}
     >
-      <Icon size={18} />
-      <span>{label}</span>
+      {children ? children : (
+        <>
+          <Icon size={18} />
+          <span>{label}</span>
+        </>
+      )}
     </button>
   );
 }

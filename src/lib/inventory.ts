@@ -434,6 +434,32 @@ export const inventory = {
           cost_price: new_weighted_cost
         });
 
+        // Recalculate BOM products using this ingredient
+        try {
+          const { collection: col, query: q, where: w, getDocs: gDocs } = await import("firebase/firestore");
+          const allProdsSnap = await gDocs(q(col(db, "products"), w("company_id", "==", user.company_id)));
+          allProdsSnap.docs.forEach((pDoc) => {
+            const pData = pDoc.data();
+            if (pData.bom_items && Array.isArray(pData.bom_items)) {
+              const hasIngredient = pData.bom_items.some((b: any) => b.product_id === item.id);
+              if (hasIngredient) {
+                let totalBomCost = 0;
+                pData.bom_items.forEach((b: any) => {
+                  const bCost = b.product_id === item.id ? new_weighted_cost : (Number(b.cost_price) || Number(b.cost) || Number(b.price) || 0);
+                  totalBomCost += (Number(b.quantity) || 1) * bCost;
+                });
+                const bomProdRef = doc(db, "products", pDoc.id);
+                transaction.update(bomProdRef, {
+                  cost: totalBomCost,
+                  cost_price: totalBomCost
+                });
+              }
+            }
+          });
+        } catch (bomErr) {
+          console.error("Erro ao recalcular custo de produtos compostos (BOM):", bomErr);
+        }
+
         // Record movement
         const movementRef = doc(collection(db, "inventory_movements"));
         const movement = {
