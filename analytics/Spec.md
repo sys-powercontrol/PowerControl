@@ -1,51 +1,70 @@
 # Especificação Técnica de Finalizações (Spec)
 
-**Data e Hora de Geração (Horário de Brasília):** 02/08/2026 14:29:20 BRT
+**Data e Hora de Geração:** 02/08/2026 17:22:14 (Horário de Brasília - BRT)
 
 ---
 
 ## 1. Escopo e Objetivos
-Esta especificação descreve em detalhes técnicos as alterações de comportamento, regras de negócio e componentes/páginas necessários para concluir 100% das funcionalidades pendentes mapeadas no relatório de análise do sistema.
+Esta especificação estabelece os requisitos técnicos detalhados para a conclusão das 6 pendências mapeadas no relatório geral (`analytics/report.md`). O objetivo é definir as alterações de página, comportamento e componente necessárias para finalizar o sistema sem adicionar novas páginas ou funcionalidades fora do escopo original.
 
 ---
 
-## 2. Especificações por Módulo
+## 2. Especificações de Finalização por Módulo
 
-### SPEC-01: Resiliência e Transacionalidade de Sincronização Offline de Vendas
-- **Páginas e Módulos:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/lib/offlineStore.ts`
-- **Comportamento Esperado:**
-  - Persistir vendas realizadas sem conexão no IndexedDB/LocalStorage.
-  - Ao detectar o retorno da conectividade via listener de rede, disparar a sincronização em lote utilizando transações atômicas no Firestore (`runTransaction`).
-  - Sincronizar simultaneamente a criação do registro de venda, baixa no estoque (`inventory_movements`), movimentação no livro caixa (`movements`) e criação de título em `accountsReceivable`.
-  - Exibir badge indicador visual no histórico de vendas informando o status de sincronização (`Sincronizado` / `Pendente`).
+### SPEC-01: Sincronização Transacional de Vendas Offline
+- **Arquivos Envolvidos:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/lib/offlineStore.ts`
+- **Página / Componente:** Módulo de PDV e Histórico de Vendas
+- **Comportamento:**
+  - O utilitário `offlineStore.ts` deve armazenar o pacote completo da venda offline (itens, cliente, forma de pagamento).
+  - Ao detectar reconexão (`window.addEventListener('online')`), acionar `syncOfflineSales()`.
+  - Executar a gravação utilizando `runTransaction` no Firestore para assegurar atomicidade entre:
+    - Gravação da venda na coleção `sales`.
+    - Atualização dos saldos de estoque em `products` e registro em `inventory_movements`.
+    - Lançamento financeiro em `movements` (caixa) ou `accountsReceivable` (a prazo).
+  - Atualizar o badge visual na página `SalesHistory.tsx` refletindo o status real (`Pendente` / `Sincronizado`).
 
-### SPEC-02: Gerenciamento e Liquidação de Recorrências Financeiras
-- **Páginas e Módulos:** `src/pages/AccountsPayable.tsx`, `src/pages/AccountsReceivable.tsx`, `src/lib/finance.ts`
-- **Comportamento Esperado:**
-  - Permitir alteração ou liquidação de títulos recorrentes oferecendo escolha entre atualizar apenas a parcela selecionada ou aplicar a alteração em cascata às parcelas futuras.
-  - Interromper a geração automática de novos lançamentos assim que atingida a data de término ou a quantidade máxima de parcelas estipulada.
+### SPEC-02: Gestão de Baixa e Alteração em Cascata de Recorrências Financeiras
+- **Arquivos Envolvidos:** `src/pages/AccountsPayable.tsx`, `src/pages/AccountsReceivable.tsx`, `src/lib/finance.ts`
+- **Página / Componente:** Telas de Contas a Pagar e Contas a Receber
+- **Comportamento:**
+  - Ao editar ou dar baixa em um título recorrente, exibir modal de decisão de escopo:
+    1. *Somente este lançamento*;
+    2. *Este e todos os lançamentos futuros*.
+  - Ao optar por "Este e todos os futuros", atualizar todas as parcelas subsequentes geradas com o mesmo `recurrent_id`.
+  - Respeitar a regra de interrupção da recorrência configurada em `finance.ts` ao atingir `max_installments` ou a data limite `until_date`.
 
-### SPEC-03: Algoritmo de Match Automático e Baixa via OFX
-- **Páginas e Módulos:** `src/pages/BankReconciliation.tsx`, `src/components/Financial/OFXImporter.tsx`
-- **Comportamento Esperado:**
-  - Implementar algoritmo para cruzamento de dados de extrato OFX com lançamentos abertos no sistema, considerando aproximação de data (±3 dias), correspondência exata de valor e similaridade de descrição/documento.
-  - Atribuir uma pontuação de confiança (*Score de Match*) para cada sugestão de conciliação.
-  - Permitir a conciliação e baixa em lote das transações confirmadas pelo usuário com alteração do status para `Conciliado`.
+### SPEC-03: Algoritmo de Score de Match e Conciliação OFX em Lote
+- **Arquivos Envolvidos:** `src/pages/BankReconciliation.tsx`, `src/components/Financial/OFXImporter.tsx`
+- **Página / Componente:** Extrato de Conciliação Bancária
+- **Comportamento:**
+  - Ao processar as transações do arquivo OFX, comparar com o array de movimentações não conciliadas.
+  - Atribuir pontuação de match de 0 a 100 com base em:
+    - Valor exatamente igual (+50 pontos).
+    - Data dentro do intervalo de ±3 dias (+30 pontos).
+    - Descrição ou número de documento similar (+20 pontos).
+  - Exibir indicação visual do nível de confiança (Alto >80, Médio 50-80, Baixo <50).
+  - Fornecer botão de "Conciliar Selecionados em Lote", atualizando o status do lançamento no Firestore para `reconciled: true` e atualizando o saldo bancário correspondente.
 
-### SPEC-04: Compactação Mensal de XMLs Fiscais e Reprocessamento de Contingência
-- **Páginas e Módulos:** `src/pages/Fiscal.tsx`, `src/lib/fiscal.ts`
-- **Comportamento Esperado:**
-  - Permitir seleção de mês/ano para geração e download de um pacote ZIP contendo todos os arquivos XML das NF-e / NFC-e autorizadas no período.
-  - Implementar opção de reprocessamento e re-autorização para notas fiscais armazenadas com status pendente ou em contingência.
+### SPEC-04: Empacotamento de XMLs Fiscais em ZIP e Tratamento de Contingência
+- **Arquivos Envolvidos:** `src/pages/Fiscal.tsx`, `src/lib/fiscal.ts`, `src/services/fiscalApi.ts`
+- **Página / Componente:** Módulo Fiscal de NF-e / NFC-e
+- **Comportamento:**
+  - Adicionar/ajustar seletor de Mês e Ano na tela `Fiscal.tsx` com o botão "Baixar Pacote XML (ZIP)".
+  - A rotina de download deve recuperar as notas autorizadas do período em `invoices`, baixar os XMLs correspondentes (da nuvem/storage ou gerados localmente) e agrupá-los utilizando a biblioteca `JSZip`, disparando o download do arquivo `xmls_nfe_MM_YYYY.zip`.
+  - Na ação "Sincronizar Pendentes / Contingência", consultar o status das notas com estado `contingency` ou `pending` na API fiscal e atualizar o registro local.
 
-### SPEC-05: Atualização em Cascata de Custos em Ficha Técnica (BOM)
-- **Páginas e Módulos:** `src/pages/Products.tsx`, `src/lib/inventory.ts`
-- **Comportamento Esperado:**
-  - Sempre que o custo de uma matéria-prima/insumo for atualizado (via entrada de nota de compra ou ajuste manual), recalcular automaticamente o `cost_price` de todos os produtos acabados que contenham esse insumo na sua lista de componentes (`bom_items`).
-  - Registrar no histórico as alterações de custo decorrentes do recalculo.
+### SPEC-05: Recálculo em Cascata de Custos em Ficha Técnica (BOM)
+- **Arquivos Envolvidos:** `src/pages/Products.tsx`, `src/lib/inventory.ts`, `src/pages/InventoryAdjustments.tsx`
+- **Página / Componente:** Cadastro e Ajustes de Produtos / Insumos
+- **Comportamento:**
+  - Sempre que o campo `cost_price` de uma matéria-prima/insumo for atualizado, acionar a função `recalculateBOMCosts(insumoId)`.
+  - Buscar todos os produtos cujo array `bom_items` inclua o `insumoId`.
+  - Recalcular o custo total do produto acabado somando `(quantidade_insumo * novo_custo_insumo)`.
+  - Gravar os novos custos nos produtos acabados e registrar o log de movimentação/ajuste em `inventory_movements`.
 
-### SPEC-06: Estorno e Integração Financeira de Comissões
-- **Páginas e Módulos:** `src/pages/CommissionPayouts.tsx`, `src/pages/SalesHistory.tsx`
-- **Comportamento Esperado:**
-  - Na liquidação de comissões de vendedores em `CommissionPayouts.tsx`, criar automaticamente uma saída financeira vinculada em `accountsPayable`.
-  - Em casos de cancelamento ou exclusão de vendas no histórico, recalcular a comissão do vendedor e alterar o status da comissão para `Cancelada`.
+### SPEC-06: Integração de Fechamento de Comissões com Contas a Pagar e Estornos
+- **Arquivos Envolvidos:** `src/pages/CommissionPayouts.tsx`, `src/pages/SalesHistory.tsx`
+- **Página / Componente:** Fechamento de Comissões e Histórico de Vendas
+- **Comportamento:**
+  - No modal de liquidação de comissão em `CommissionPayouts.tsx`, ao confirmar o pagamento, criar uma nova conta a pagar na coleção `accountsPayable` referente ao valor pago ao vendedor.
+  - Ao cancelar/estornar uma venda em `SalesHistory.tsx`, se a comissão correspondente ainda estiver pendente, atualizar o registro de comissão para `cancelada`. Caso já tenha sido paga, registrar um lançamento de débito/ajuste no extrato do vendedor.

@@ -404,7 +404,7 @@ export default function Layout() {
       {/* Main Content */}
       <main className="flex-1 md:ml-64 pb-24 md:pb-8">
         {/* Header Bar */}
-        <header className="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-gray-100 p-4 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 p-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <GlobalSearch />
             

@@ -252,6 +252,19 @@ export default function AccountsPayable() {
       : api.post("accountsPayable", accountData);
 
     mutationPromise.then(async () => {
+      if (editingAccount && (editingAccount.recurrent_id || editingAccount.is_recurring)) {
+        const { updateRecurrencesCascade } = await import("../lib/finance");
+        const recId = editingAccount.recurrent_id || editingAccount.id;
+        await updateRecurrencesCascade("accountsPayable", recId, editingAccount.due_date, {
+          amount: accountData.amount,
+          supplier: accountData.supplier,
+          supplier_name: accountData.supplier_name,
+          category_id: accountData.category_id,
+          category_name: accountData.category_name,
+          description: (data.description as string) || ""
+        });
+      }
+
       // HANDLE FINANCIAL RESTORATION IF REOPENED
       if (editingAccount && editingAccount.status === "Pago" && (newStatus === "Pendente" || newStatus === "Atrasado")) {
         const { reverseAccountPayment } = await import("../lib/finance");
@@ -785,7 +798,7 @@ if (!canView) {
 
       {/* Modal Pagamento em Lote */}
       {isBatchPayModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsBatchPayModalOpen(false)} />
           <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -845,7 +858,7 @@ if (!canView) {
 
       {/* Modal Pagamento */}
       {isPayModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsPayModalOpen(false)} />
           <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -884,7 +897,7 @@ if (!canView) {
 
       {/* Modal Alterar Vencimento */}
       {isEditDateModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEditDateModalOpen(false)} />
           <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -932,7 +945,7 @@ if (!canView) {
 
       {/* Modal Confirmar Exclusão */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setIsDeleteModalOpen(false); setAccountToDelete(null); }} />
           <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
@@ -960,7 +973,7 @@ if (!canView) {
 
       {/* Modal Nova Conta */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
           <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -1121,7 +1134,7 @@ if (!canView) {
       )}
       {/* Modal Confirmar Estorno */}
       {isReverseModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setIsReverseModalOpen(false); setAccountToReverse(null); }} />
           <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-6 text-center space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto">

@@ -251,7 +251,7 @@ export default function Support() {
 
       {/* Ticket Details Modal */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedTicketId(null)} />
           <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-gray-100 flex flex-col gap-2 shrink-0">

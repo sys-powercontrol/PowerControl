@@ -231,12 +231,19 @@ export default function NotificationCenter() {
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute right-0 mt-2 w-[90vw] max-w-[380px] sm:w-96 bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-gray-200/80 overflow-hidden z-[9999]"
-          >
+          <>
+            {/* Mobile Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/20 backdrop-blur-[1px] sm:hidden z-[9998]"
+              onClick={() => setIsOpen(false)}
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="fixed sm:absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 top-16 sm:top-full mt-2 w-[calc(100vw-2rem)] max-w-[380px] sm:w-96 bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-gray-200/80 overflow-hidden z-[9999]"
+            >
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div>
                 <h3 className="font-bold text-gray-900">Notificações</h3>
@@ -352,6 +359,7 @@ export default function NotificationCenter() {
               </button>
             </div>
           </motion.div>
+        </>
         )}
       </AnimatePresence>
     </div>

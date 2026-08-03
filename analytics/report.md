@@ -1,41 +1,55 @@
 # Relatório de Análise Geral do Sistema - Pendências de Finalização
 
-**Data e Hora de Geração (Horário de Brasília):** 02/08/2026 14:29:20 BRT
+**Data e Hora de Geração:** 02/08/2026 17:22:14 (Horário de Brasília - BRT)
 
 ---
 
-## 1. Visão Geral
-Este relatório detalha a análise situacional completa do ecossistema do sistema, identificando exclusivamente os pontos de **finalização, polimento e refinamento de regras de negócio existentes**, sem a inclusão de novas funcionalidades não solicitadas. O objetivo é assegurar robustez, consistência de dados e ausência de pontas soltas nos módulos já construídos.
+## 1. Visão Geral e Diretrizes
+Este relatório é o resultado da análise arquitetural e funcional do sistema de gestão comercial e ERP. O foco exclusivo é a identificação das **pendências de finalização e polimento das funcionalidades já existentes**, garantindo integridade de dados, transacionalidade e eliminação de falhas de consistência sem a inclusão de novas funcionalidades.
+
+Nenhuma alteração nos arquivos do código-fonte da aplicação (`src/`) foi realizada nesta fase.
 
 ---
 
-## 2. Diagnóstico de Pendências de Finalização por Módulo
+## 2. Diagnóstico de Finalização por Módulo
 
-### 2.1 Módulo de Vendas e PDV (`Sales.tsx`, `SalesHistory.tsx`, `offlineStore.ts`)
-- **Pendência:** Tratamento integral da sincronização em lote de vendas pendentes em modo offline quando a conexão com a internet é restabelecida.
-- **Refinamento:** Garantir que o envio da fila offline execute uma transação atômica que sincronize simultaneamente a baixa no estoque (`inventory_movements`), o lançamento em caixa (`movements`) e os títulos em contas a receber (`accountsReceivable`), com sinalização visual clara do status de sincronização no histórico.
+### 2.1 Módulo de Vendas e PDV (`src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/lib/offlineStore.ts`)
+- **Situação Atual:** Vendas realizadas offline são salvas localmente no `offlineStore.ts`, mas a rotina de ressincronização automática precisa garantir transacionalidade atômica ao reconectar à internet.
+- **Pendência de Finalização:** 
+  1. Garantir transação atômica no Firestore (`runTransaction`) para gravar simultaneamente a venda, baixar o estoque (`inventory_movements`), lançar movimentação de caixa (`movements`) e registrar o título financeiro (`accountsReceivable`).
+  2. Atualizar o badge de status visual no histórico de vendas para indicar com clareza a transição entre `Pendente de Sincronização` e `Sincronizado`.
 
-### 2.2 Módulo Financeiro e Recorrências (`AccountsPayable.tsx`, `AccountsReceivable.tsx`, `finance.ts`)
-- **Pendência:** Fechamento e baixa automatizada do ciclo de vida de lançamentos com recorrência definida (semanal, mensal, anual).
-- **Refinamento:** Garantir suporte para baixa individual de parcelas ou em lote ("esta e próximas parcelas"), ajustando automaticamente os saldos acumulados e encerrando agendamentos que atingiram a data limite ou o número máximo de parcelas.
+### 2.2 Módulo Financeiro e Recorrências (`src/pages/AccountsPayable.tsx`, `src/pages/AccountsReceivable.tsx`, `src/lib/finance.ts`)
+- **Situação Atual:** Contas a pagar e receber possuem marcação de frequência e recorrência, mas a baixa de parcelas recorrentes não oferece opção de alteração em cascata.
+- **Pendência de Finalização:**
+  1. Adicionar o modal/seletor de confirmação no momento da baixa ou edição de títulos recorrentes: "Baixar/Editar apenas esta parcela" vs. "Baixar/Editar esta e todas as próximas parcelas".
+  2. Implementar trava de encerramento automático do ciclo de recorrência ao atingir a data limite estipulada ou o número máximo de parcelas configurado.
 
-### 2.3 Importação e Conciliação Bancária OFX (`BankReconciliation.tsx`, `OFXImporter.tsx`)
-- **Pendência:** Finalização do algoritmo de pontuação de correspondência automática (*auto-matching*) entre transações do extrato bancário OFX e os lançamentos do sistema.
-- **Refinamento:** Permitir conciliação rápida em lote com confirmação explícita do usuário, atualizando o status dos títulos financeiros para `Conciliado` e ajustando os saldos das contas bancárias.
+### 2.3 Conciliação Bancária OFX (`src/pages/BankReconciliation.tsx`, `src/components/Financial/OFXImporter.tsx`)
+- **Situação Atual:** O importador OFX lê o arquivo bancário, mas o cruzamento automático (*auto-matching*) com o livro de lançamentos abertos necessita de refinamento do Score de Match.
+- **Pendência de Finalização:**
+  1. Calcular o Score de Match com base na tolerância de data (±3 dias), correspondência exata de valor e similaridade de descrição/documento.
+  2. Permitir conciliação em lote com confirmação explícita do usuário, alterando o status das transações para `Conciliado` e atualizando o saldo real do extrato bancário.
 
-### 2.4 Módulo Fiscal e Emissão de Notas (`Fiscal.tsx`, `TaxSettings.tsx`, `fiscal.ts`)
-- **Pendência:** Finalização da rotina de exportação mensal agrupada em pacote ZIP contendo os arquivos XML das NF-e / NFC-e emitidas para envio contábil.
-- **Refinamento:** Aperfeiçoar o reprocessamento de notas fiscais que tenham ficado salvas em modo de contingência ou pendentes de autorização na SEFAZ.
+### 2.4 Módulo Fiscal e Emissão de Notas (`src/pages/Fiscal.tsx`, `src/lib/fiscal.ts`, `src/services/fiscalApi.ts`)
+- **Situação Atual:** Visualização e emissão de NF-e/NFC-e funcionam via APIs integradas, mas a exportação do pacote mensal de XMLs e a re-tentativa de notas em contingência exigem fechamento.
+- **Pendência de Finalização:**
+  1. Finalizar o empacotamento assíncrono em ZIP contendo todos os arquivos XML das notas fiscais autorizadas no mês/ano selecionado para envio contábil.
+  2. Implementar a rotina de reprocessamento e consulta de status para notas salvas em modo de contingência ou pendentes na SEFAZ.
 
-### 2.5 Custo Estruturado (BOM / Ficha Técnica) e Estoque (`Products.tsx`, `inventory.ts`, `InventoryAdjustments.tsx`)
-- **Pendência:** Recálculo em cascata do custo total de produtos compostos (Kits / Ficha Técnica) sempre que houver alteração de preço de custo em matérias-primas ou insumos integrantes.
-- **Refinamento:** Registrar o histórico de evolução do Custo Médio e garimpar inconsistências em atualizações simultâneas de movimentações de estoque.
+### 2.5 Atualização de Custo Estruturado (BOM / Ficha Técnica) (`src/pages/Products.tsx`, `src/lib/inventory.ts`, `src/pages/InventoryAdjustments.tsx`)
+- **Situação Atual:** Cadastramento de kits e fichas técnicas existe no sistema, mas a alteração de custo da matéria-prima não recalcula automaticamente o custo do produto acabado.
+- **Pendência de Finalização:**
+  1. Disparar recalculo em cascata do `cost_price` de produtos acabados sempre que houver alteração de preço de custo em matérias-primas ou insumos pertencentes à sua estrutura (`bom_items`).
+  2. Registrar o histórico de recálculo no histórico do produto.
 
-### 2.6 Módulo de Comissões e Vendedores (`CommissionPayouts.tsx`, `Sellers.tsx`, `SalesHistory.tsx`)
-- **Pendência:** Fechamento da integração entre liquidação de comissões de vendedores e o módulo de Contas a Pagar.
-- **Refinamento:** Garantir que o cancelamento ou estorno de vendas abata proporcionalmente e automaticamente o saldo de comissões pendentes ou lance os ajustes no financeiro.
+### 2.6 Módulo de Comissões e Vendedores (`src/pages/CommissionPayouts.tsx`, `src/pages/SalesHistory.tsx`)
+- **Situação Atual:** Apuração de comissões por vendedor é exibida na tela, mas o fechamento financeiro do pagamento não gera lançamento direto no Contas a Pagar.
+- **Pendência de Finalização:**
+  1. Ao confirmar o pagamento de comissão em `CommissionPayouts.tsx`, gerar um registro no módulo `accountsPayable` classificado sob a categoria "Comissões de Vendas".
+  2. Em caso de cancelamento ou estorno de venda no histórico, recalcular a comissão proporcional pendente e atualizar seu status para `Cancelado/Ajustado`.
 
 ---
 
-## 3. Diretriz de Execução
-Não foram implementadas alterações de código nesta fase. O relatório serve como diagnóstico de referência para a especificação técnica e plano de execução subsequente.
+## 3. Conclusão
+O sistema possui uma arquitetura sólida e quase completa. As pendências mapeadas acima representam os pontos finais de amarração e consistência necessários para assegurar a máxima estabilidade operacional do ERP.

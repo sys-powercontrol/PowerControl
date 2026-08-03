@@ -3,6 +3,39 @@ import { formatBR } from "./dateUtils";
 import { db } from "./firebase";
 import { doc, runTransaction, collection, serverTimestamp } from "firebase/firestore";
 
+export async function updateRecurrencesCascade(
+  collectionName: 'accountsPayable' | 'accountsReceivable',
+  recurrentId: string,
+  currentDueDate: string,
+  updates: Record<string, any>
+) {
+  const { collection, query, where, getDocs, doc, writeBatch } = await import("firebase/firestore");
+  const ref = collection(db, collectionName);
+  const q = query(ref, where("recurrent_id", "==", recurrentId));
+  const snap = await getDocs(q);
+
+  const batch = writeBatch(db);
+  let count = 0;
+
+  snap.docs.forEach((d) => {
+    const data = d.data();
+    // Only update pending future installments (due_date >= currentDueDate)
+    if (data.due_date >= currentDueDate && data.status === "Pendente") {
+      const docRef = doc(db, collectionName, d.id);
+      batch.update(docRef, {
+        ...updates,
+        updated_at: new Date().toISOString()
+      });
+      count++;
+    }
+  });
+
+  if (count > 0) {
+    await batch.commit();
+  }
+  return count;
+}
+
 export type Frequency = "WEEKLY" | "MONTHLY" | "YEARLY" | "Semanal" | "Mensal" | "Anual";
 
 export function calculateNextDueDate(currentDueDate: string, frequency?: Frequency | string): string {

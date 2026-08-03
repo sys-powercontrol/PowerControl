@@ -172,6 +172,12 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       
       const result = await api.put("products", id, otherData);
       
+      const newCostPrice = Number(otherData.cost_price ?? otherData.cost);
+      const oldCostPrice = Number(oldProduct?.cost_price ?? oldProduct?.cost);
+      if (!isNaN(newCostPrice) && newCostPrice !== oldCostPrice) {
+        await inventory.recalculateBOMCosts(id, newCostPrice);
+      }
+      
       if (stock_quantity !== undefined && parseFloat(stock_quantity) !== oldProduct?.stock_quantity) {
         const diff = parseFloat(stock_quantity) - (oldProduct?.stock_quantity || 0);
         await inventory.recordMovement({
@@ -815,7 +821,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
 
       {/* Modal Novo/Editar */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
           <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -1095,7 +1101,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       )}
       {/* Category Modal */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsCategoryModalOpen(false)} />
           <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -1123,7 +1129,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
 
       {/* Brand Modal */}
       {isBrandModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsBrandModalOpen(false)} />
           <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">

@@ -167,10 +167,30 @@ export default function SalesHistory() {
         // Return stock quantities to inventory
         await inventory.reverseSaleStock(dbSale);
 
-        // Cancel commission
+        // Cancel or refund commission
         const commissionUpdates: Record<string, any> = { status: "Cancelada" };
         if (dbSale.commission_amount > 0) {
-          commissionUpdates.commission_status = "cancelled";
+          if (dbSale.commission_status === "paid") {
+            commissionUpdates.commission_status = "refunded_reversal";
+            try {
+              await api.post("accountsPayable", {
+                company_id: dbSale.company_id || api.getCompanyId(),
+                description: `Estorno de Comissão: Venda #${dbSale.id.substr(0, 8).toUpperCase()} Cancelada (${dbSale.seller_name || 'Vendedor'})`,
+                amount: Math.abs(dbSale.commission_amount),
+                due_date: new Date().toISOString().split('T')[0],
+                status: "Pago",
+                payment_date: new Date().toISOString(),
+                category_name: "Estorno de Comissões",
+                supplier: dbSale.seller_name || "Vendedor",
+                observation: `Estorno automático de comissão paga após cancelamento da venda #${dbSale.id}`,
+                created_at: new Date().toISOString()
+              });
+            } catch (err) {
+              console.error("Erro ao criar lançamento de estorno de comissão:", err);
+            }
+          } else {
+            commissionUpdates.commission_status = "cancelled";
+          }
         }
 
         // We then set status to "Cancelada" and update commission_status
@@ -591,7 +611,7 @@ if (!canView) {
 
       {/* Details Modal */}
       {isDetailsModalOpen && selectedSale && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsDetailsModalOpen(false)} />
           <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">

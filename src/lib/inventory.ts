@@ -15,6 +15,73 @@ const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
 };
 
 export const inventory = {
+  async recalculateBOMCosts(insumoId: string, newCost: number, userContext?: User) {
+    const user = userContext || (await api.get<User>("me")) as User;
+    if (!user || !user.company_id) return;
+
+    try {
+      const { collection, query, where, getDocs, doc, writeBatch, serverTimestamp } = await import("firebase/firestore");
+      const productsRef = collection(db, "products");
+      const q = query(productsRef, where("company_id", "==", user.company_id));
+      const snap = await getDocs(q);
+
+      const costMap = new Map<string, number>();
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        costMap.set(d.id, d.id === insumoId ? newCost : (Number(data.cost_price) || Number(data.cost) || Number(data.price) || 0));
+      });
+
+      const batch = writeBatch(db);
+      let updatedCount = 0;
+
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (data.bom_items && Array.isArray(data.bom_items) && data.bom_items.length > 0) {
+          const usesInsumo = data.bom_items.some((b: any) => b.product_id === insumoId);
+          if (usesInsumo) {
+            let totalCost = 0;
+            const updatedBomItems = data.bom_items.map((b: any) => {
+              const itemCost = b.product_id === insumoId ? newCost : (costMap.get(b.product_id) || Number(b.cost_price) || 0);
+              totalCost += (Number(b.quantity) || 1) * itemCost;
+              return { ...b, cost_price: itemCost };
+            });
+
+            const productRef = doc(db, "products", d.id);
+            batch.update(productRef, {
+              cost: totalCost,
+              cost_price: totalCost,
+              bom_items: updatedBomItems,
+              updated_at: serverTimestamp()
+            });
+
+            const mRef = doc(collection(db, "inventory_movements"));
+            batch.set(mRef, {
+              product_id: d.id,
+              product_name: data.name,
+              company_id: user.company_id,
+              type: 'ADJUSTMENT',
+              reason: 'BOM_COST_RECALCULATION',
+              quantity: 0,
+              previous_stock: data.stock_quantity || 0,
+              current_stock: data.stock_quantity || 0,
+              observation: `Recálculo em cascata de custo via BOM (novo custo: R$ ${totalCost.toFixed(2)})`,
+              user_id: user.id,
+              user_name: user.full_name || user.email || "Sistema",
+              timestamp: serverTimestamp()
+            });
+            updatedCount++;
+          }
+        }
+      });
+
+      if (updatedCount > 0) {
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error("Erro ao recalcular custos BOM em cascata:", err);
+    }
+  },
+
   async recordMovement(data: Omit<InventoryMovement, "id" | "timestamp" | "user_id" | "user_name" | "previous_stock" | "current_stock">, userContext?: User) {
     const user = userContext || (await api.get<User>("me")) as User;
     if (!user) throw new Error("Usuário não autenticado");

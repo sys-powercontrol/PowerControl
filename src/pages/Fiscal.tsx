@@ -112,22 +112,30 @@ export default function Fiscal() {
     setIsSyncingPending(false);
   };
 
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
+
   const handleExportXmlZip = async () => {
-    const emittedInvoices = filteredInvoices.filter(
-      (i) => (i.status === "Emitida" || i.status === "Autorizada") && (i.xml_storage_url || i.xml_url || i.xml_content)
-    );
+    const emittedInvoices = invoices.filter((i) => {
+      const isEmitted = (i.status === "Emitida" || i.status === "Autorizada") && (i.xml_storage_url || i.xml_url || i.xml_content);
+      if (!isEmitted) return false;
+      const d = new Date(i.created_at || i.issue_date || Date.now());
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const y = String(d.getFullYear());
+      return m === selectedMonth && y === selectedYear;
+    });
 
     if (emittedInvoices.length === 0) {
-      toast.warning("Nenhuma nota fiscal emitida/autorizada com XML disponível para exportação no filtro atual.");
+      toast.warning(`Nenhuma nota fiscal emitida/autorizada com XML encontrada para ${selectedMonth}/${selectedYear}.`);
       return;
     }
 
     setIsExportingXmlZip(true);
-    toast.info(`Compactando XMLs de ${emittedInvoices.length} nota(s)...`);
+    toast.info(`Compactando XMLs de ${emittedInvoices.length} nota(s) (${selectedMonth}/${selectedYear})...`);
 
     try {
       const zip = new JSZip();
-      const folder = zip.folder("XMLs_NFe");
+      const folder = zip.folder(`XMLs_NFe_${selectedMonth}_${selectedYear}`);
 
       let addedCount = 0;
       for (const invoice of emittedInvoices) {
@@ -154,19 +162,17 @@ export default function Fiscal() {
       }
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
-      const now = new Date();
-      const monthYear = `${(now.getMonth() + 1).toString().padStart(2, "0")}${now.getFullYear()}`;
       const downloadUrl = URL.createObjectURL(zipBlob);
 
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download = `NFe_Lote_${monthYear}.zip`;
+      a.download = `xmls_nfe_${selectedMonth}_${selectedYear}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(downloadUrl);
 
-      toast.success(`Exportação concluída! ${addedCount} arquivo(s) XML baixado(s) em ZIP.`);
+      toast.success(`Exportação concluída! ${addedCount} arquivo(s) XML baixado(s) em xmls_nfe_${selectedMonth}_${selectedYear}.zip.`);
     } catch (err: any) {
       console.error("Erro na exportação ZIP de XML:", err);
       toast.error(err.message || "Erro ao gerar arquivo ZIP com os XMLs.");
@@ -452,15 +458,37 @@ if (!canManage) {
             <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
           </ExportButton>
 
-          <button
-            onClick={handleExportXmlZip}
-            disabled={isExportingXmlZip}
-            className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 text-slate-700 font-bold transition-all text-xs sm:text-sm disabled:opacity-50 min-h-[48px] w-full h-full cursor-pointer"
-            title="Exportar todos os XMLs emitidos compactados em arquivo ZIP"
-          >
-            <Download size={18} className={isExportingXmlZip ? "animate-bounce text-emerald-600 shrink-0" : "text-slate-600 shrink-0"} />
-            <span className="truncate">{isExportingXmlZip ? "Exportando..." : "XMLs (ZIP)"}</span>
-          </button>
+          <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-white border border-slate-200 rounded-xl px-2 py-2.5 text-xs font-bold text-slate-700 outline-none"
+              title="Mês para exportação de XMLs"
+            >
+              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-white border border-slate-200 rounded-xl px-2 py-2.5 text-xs font-bold text-slate-700 outline-none"
+              title="Ano para exportação de XMLs"
+            >
+              {["2024", "2025", "2026", "2027"].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleExportXmlZip}
+              disabled={isExportingXmlZip}
+              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 text-slate-700 font-bold transition-all text-xs sm:text-sm disabled:opacity-50 min-h-[48px] w-full h-full cursor-pointer"
+              title="Exportar XMLs do mês/ano selecionado compactados em arquivo ZIP"
+            >
+              <Download size={18} className={isExportingXmlZip ? "animate-bounce text-emerald-600 shrink-0" : "text-slate-600 shrink-0"} />
+              <span className="truncate">{isExportingXmlZip ? "Exportando..." : `ZIP (${selectedMonth}/${selectedYear})`}</span>
+            </button>
+          </div>
 
           <button
             onClick={handleSyncPendingInvoices}
@@ -618,7 +646,7 @@ if (!canManage) {
 
       {/* Modal Emitir Nota */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
           <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -677,7 +705,7 @@ if (!canManage) {
 
       {/* Modal Enviar E-mail Fiscal */}
       {isEmailModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEmailModalOpen(false)} />
           <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-6 space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
