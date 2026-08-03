@@ -104,7 +104,12 @@ export const offlineStore = {
 
     for (const sale of pending) {
       try {
-        const processedSaleData = await inventory.processSale(sale.saleData, sale.items, sale.userContext);
+        const salePayload = {
+          ...sale.saleData,
+          is_offline_sync: true,
+          synced_at: new Date().toISOString()
+        };
+        const processedSaleData = await inventory.processSale(salePayload, sale.items, sale.userContext);
         
         await api.log({
           action: 'CREATE',

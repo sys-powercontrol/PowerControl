@@ -269,6 +269,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
   const importMutation = useMutation({
     mutationFn: async (selectedIds: string[]) => {
       const toImport = transactions.filter(t => selectedIds.includes(t.id));
+      const { processAccountPayment, processAccountReceipt } = await import("../../lib/finance");
       
       for (const t of toImport) {
         const isExpense = t.type === "DEBIT";
@@ -281,13 +282,24 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
         if (!match) {
           const existing = isExpense ? payables : receivables;
           const result = findBestMatch(t, existing);
-          if (result && result.score >= 70) {
+          if (result && result.score >= 50) {
             match = result.match;
           }
         }
 
         if (match) {
-          // Update existing to Paid and Reconciled
+          // Process payment/receipt to update bank account balance and register movement
+          try {
+            if (isExpense) {
+              await processAccountPayment(match.id, { ...match, amount: Math.abs(t.amount) }, { type: 'bank', id: bankAccountId });
+            } else {
+              await processAccountReceipt(match.id, { ...match, amount: Math.abs(t.amount) }, { type: 'bank', id: bankAccountId });
+            }
+          } catch (err) {
+            console.warn("Conta já baixada ou erro ao processar fluxo financeiro:", err);
+          }
+
+          // Update existing to Reconciled
           await api.put(endpoint, match.id, {
             status: isExpense ? "Pago" : "Recebido",
             reconciled: true,
@@ -307,7 +319,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
           });
 
           // Create new entry marked as Paid and Reconciled
-          await api.post(endpoint, {
+          const createdAcc = await api.post(endpoint, {
             company_id: currentCompanyId,
             description: `OFX: ${t.memo}`,
             amount: Math.abs(t.amount),
@@ -322,6 +334,18 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
             client_id: matchingRule?.client_id || null,
             created_at: new Date().toISOString()
           });
+
+          if (createdAcc && createdAcc.id) {
+            try {
+              if (isExpense) {
+                await processAccountPayment(createdAcc.id, createdAcc, { type: 'bank', id: bankAccountId });
+              } else {
+                await processAccountReceipt(createdAcc.id, createdAcc, { type: 'bank', id: bankAccountId });
+              }
+            } catch (err) {
+              console.warn("Erro ao atualizar saldo da conta bancária:", err);
+            }
+          }
         }
       }
     },
@@ -527,13 +551,21 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                           {matchResult && (
                             <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                               manualMatch 
-                                ? "bg-blue-100 text-blue-700" 
+                                ? "bg-blue-100 text-blue-700 border border-blue-200" 
                                 : score >= 80 
-                                  ? "bg-green-100 text-green-700" 
-                                  : "bg-yellow-100 text-yellow-700"
+                                  ? "bg-green-100 text-green-700 border border-green-200" 
+                                  : score >= 50
+                                    ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                                    : "bg-red-100 text-red-700 border border-red-200"
                             }`}>
                               <CheckCircle2 size={10} /> 
-                              {manualMatch ? "Vínculo Manual" : score >= 80 ? "Conciliação Automática" : "Sugestão"}
+                              {manualMatch 
+                                ? "Vínculo Manual (100%)" 
+                                : score >= 80 
+                                  ? `Match Alto (${score}%)` 
+                                  : score >= 50
+                                    ? `Match Médio (${score}%)`
+                                    : `Match Baixo (${score}%)`}
                             </span>
                           )}
                         </div>

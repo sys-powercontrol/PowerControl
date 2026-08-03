@@ -145,22 +145,34 @@ export default function AccountsReceivable() {
       const { processAccountReceipt } = await import("../lib/finance");
       await processAccountReceipt(id, currentAccount, account);
 
-      // If recurring, create the next one
+      // If recurring, create the next one respecting max_installments and until_date
       if (currentAccount?.is_recurring && currentAccount?.frequency) {
         const nextDueDate = calculateNextDueDate(currentAccount.due_date, currentAccount.frequency as Frequency);
-        
-        await api.post("accountsReceivable", {
-          ...currentAccount,
-          id: undefined, // Ensure new ID
-          due_date: nextDueDate,
-          status: "Pendente",
-          receipt_date: undefined,
-          bank_account_id: undefined,
-          cashier_id: undefined,
-          created_at: new Date().toISOString()
-        });
-        
-        toast.info(`Próximo lançamento gerado para ${formatBR(nextDueDate)}`);
+        const currentNum = currentAccount.installment_number || 1;
+        const maxInst = currentAccount.max_installments;
+        const untilDate = currentAccount.until_date;
+
+        const shouldGenerate = (!maxInst || currentNum < maxInst) && (!untilDate || nextDueDate <= untilDate);
+
+        if (shouldGenerate) {
+          const recurrentId = currentAccount.recurrent_id || currentAccount.id;
+          await api.post("accountsReceivable", {
+            ...currentAccount,
+            id: undefined, // Ensure new ID
+            recurrent_id: recurrentId,
+            installment_number: currentNum + 1,
+            due_date: nextDueDate,
+            status: "Pendente",
+            receipt_date: undefined,
+            bank_account_id: undefined,
+            cashier_id: undefined,
+            created_at: new Date().toISOString()
+          });
+          
+          toast.info(`Próximo lançamento (${currentNum + 1}/${maxInst || '∞'}) gerado para ${formatBR(nextDueDate)}`);
+        } else {
+          toast.info("Ciclo de recorrência encerrado (limite de parcelas ou data limite atingido).");
+        }
       }
 
       return { success: true };

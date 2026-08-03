@@ -1,5 +1,9 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching';
+import { precacheAndRoute, matchPrecache } from 'workbox-precaching';
+import { registerRoute, NavigationRoute } from 'workbox-routing';
+import { CacheFirst, NetworkFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
+import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { openDB } from 'idb';
 import { inventory } from './lib/inventory';
 import { api } from './lib/api';
@@ -22,6 +26,93 @@ interface PendingSale {
 
 // Precache assets injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST || []);
+
+// 1. Caching Strategy for Images (CacheFirst with Expiration)
+registerRoute(
+  ({ request, url }) =>
+    request.destination === 'image' ||
+    /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i.test(url.pathname),
+  new CacheFirst({
+    cacheName: 'images-cache-v1',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new ExpirationPlugin({
+        maxEntries: 150,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 dias
+        purgeOnQuotaError: true,
+      }),
+    ],
+  })
+);
+
+// 2. Caching Strategy for Web Fonts
+registerRoute(
+  ({ request, url }) =>
+    request.destination === 'font' ||
+    url.origin.includes('fonts.googleapis.com') ||
+    url.origin.includes('fonts.gstatic.com'),
+  new CacheFirst({
+    cacheName: 'fonts-cache-v1',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new ExpirationPlugin({
+        maxEntries: 30,
+        maxAgeSeconds: 365 * 24 * 60 * 60, // 1 ano
+      }),
+    ],
+  })
+);
+
+// 3. Caching Strategy for Application Routes / SPA Navigation (NetworkFirst with Cache Fallback)
+const navigationRoute = new NavigationRoute(
+  new NetworkFirst({
+    cacheName: 'pages-cache-v1',
+    networkTimeoutSeconds: 3,
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [200],
+      }),
+    ],
+  }),
+  {
+    denylist: [/^\/api\//, /^\/__/],
+  }
+);
+registerRoute(navigationRoute);
+
+// 4. Fallback Handler for Offline SPA Navigation
+self.addEventListener('fetch', (event: FetchEvent) => {
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          // Attempt network first
+          const preloadResponse = await event.preloadResponse;
+          if (preloadResponse) return preloadResponse;
+          return await fetch(event.request);
+        } catch {
+          // Offline fallback to matched page cache, precached index.html or root fallback
+          const cachedPage = await caches.match(event.request);
+          if (cachedPage) return cachedPage;
+
+          const precachedIndex = await matchPrecache('/index.html');
+          if (precachedIndex) return precachedIndex;
+
+          const anyIndex = await caches.match('/index.html');
+          if (anyIndex) return anyIndex;
+
+          return new Response('Offline - PowerControl ERP', {
+            headers: { 'Content-Type': 'text/html' },
+          });
+        }
+      })()
+    );
+  }
+});
 
 const DB_NAME = "powercontrol_offline_db";
 const STORE_SALES = "sales";

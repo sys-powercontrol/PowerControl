@@ -536,9 +536,14 @@ if (!canView) {
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-gray-900">Venda #{sale.id.substr(0, 8).toUpperCase()}</h3>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                      sale.status === "Cancelada" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                      sale.status === "Cancelada" ? "bg-red-100 text-red-700" :
+                      sale.status === "Pendente de Estoque" ? "bg-amber-100 text-amber-700 font-extrabold border border-amber-300" :
+                      (sale.is_offline_sync || sale.synced_at || sale.isOfflineSync) ? "bg-purple-100 text-purple-700 border border-purple-200" :
+                      "bg-green-100 text-green-700"
                     }`}>
-                      {sale.status}
+                      {sale.status === "Pendente de Estoque" ? "Pendente de Estoque" :
+                       (sale.is_offline_sync || sale.synced_at || sale.isOfflineSync) ? "Sincronizado (Offline)" :
+                       sale.status || "Concluída"}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">

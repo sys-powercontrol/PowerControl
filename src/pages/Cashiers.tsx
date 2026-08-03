@@ -93,15 +93,79 @@ export default function Cashiers() {
     }
   });
 
+  const [closingCashier, setClosingCashier] = useState<any>(null);
+  const [closingSummary, setClosingSummary] = useState<{ salesCount: number; salesTotal: number; movementsCount: number } | null>(null);
+  const [isClosingLoading, setIsClosingLoading] = useState(false);
+
+  const handleInitiateClose = async (cashier: any) => {
+    setClosingCashier(cashier);
+    setIsClosingLoading(true);
+    try {
+      const sales: any[] = await api.get("sales", { cashier_id: cashier.id });
+      const movements: any[] = await api.get("movements", { from_account_id: cashier.id });
+
+      const unclosedSales = sales.filter((s: any) => !s.cashier_closed_at && s.status !== "Cancelada");
+      const unclosedMovements = movements.filter((m: any) => !m.cashier_closed_at);
+
+      const salesTotal = unclosedSales.reduce((acc, s) => acc + (parseFloat(s.total) || 0), 0);
+
+      setClosingSummary({
+        salesCount: unclosedSales.length,
+        salesTotal,
+        movementsCount: unclosedMovements.length
+      });
+    } catch (err) {
+      console.warn("Erro ao buscar resumo de encerramento do caixa:", err);
+      setClosingSummary({ salesCount: 0, salesTotal: 0, movementsCount: 0 });
+    } finally {
+      setIsClosingLoading(false);
+    }
+  };
+
   const closeCashierMutation = useMutation({
-    mutationFn: (id: string) => api.put("cashiers", id, {
-      status: "Fechado",
-      closed_at: new Date().toISOString(),
-      closed_by: user?.full_name || "Sistema"
-    }),
+    mutationFn: async (cashier: any) => {
+      const now = new Date().toISOString();
+      const closedBy = user?.full_name || "Sistema";
+
+      // 1. Fetch and link unclosed sales and movements
+      try {
+        const sales: any[] = await api.get("sales", { cashier_id: cashier.id });
+        const movements: any[] = await api.get("movements", { from_account_id: cashier.id });
+
+        const unclosedSales = sales.filter((s: any) => !s.cashier_closed_at);
+        for (const sale of unclosedSales) {
+          await api.put("sales", sale.id, {
+            cashier_closed_at: now,
+            cashier_cycle_id: cashier.id
+          });
+        }
+
+        const unclosedMovements = movements.filter((m: any) => !m.cashier_closed_at);
+        for (const mov of unclosedMovements) {
+          await api.put("movements", mov.id, {
+            cashier_closed_at: now,
+            cashier_cycle_id: cashier.id
+          });
+        }
+      } catch (err) {
+        console.warn("Aviso ao vincular lançamentos ao fechamento do caixa:", err);
+      }
+
+      // 2. Close cashier
+      return api.put("cashiers", cashier.id, {
+        status: "Fechado",
+        closed_at: now,
+        closed_by: closedBy,
+        closing_balance: cashier.balance || 0
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
-      toast.success("Caixa fechado!");
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      toast.success("Caixa fechado e lançamentos vinculados com sucesso!");
+      setClosingCashier(null);
+      setClosingSummary(null);
     }
   });
 
@@ -229,7 +293,7 @@ if (!canView) {
                 </button>
               ) : (
                 <button 
-                  onClick={() => closeCashierMutation.mutate(c.id)}
+                  onClick={() => handleInitiateClose(c)}
                   className="flex-1 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-red-100"
                 >
                   <Lock size={14} /> Fechar Caixa
@@ -384,6 +448,72 @@ if (!canView) {
                 
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Closing Cashier Confirmation Modal */}
+      {closingCashier && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setClosingCashier(null); setClosingSummary(null); }} />
+          <div className="relative bg-white p-8 rounded-3xl shadow-2xl space-y-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Lock size={32} />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Encerrar Turno / Fechar Caixa</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Caixa: <span className="font-bold text-gray-800">{closingCashier.name}</span>
+              </p>
+            </div>
+
+            {isClosingLoading ? (
+              <div className="py-8 text-center text-sm font-bold text-gray-500">
+                Calculando lançamentos pendentes de vinculo...
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 font-medium">Vendas no Turno</span>
+                    <span className="font-bold text-gray-900">{closingSummary?.salesCount || 0} venda(s)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 font-medium">Total de Vendas</span>
+                    <span className="font-bold text-green-600">{formatCurrency(closingSummary?.salesTotal || 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 font-medium">Movimentações de Caixa</span>
+                    <span className="font-bold text-blue-600">{closingSummary?.movementsCount || 0} registro(s)</span>
+                  </div>
+                  <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
+                    <span className="text-sm font-bold text-gray-800">Saldo Final de Fechamento</span>
+                    <span className="text-lg font-bold text-gray-900">{formatCurrency(closingCashier.balance || 0)}</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500 text-center">
+                  Todos os lançamentos acima serão atrelados a este ciclo com horário de encerramento e ID do ciclo para auditoria.
+                </p>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button" 
+                    onClick={() => { setClosingCashier(null); setClosingSummary(null); }} 
+                    className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => closeCashierMutation.mutate(closingCashier)} 
+                    disabled={closeCashierMutation.isPending} 
+                    className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100 disabled:opacity-50"
+                  >
+                    {closeCashierMutation.isPending ? "Encerrando..." : "Confirmar Fechamento"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
