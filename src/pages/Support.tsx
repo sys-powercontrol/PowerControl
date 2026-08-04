@@ -121,6 +121,10 @@ export default function Support() {
   };
 
   const faqs = [
+    { 
+      q: "Quais são os atalhos de teclado do sistema?", 
+      a: `O PowerControl oferece atalhos de teclado globais para acelerar a produtividade:\n\n• Ctrl + P: Abrir PDV / Nova Venda\n• Ctrl + E: Ir para Catálogo de Produtos / Estoque\n• Ctrl + D: Ir para o Dashboard Executive\n• Ctrl + Shift + C (ou Alt + C): Ir para Gestão de Clientes\n• Ctrl + Shift + F (ou Alt + F): Ir para Contas a Pagar / Financeiro\n• Ctrl + Shift + X (ou Alt + X): Gerenciar Caixas e Operações\n• Ctrl + Shift + B (ou Alt + B): Ir para Compras e Entradas\n• Ctrl + K: Abrir Busca Global Inteligente\n• Alt + H (ou ?): Abrir Painel de Atalhos de Teclado\n\nVocê também pode pressionar Alt + H ou clicar no botão "Atalhos" no topo do sistema a qualquer momento.` 
+    },
     { q: "Como abrir um novo caixa?", a: "Vá em 'Caixas' no menu lateral, escolha o caixa desejado e clique em 'Abrir Caixa'. Informe o saldo inicial e confirme." },
     { q: "Como emitir nota fiscal?", a: "No histórico de vendas, localize a venda desejada e clique no ícone de documento 'Emitir NF'. Certifique-se de que a API Fiscal está configurada." },
     { q: "Posso ter mais de uma empresa?", a: "Sim, o PowerControl é multi-tenant. Você pode gerenciar múltiplas empresas se tiver permissão de Admin Enterprise." },
@@ -226,7 +230,7 @@ export default function Support() {
                       {faq.q}
                       <ChevronRight size={16} className="text-gray-400 group-open:rotate-90 transition-transform" />
                     </summary>
-                    <p className="mt-2 text-sm text-gray-500 leading-relaxed pl-2 border-l-2 border-blue-100">
+                    <p className="mt-2 text-sm text-gray-500 leading-relaxed pl-2 border-l-2 border-blue-100 whitespace-pre-line">
                       {faq.a}
                     </p>
                   </details>

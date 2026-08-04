@@ -102,6 +102,33 @@ Nossos gráficos (desenhados em formato de barras e pizza) atualizam em tempo re
 Aproveite o filtro de datas superior! Por padrão, mostra o mês atual, mas você pode mudar para visualizar a semana ou o semestre num clique.
 \`\`\`
         ` 
+      },
+      {
+        id: "keyboard-shortcuts",
+        title: "Atalhos de Teclado Globais",
+        content: `## Guia de Atalhos de Teclado Globais
+
+Acelere a navegação e o atendimento ao cliente no **PowerControl** com teclas de atalho instantâneas:
+
+### Operacional & Vendas
+- **Ctrl + P**: Abrir Frente de Caixa (PDV / Vender)
+- **Ctrl + E**: Ir para Catálogo de Produtos e Estoque
+- **Ctrl + Shift + X** (ou **Alt + X**): Gerenciar Caixas e Operações
+- **Ctrl + Shift + B** (ou **Alt + B**): Acessar Compras e Entrada de Estoque
+
+### Navegação & Financeiro
+- **Ctrl + D**: Ir para o Dashboard Executive
+- **Ctrl + Shift + C** (ou **Alt + C**): Ir para Gestão de Clientes
+- **Ctrl + Shift + F** (ou **Alt + F**): Ir para Contas a Pagar / Módulo Financeiro
+
+### Sistema & Busca
+- **Ctrl + K**: Abrir Busca Global Inteligente
+- **Alt + H** (ou pressione **?** fora de caixas de texto): Abrir Painel Guia de Atalhos de Teclado
+
+\`\`\`tip
+Você também pode clicar no botão "Atalhos" no topo do menu superior para abrir o modal explicativo a qualquer momento!
+\`\`\`
+        `
       }
     ]
   },

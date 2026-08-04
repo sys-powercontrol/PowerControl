@@ -48,7 +48,14 @@ export default function SalesHistory() {
       }
     };
     loadFailedSales();
-  }, []);
+
+    const handleSync = () => {
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      loadFailedSales();
+    };
+    window.addEventListener("sales_synced", handleSync);
+    return () => window.removeEventListener("sales_synced", handleSync);
+  }, [queryClient]);
 
   const handleRecoverSale = async (sale: any) => {
     try {

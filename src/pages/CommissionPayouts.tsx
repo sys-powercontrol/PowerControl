@@ -126,6 +126,40 @@ export default function CommissionPayouts() {
     }
   });
 
+  const batchPayoutMutation = useMutation({
+    mutationFn: async (salesList: any[]) => {
+      for (const sale of salesList) {
+        // 1. Update sale status
+        await api.put("sales", sale.id, {
+          commission_status: "paid",
+          commission_paid_at: new Date().toISOString()
+        });
+
+        // 2. Create accounts payable entry
+        await api.post("accountsPayable", {
+          company_id: currentCompanyId,
+          description: `Comissão: Venda #${sale.id.substr(0, 8).toUpperCase()} - ${sale.seller_name}`,
+          amount: sale.commission_amount,
+          due_date: getTodayBR(),
+          status: "Pago",
+          payment_date: new Date().toISOString(),
+          category_name: "Comissões de Vendas",
+          supplier: sale.seller_name,
+          created_at: new Date().toISOString()
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success("Todas as comissões filtradas foram pagas!");
+    },
+    onError: (error: any) => {
+      toast.error(`Erro ao processar lote de comissões: ${error.message}`);
+    }
+  });
+
 if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
@@ -166,7 +200,22 @@ if (!canManage) {
           <h1 className="text-2xl font-bold text-gray-900">Fechamento de Comissões</h1>
           <p className="text-gray-500">Gerencie e pague as comissões pendentes dos seus vendedores.</p>
         </div>
-        <div className="grid grid-cols-2 gap-3 w-full sm:w-auto min-w-0 items-stretch">
+        <div className="flex flex-wrap gap-3 w-full sm:w-auto items-stretch">
+          {filteredSales.length > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Deseja realizar o pagamento em lote de ${filteredSales.length} comissão(ões) no valor total de ${formatCurrency(totalPending)}?`)) {
+                  batchPayoutMutation.mutate(filteredSales);
+                }
+              }}
+              disabled={batchPayoutMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 font-bold text-xs sm:text-sm transition-all shadow-md shadow-green-100 disabled:opacity-50 min-h-[48px]"
+            >
+              <CheckCircle2 size={18} />
+              {batchPayoutMutation.isPending ? "Processando..." : `Pagar Todas (${filteredSales.length})`}
+            </button>
+          )}
+
           <ExportButton 
             data={filteredSales} 
             filename="comissoes-pendentes" 

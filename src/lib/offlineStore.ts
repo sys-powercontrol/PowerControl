@@ -192,6 +192,9 @@ export const offlineStore = {
 
     if (successCount > 0) {
       toast.success(`${successCount} vendas sincronizadas com sucesso!`);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("sales_synced"));
+      }
     }
     if (failCount > 0) {
       toast.error(`${failCount} vendas falharam na sincronização.`);

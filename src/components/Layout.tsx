@@ -23,7 +23,8 @@ import {
   BarChart3,
   Globe,
   Tag,
-  WifiOff
+  WifiOff,
+  Keyboard
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,6 +39,8 @@ import * as idb from "idb-keyval";
 
 import GlobalSearch from "./GlobalSearch";
 import NotificationCenter from "./NotificationCenter";
+import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
+import { useGlobalKeyboardShortcuts } from "../hooks/useGlobalKeyboardShortcuts";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -50,6 +53,7 @@ export default function Layout() {
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
+  const { isModalOpen, openModal, closeModal } = useGlobalKeyboardShortcuts();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(api.getCompanyId());
   const hasCompany = !!(user?.company_id || selectedCompanyId);
 
@@ -432,7 +436,19 @@ export default function Layout() {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openModal}
+              title="Atalhos Globais do Teclado (Alt+H)"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 rounded-xl text-xs font-bold transition-all border border-gray-200 shadow-sm"
+            >
+              <Keyboard size={15} className="text-blue-600" />
+              <span>Atalhos</span>
+              <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-white border border-gray-300 rounded text-gray-500 font-extrabold ml-1">
+                Alt+H
+              </kbd>
+            </button>
+
             <NotificationCenter />
             <Link to="/MeuPerfil" className="flex items-center gap-3 group cursor-pointer hover:opacity-80 transition-opacity">
               <div className="hidden sm:flex flex-col items-end">
@@ -449,6 +465,8 @@ export default function Layout() {
             </Link>
           </div>
         </header>
+
+        <KeyboardShortcutsModal isOpen={isModalOpen} onClose={closeModal} />
 
         {isPendingApproval && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-4 text-amber-900 text-sm flex items-center gap-3">
