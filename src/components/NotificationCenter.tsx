@@ -29,6 +29,8 @@ interface Alert {
   type: 'warning' | 'error' | 'info' | 'success';
   link: string;
   date: string;
+  isRead?: boolean;
+  isPersisted?: boolean;
 }
 
 export default function NotificationCenter() {
@@ -80,19 +82,29 @@ export default function NotificationCenter() {
   // Persisted notifications
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", currentCompanyId],
-    queryFn: () => api.get("notifications", { company_id: currentCompanyId, status: "unread" }),
+    queryFn: () => api.get("notifications", { company_id: currentCompanyId }),
     enabled: !!user
   });
 
   const markAsReadMutation = useMutation({
-    mutationFn: (id: string) => api.put("notifications", id, { status: "read" }),
+    mutationFn: (id: string) => api.put("notifications", id, { status: "read", read: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
+  });
+
+  const markAsUnreadMutation = useMutation({
+    mutationFn: (id: string) => api.put("notifications", id, { status: "unread", read: false }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
+  });
+
+  const deleteNotificationMutation = useMutation({
+    mutationFn: (id: string) => api.delete("notifications", id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
   });
 
   const clearAllMutation = useMutation({
     mutationFn: async () => {
-      const unread = notifications.filter((n: any) => n.status === "unread");
-      await Promise.all(unread.map((n: any) => api.put("notifications", n.id, { status: "read" })));
+      const unread = notifications.filter((n: any) => n.status === "unread" || n.read === false);
+      await Promise.all(unread.map((n: any) => api.put("notifications", n.id, { status: "read", read: true })));
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
   });
@@ -176,7 +188,9 @@ export default function NotificationCenter() {
         message: n.message,
         type: n.type || 'info',
         link: n.link || "#",
-        date: n.created_at
+        date: n.created_at || new Date().toISOString(),
+        isRead: n.status === "read" || n.read === true,
+        isPersisted: true
       });
     });
 
@@ -330,12 +344,32 @@ export default function NotificationCenter() {
                               Ver Detalhes <ChevronRight size={12} />
                             </button>
                             {!alert.id.includes('-') && (
-                              <button
-                                onClick={() => markAsReadMutation.mutate(alert.id)}
-                                className="text-[10px] font-bold text-gray-400 hover:text-gray-600"
-                              >
-                                Marcar como lida
-                              </button>
+                              <div className="flex items-center gap-2 ml-auto">
+                                {alert.isRead ? (
+                                  <button
+                                    onClick={() => markAsUnreadMutation.mutate(alert.id)}
+                                    className="text-[10px] font-bold text-orange-600 hover:text-orange-700 hover:underline"
+                                    title="Marcar como não lida"
+                                  >
+                                    Marcar não lida
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => markAsReadMutation.mutate(alert.id)}
+                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                                    title="Marcar como lida"
+                                  >
+                                    Marcar como lida
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => deleteNotificationMutation.mutate(alert.id)}
+                                  className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:underline flex items-center gap-0.5"
+                                  title="Apagar notificação"
+                                >
+                                  Apagar
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
