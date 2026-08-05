@@ -67,6 +67,9 @@ export default function Layout() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
+    const handleOpenMobileMenu = () => setIsMobileMenuOpen(true);
+    window.addEventListener("open-mobile-menu", handleOpenMobileMenu);
+
     // Periodically check for offline mutations in React Query Cache from IDB
     const checkOfflineQueue = async () => {
       try {
@@ -88,6 +91,7 @@ export default function Layout() {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("open-mobile-menu", handleOpenMobileMenu);
       clearInterval(interval);
     };
   }, []);

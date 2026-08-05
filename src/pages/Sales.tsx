@@ -21,7 +21,8 @@ import {
   Lock,
   CreditCard,
   FileText,
-  ReceiptText
+  ReceiptText,
+  Menu
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -1053,35 +1054,64 @@ if (!canCreate) {
     </div>
 
       {/* Mobile Bottom Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-50 flex items-center justify-between gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 z-50 flex items-center justify-between gap-2 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        <div className="flex flex-col shrink-0 min-w-[70px]">
           <span className="text-[10px] font-bold text-gray-400 uppercase">Total</span>
-          <span className="text-xl font-black text-blue-600">{formatCurrency(total)}</span>
+          <span className="text-base font-black text-blue-600">{formatCurrency(total)}</span>
         </div>
-        {activeTab === "items" ? (
-          <button 
-            onClick={() => setActiveTab("cart")}
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"
-          >
-            Ver Carrinho
-            <ChevronRight size={18} />
-          </button>
-        ) : (
-          <button 
-            onClick={() => {
-              if (!validateCheckout()) {
-                toast.error("Preencha todos os campos obrigatórios.");
-                return;
-              }
-              finalizeSale.mutate();
-            }}
-            disabled={finalizeSale.isPending || cart.length === 0}
-            className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <CheckCircle2 size={18} />
-            {finalizeSale.isPending ? "Processando..." : "Finalizar"}
-          </button>
-        )}
+
+        <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
+          {activeTab === "items" ? (
+            <>
+              <button 
+                type="button"
+                onClick={() => setActiveTab("cart")}
+                className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all truncate"
+              >
+                <span className="truncate">Ver Carrinho</span>
+                <ChevronRight size={15} className="shrink-0" />
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("open-mobile-menu"))}
+                className="py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1 border border-gray-200 transition-all shrink-0 cursor-pointer"
+                title="Abrir Menu Lateral"
+              >
+                <Menu size={16} className="shrink-0 text-gray-600" />
+                <span>Menu</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (!validateCheckout()) {
+                    toast.error("Preencha todos os campos obrigatórios.");
+                    return;
+                  }
+                  finalizeSale.mutate();
+                }}
+                disabled={finalizeSale.isPending || cart.length === 0}
+                className="flex-1 py-2.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 disabled:opacity-50 shadow-sm transition-all truncate"
+              >
+                <CheckCircle2 size={15} className="shrink-0" />
+                <span className="truncate">{finalizeSale.isPending ? "Processando..." : "Finalizar"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("open-mobile-menu"))}
+                className="py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1 border border-gray-200 transition-all shrink-0 cursor-pointer"
+                title="Abrir Menu Lateral"
+              >
+                <Menu size={16} className="shrink-0 text-gray-600" />
+                <span>Menu</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Payment Gateway Modal */}
