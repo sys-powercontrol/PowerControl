@@ -306,6 +306,11 @@
       },
       "required": ["user_id", "subject", "message", "status"]
     },
+    "SystemSettings": {
+      "title": "System Settings",
+      "description": "Global system settings including footer configuration",
+      "type": "object"
+    },
     "Movement": {
       "title": "Movement",
       "description": "Financial movement record",
@@ -385,6 +390,7 @@
     "notifications": { "schema": "Notification", "description": "System notifications" },
     "invoices": { "schema": "Invoice", "description": "Fiscal invoices" },
     "support_tickets": { "schema": "SupportTicket", "description": "Support tickets" },
-    "api_configurations": { "schema": "ApiConfiguration", "description": "Global API keys and configurations" }
+    "api_configurations": { "schema": "ApiConfiguration", "description": "Global API keys and configurations" },
+    "system_settings": { "schema": "SystemSettings", "description": "Global system configuration documents" }
   }
 }

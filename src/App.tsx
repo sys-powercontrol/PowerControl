@@ -30,6 +30,8 @@ import BankReconciliation from "./pages/BankReconciliation";
 import Transfers from "./pages/Transfers";
 import Support from "./pages/Support";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import TermsOfUse from "./pages/TermsOfUse";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Services from "./pages/Services";
 import Sellers from "./pages/Sellers";
 import Suppliers from "./pages/Suppliers";
@@ -157,6 +159,8 @@ export default function App() {
               <Route path="Fiscal" element={<Fiscal />} />
               <Route path="Suporte" element={<Support />} />
               <Route path="BaseConhecimento" element={<KnowledgeBase />} />
+              <Route path="TermosDeUso" element={<TermsOfUse />} />
+              <Route path="PoliticaPrivacidade" element={<PrivacyPolicy />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

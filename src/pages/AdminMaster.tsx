@@ -30,8 +30,14 @@ import {
   Power,
   Trash2,
   UserCheck,
-  UserX
+  UserX,
+  LayoutTemplate,
+  Globe,
+  Link2,
+  Eye,
+  Sparkles
 } from "lucide-react";
+import { DEFAULT_FOOTER_CONFIG, FooterConfig, FooterLink } from "../types/footer";
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -161,6 +167,92 @@ export default function AdminMaster() {
     };
 
     saveApiConfigMutation.mutate(configData);
+  };
+
+  const { data: footerConfigData, refetch: refetchFooterConfig } = useQuery({
+    queryKey: ["system_settings", "footer"],
+    queryFn: async () => {
+      try {
+        const docRef = doc(db, "system_settings", "footer");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          return { ...DEFAULT_FOOTER_CONFIG, ...docSnap.data() } as FooterConfig;
+        }
+      } catch (err) {
+        console.error("Erro ao carregar configurações de rodapé:", err);
+      }
+      return DEFAULT_FOOTER_CONFIG;
+    },
+    enabled: activeTab === "Rodapé"
+  });
+
+  const [footerFormState, setFooterFormState] = useState<FooterConfig | null>(null);
+
+  const footerForm = footerFormState ?? footerConfigData ?? DEFAULT_FOOTER_CONFIG;
+
+  const setFooterForm = (updater: FooterConfig | ((prev: FooterConfig) => FooterConfig)) => {
+    setFooterFormState(prev => {
+      const current = prev ?? footerConfigData ?? DEFAULT_FOOTER_CONFIG;
+      return typeof updater === 'function' ? updater(current) : updater;
+    });
+  };
+
+  const saveFooterConfigMutation = useMutation({
+    mutationFn: async (data: FooterConfig) => {
+      const docRef = doc(db, "system_settings", "footer");
+      await setDoc(docRef, {
+        ...data,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+
+      await api.log({
+        action: 'UPDATE',
+        entity: 'system_settings',
+        entity_id: 'footer',
+        description: `Atualizou as configurações do rodapé do sistema`,
+        metadata: data as any
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system_settings", "footer"] });
+      refetchFooterConfig();
+      toast.success("Configurações do rodapé salvas com sucesso!");
+    },
+    onError: (err: any) => {
+      toast.error(`Erro ao salvar configurações do rodapé: ${err.message}`);
+    }
+  });
+
+  const handleFooterConfigSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveFooterConfigMutation.mutate(footerForm);
+  };
+
+  const handleAddFooterLink = () => {
+    const newLink: FooterLink = {
+      id: Date.now().toString(),
+      label: "Novo Link",
+      url: "/",
+      isExternal: false
+    };
+    setFooterForm(prev => ({
+      ...prev,
+      links: [...(prev.links || []), newLink]
+    }));
+  };
+
+  const handleUpdateFooterLink = (id: string, key: keyof FooterLink, value: any) => {
+    setFooterForm(prev => ({
+      ...prev,
+      links: (prev.links || []).map(link => link.id === id ? { ...link, [key]: value } : link)
+    }));
+  };
+
+  const handleRemoveFooterLink = (id: string) => {
+    setFooterForm(prev => ({
+      ...prev,
+      links: (prev.links || []).filter(link => link.id !== id)
+    }));
   };
 
   const searchCEP = async () => {
@@ -469,7 +561,7 @@ if (currentUser?.role !== 'master') {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar">
-        {["Visão Geral", "Usuários", "Empresas", "Suporte", "Auditoria", "APIs"].map(tab => (
+        {["Visão Geral", "Usuários", "Empresas", "Suporte", "Auditoria", "APIs", "Rodapé"].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -1167,6 +1259,416 @@ if (currentUser?.role !== 'master') {
                     <>
                       <Save size={18} />
                       Salvar Todas as Configurações
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "Rodapé" && (
+        <div className="space-y-8">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                  <LayoutTemplate size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Configurações do Rodapé do Sistema</h2>
+                  <p className="text-sm text-gray-500">
+                    Gerencie informações, contatos, redes sociais, avisos e links exibidos no rodapé de todas as páginas.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleFooterConfigSubmit}
+                disabled={saveFooterConfigMutation.isPending}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all shrink-0 text-sm"
+              >
+                {saveFooterConfigMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Salvar Rodapé
+                  </>
+                )}
+              </button>
+            </div>
+
+            <form onSubmit={handleFooterConfigSubmit} className="space-y-8">
+              {/* Informações Gerais */}
+              <div className="space-y-4">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-blue-600" />
+                  Informações da Marca & Sistema
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Nome do Sistema / Marca</label>
+                    <input
+                      type="text"
+                      value={footerForm.system_name || ""}
+                      onChange={e => setFooterForm({ ...footerForm, system_name: e.target.value })}
+                      placeholder="Ex: PowerControl ERP"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Versão do Sistema</label>
+                    <input
+                      type="text"
+                      value={footerForm.system_version || ""}
+                      onChange={e => setFooterForm({ ...footerForm, system_version: e.target.value })}
+                      placeholder="Ex: v2.5.0"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Subtítulo / Descrição Curta (Tagline)</label>
+                    <input
+                      type="text"
+                      value={footerForm.tagline || ""}
+                      onChange={e => setFooterForm({ ...footerForm, tagline: e.target.value })}
+                      placeholder="Ex: Plataforma integrada de gestão empresarial e controle financeiro."
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Texto de Copyright</label>
+                    <input
+                      type="text"
+                      value={footerForm.copyright_text || ""}
+                      onChange={e => setFooterForm({ ...footerForm, copyright_text: e.target.value })}
+                      placeholder="Ex: © 2026 PowerControl - Todos os direitos reservados."
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Status do Sistema & Banner */}
+              <div className="pt-6 border-t border-gray-100 space-y-4">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-600" />
+                  Status Operacional & Banner de Aviso
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50/80 rounded-2xl border border-gray-100">
+                  <div className="flex items-center gap-3 md:col-span-3">
+                    <input
+                      type="checkbox"
+                      id="status_badge_enabled"
+                      checked={footerForm.status_badge_enabled}
+                      onChange={e => setFooterForm({ ...footerForm, status_badge_enabled: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="status_badge_enabled" className="text-sm font-bold text-gray-800 cursor-pointer select-none">
+                      Exibir Indicador de Status do Sistema no Rodapé
+                    </label>
+                  </div>
+
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Texto do Status</label>
+                    <input
+                      type="text"
+                      value={footerForm.status_text || ""}
+                      onChange={e => setFooterForm({ ...footerForm, status_text: e.target.value })}
+                      placeholder="Ex: Sistemas 100% Operacionais"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Cor / Nível</label>
+                    <select
+                      value={footerForm.status_color || "green"}
+                      onChange={e => setFooterForm({ ...footerForm, status_color: e.target.value as any })}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-bold"
+                    >
+                      <option value="green">🟢 Verde (Operacional)</option>
+                      <option value="yellow">🟡 Amarelo (Atenção / Manutenção)</option>
+                      <option value="red">🔴 Vermelho (Instabilidade)</option>
+                      <option value="blue">🔵 Azul (Informativo)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Banner de Aviso */}
+                <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200/60 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="announcement_enabled"
+                      checked={footerForm.announcement_enabled}
+                      onChange={e => setFooterForm({ ...footerForm, announcement_enabled: e.target.checked })}
+                      className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+                    />
+                    <label htmlFor="announcement_enabled" className="text-sm font-bold text-amber-900 cursor-pointer select-none flex items-center gap-2">
+                      <Sparkles size={16} className="text-amber-600" />
+                      Exibir Banner de Aviso Especial no Rodapé
+                    </label>
+                  </div>
+
+                  {footerForm.announcement_enabled && (
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-xs font-bold text-amber-900 uppercase tracking-wider">Mensagem do Aviso</label>
+                      <input
+                        type="text"
+                        value={footerForm.announcement_text || ""}
+                        onChange={e => setFooterForm({ ...footerForm, announcement_text: e.target.value })}
+                        placeholder="Ex: Manutenção programada para o próximo domingo das 02h às 04h."
+                        className="w-full px-4 py-2 border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 text-sm bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Contatos & Atendimento */}
+              <div className="pt-6 border-t border-gray-100 space-y-4">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Mail size={18} className="text-blue-600" />
+                  Contatos de Suporte & Atendimento
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">E-mail de Suporte</label>
+                    <input
+                      type="email"
+                      value={footerForm.support_email || ""}
+                      onChange={e => setFooterForm({ ...footerForm, support_email: e.target.value })}
+                      placeholder="suporte@sistema.com.br"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Telefone / Whats</label>
+                    <input
+                      type="text"
+                      value={footerForm.support_phone || ""}
+                      onChange={e => setFooterForm({ ...footerForm, support_phone: e.target.value })}
+                      placeholder="(11) 99999-8888"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Horário de Atendimento</label>
+                    <input
+                      type="text"
+                      value={footerForm.support_hours || ""}
+                      onChange={e => setFooterForm({ ...footerForm, support_hours: e.target.value })}
+                      placeholder="Seg a Sex: 08h às 18h"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Redes Sociais / Canais */}
+              <div className="pt-6 border-t border-gray-100 space-y-4">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Globe size={18} className="text-blue-600" />
+                  Canais Oficiais & Redes Sociais
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">WhatsApp (número com DDD)</label>
+                    <input
+                      type="text"
+                      value={footerForm.whatsapp_number || ""}
+                      onChange={e => setFooterForm({ ...footerForm, whatsapp_number: e.target.value })}
+                      placeholder="5511999998888"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Website Oficial</label>
+                    <input
+                      type="url"
+                      value={footerForm.website_url || ""}
+                      onChange={e => setFooterForm({ ...footerForm, website_url: e.target.value })}
+                      placeholder="https://empresa.com.br"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Instagram (@usuario)</label>
+                    <input
+                      type="text"
+                      value={footerForm.instagram_handle || ""}
+                      onChange={e => setFooterForm({ ...footerForm, instagram_handle: e.target.value })}
+                      placeholder="@empresa.oficial"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">LinkedIn URL</label>
+                    <input
+                      type="url"
+                      value={footerForm.linkedin_url || ""}
+                      onChange={e => setFooterForm({ ...footerForm, linkedin_url: e.target.value })}
+                      placeholder="https://linkedin.com/company/..."
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Gerenciador de Links do Rodapé */}
+              <div className="pt-6 border-t border-gray-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <Link2 size={18} className="text-blue-600" />
+                    Links Rápidos Personalizáveis
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAddFooterLink}
+                    className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus size={15} />
+                    Adicionar Link
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {(footerForm.links || []).map((link, idx) => (
+                    <div key={link.id || idx} className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="flex-1 space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Rótulo / Título</label>
+                        <input
+                          type="text"
+                          value={link.label}
+                          onChange={e => handleUpdateFooterLink(link.id, "label", e.target.value)}
+                          placeholder="Ex: Termos de Uso"
+                          className="w-full px-3 py-1.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs bg-white"
+                        />
+                      </div>
+                      <div className="flex-[2] space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">URL ou Rota Interna</label>
+                        <input
+                          type="text"
+                          value={link.url}
+                          onChange={e => handleUpdateFooterLink(link.id, "url", e.target.value)}
+                          placeholder="Ex: /BaseConhecimento ou https://..."
+                          className="w-full px-3 py-1.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs bg-white font-mono"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 sm:self-end sm:pb-1">
+                        <label className="flex items-center gap-1.5 text-xs text-gray-600 font-semibold cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={!!link.isExternal}
+                            onChange={e => handleUpdateFooterLink(link.id, "isExternal", e.target.checked)}
+                            className="w-3.5 h-3.5 text-blue-600 rounded"
+                          />
+                          <span>Nova Aba</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFooterLink(link.id)}
+                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer ml-2"
+                          title="Remover Link"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!footerForm.links || footerForm.links.length === 0) && (
+                    <p className="text-xs text-gray-400 italic text-center py-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                      Nenhum link adicionado ao rodapé. Clique em "Adicionar Link" acima.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Toggles de Exibição */}
+              <div className="pt-6 border-t border-gray-100 space-y-4">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Eye size={18} className="text-blue-600" />
+                  Visibilidade das Seções do Rodapé
+                </h3>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <label className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={footerForm.show_version}
+                      onChange={e => setFooterForm({ ...footerForm, show_version: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs font-bold text-gray-700">Versão</span>
+                  </label>
+
+                  <label className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={footerForm.show_contacts}
+                      onChange={e => setFooterForm({ ...footerForm, show_contacts: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs font-bold text-gray-700">Contatos</span>
+                  </label>
+
+                  <label className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={footerForm.show_links}
+                      onChange={e => setFooterForm({ ...footerForm, show_links: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs font-bold text-gray-700">Links Úteis</span>
+                  </label>
+
+                  <label className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={footerForm.show_social}
+                      onChange={e => setFooterForm({ ...footerForm, show_social: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs font-bold text-gray-700">Redes Sociais</span>
+                  </label>
+
+                  <label className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={footerForm.show_status}
+                      onChange={e => setFooterForm({ ...footerForm, show_status: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs font-bold text-gray-700">Badge Status</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Botão de envio inferior */}
+              <div className="pt-6 border-t border-gray-100 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={saveFooterConfigMutation.isPending}
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 cursor-pointer transition-all"
+                >
+                  {saveFooterConfigMutation.isPending ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} />
+                      Salvar Todas as Configurações do Rodapé
                     </>
                   )}
                 </button>

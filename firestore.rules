@@ -220,6 +220,11 @@ service cloud.firestore {
       allow write: if isAuthenticated() && isMaster();
     }
 
+    match /system_settings/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isMaster();
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

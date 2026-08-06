@@ -7,6 +7,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { Shield, Mail, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
+import LegalModal from "../components/LegalModal";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ export default function Login() {
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<"terms" | "privacy">("terms");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -261,9 +264,41 @@ export default function Login() {
         )}
         </div>
 
-        <p className="text-center text-gray-400 text-sm">
-          © 2026 PowerControl. Todos os direitos reservados.
-        </p>
+        <div className="text-center space-y-2">
+          <p className="text-xs text-gray-400">
+            Ao entrar, você concorda com nossos{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalTab("terms");
+                setLegalModalOpen(true);
+              }}
+              className="text-gray-600 hover:text-blue-600 font-semibold underline cursor-pointer"
+            >
+              Termos de Uso
+            </button>{" "}
+            e{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalTab("privacy");
+                setLegalModalOpen(true);
+              }}
+              className="text-gray-600 hover:text-blue-600 font-semibold underline cursor-pointer"
+            >
+              Política de Privacidade
+            </button>.
+          </p>
+          <p className="text-center text-gray-400 text-sm">
+            © 2026 PowerControl. Todos os direitos reservados.
+          </p>
+        </div>
+
+        <LegalModal 
+          isOpen={legalModalOpen} 
+          onClose={() => setLegalModalOpen(false)} 
+          initialTab={legalModalTab}
+        />
       </div>
     </motion.div>
   );

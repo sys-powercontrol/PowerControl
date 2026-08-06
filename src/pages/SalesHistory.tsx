@@ -564,20 +564,25 @@ if (!canView) {
                   <p className="text-xl font-bold text-gray-900">{formatCurrency(sale.total || 0)}</p>
                   <p className="text-[10px] text-gray-400 font-bold uppercase">{sale.payment_method}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <button 
                     onClick={() => { setSelectedSale(sale); setIsDetailsModalOpen(true); }}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
+                    title="Visualizar Detalhes"
                   >
                     <Eye size={18} />
                   </button>
-                  <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                  <button 
+                    onClick={() => { setSelectedSale(sale); setIsDetailsModalOpen(true); }}
+                    className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
+                    title="Imprimir Recibo"
+                  >
                     <Printer size={18} />
                   </button>
                   {sale.status !== "Cancelada" && canDelete && (
                     <button 
                       onClick={() => handleCancelClick(sale.id)}
-                      className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                      className="p-2 sm:p-2.5 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white border border-amber-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
                       title="Cancelar Venda"
                     >
                       <XCircle size={18} />
@@ -586,7 +591,7 @@ if (!canView) {
                   {canDelete && (
                     <button 
                       onClick={() => handleDeleteClick(sale.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 sm:p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
                       title="Excluir Venda"
                     >
                       <Trash2 size={18} />
@@ -688,14 +693,14 @@ if (!canView) {
             <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3">
               <button 
                 onClick={() => printReceipt(selectedSale, company)}
-                className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors"
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer"
                 title="Imprimir Recibo (80mm)"
               >
                 <Printer size={18} /> <span className="hidden sm:inline">Recibo 80mm</span>
               </button>
               <button 
                 onClick={() => printA4Quote(selectedSale, company)}
-                className="flex-1 py-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
                 title="Salvar Orçamento (PDF A4)"
               >
                 <FileText size={18} /> <span className="hidden sm:inline">Orçamento A4</span>
@@ -703,7 +708,7 @@ if (!canView) {
               {selectedSale.status !== "Cancelada" && canDelete && (
                 <button 
                   onClick={() => handleCancelClick(selectedSale.id)}
-                  className="flex-1 py-3 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-100 transition-colors"
+                  className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                 >
                   <XCircle size={18} /> Cancelar Venda
                 </button>
@@ -711,7 +716,7 @@ if (!canView) {
               {canDelete && (
                 <button 
                   onClick={() => handleDeleteClick(selectedSale.id)}
-                  className="flex-1 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                 >
                   <Trash2 size={18} /> Excluir
                 </button>

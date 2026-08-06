@@ -41,6 +41,7 @@ import GlobalSearch from "./GlobalSearch";
 import NotificationCenter from "./NotificationCenter";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
 import { useGlobalKeyboardShortcuts } from "../hooks/useGlobalKeyboardShortcuts";
+import Footer from "./Footer";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -486,7 +487,7 @@ export default function Layout() {
           </div>
         )}
 
-        <div className="p-4 md:p-8">
+        <div className="p-4 md:p-8 pb-20 md:pb-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -498,6 +499,7 @@ export default function Layout() {
               <Outlet />
             </motion.div>
           </AnimatePresence>
+          <Footer />
         </div>
       </main>
 

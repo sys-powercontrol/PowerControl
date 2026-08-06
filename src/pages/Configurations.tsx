@@ -24,21 +24,31 @@ import {
   Check,
   EyeOff,
   Send,
-  Tag
+  Tag,
+  ChevronDown,
+  FileText,
+  Lock,
+  ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
 import ConfirmationModal from "../components/ConfirmationModal";
+import TermsAcceptanceCard from "../components/TermsAcceptanceCard";
+import LegalModal from "../components/LegalModal";
 
 export default function Configurations() {
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
   const location = useLocation();
+
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<"terms" | "privacy">("terms");
   const companyId = api.getCompanyId() || user?.company_id;
   const [activeTab, setActiveTab] = useState(() => {
     const searchParams = new URLSearchParams(location.search);
     return location.state?.tab || searchParams.get("tab") || "general";
   });
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -323,7 +333,10 @@ export default function Configurations() {
     { id: "fiscal", name: "Fiscal / API", icon: Zap },
     { id: "permissions", name: "Permissões", icon: ShieldCheck },
     { id: "security", name: "Segurança", icon: Shield },
+    { id: "legal", name: "Termos & Privacidade", icon: FileText },
   ];
+
+  const currentTabObj = tabs.find(t => t.id === activeTab) || tabs[0];
 
 if (!canManage) {
     return (
@@ -347,14 +360,69 @@ if (!canManage) {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Tabs Sidebar */}
-        <div className="grid grid-cols-2 lg:flex lg:flex-col lg:w-64 lg:shrink-0 gap-2 sm:gap-2.5 lg:gap-1 w-full max-w-full overflow-hidden">
+        {/* Mobile Dropdown Menu (Menu Suspenso) */}
+        <div className="lg:hidden relative w-full mb-2 z-30">
+          <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider">
+            Selecione a Categoria
+          </label>
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-white border border-gray-200 rounded-2xl font-bold text-sm text-gray-800 shadow-sm hover:bg-gray-50 active:bg-gray-100 transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5 truncate">
+              {currentTabObj && <currentTabObj.icon size={20} className="text-blue-600 shrink-0" />}
+              <span className="truncate">{currentTabObj?.name}</span>
+            </div>
+            <ChevronDown size={18} className={`text-gray-400 shrink-0 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {isDropdownOpen && (
+            <>
+              <div 
+                className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" 
+                onClick={() => setIsDropdownOpen(false)} 
+              />
+              <ul className="absolute left-0 right-0 top-full mt-2 z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-y-auto max-h-[65vh] p-1.5 space-y-1 list-none m-0 touch-pan-y animate-in fade-in zoom-in-95 duration-150">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <li key={tab.id} className="w-full">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all text-left cursor-pointer ${
+                          isActive
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-gray-700 hover:bg-gray-100 active:bg-gray-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 truncate min-w-0">
+                          <Icon size={18} className="shrink-0" />
+                          <span className="truncate">{tab.name}</span>
+                        </div>
+                        {isActive && <Check size={16} className="shrink-0 text-white" />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </div>
+
+        {/* Desktop Sidebar Tabs */}
+        <div className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 gap-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full min-w-0 flex items-center justify-start gap-2 px-2.5 py-2.5 sm:px-3 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all text-left whitespace-normal break-words overflow-hidden ${
+              className={`w-full min-w-0 flex items-center justify-start gap-2.5 px-3 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all text-left overflow-hidden ${
                 activeTab === tab.id 
                   ? "bg-blue-600 text-white shadow-md shadow-blue-200" 
                   : "text-gray-600 hover:bg-white hover:text-blue-600 bg-gray-50/90 lg:bg-transparent border border-gray-100 lg:border-transparent"
@@ -451,6 +519,85 @@ if (!canManage) {
                           </label>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Cartão de Termos de Uso e Políticas de Privacidade */}
+                  <div className="pt-6 border-t border-gray-100 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                          <FileText size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900">Termos de Uso e Políticas de Privacidade</h3>
+                          <p className="text-xs text-gray-500">Documentação legal, termos de utilização e conformidade com a LGPD.</p>
+                        </div>
+                      </div>
+                      <span className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200">
+                        <ShieldCheck size={14} />
+                        LGPD Regular
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Termos de Uso Card */}
+                      <div className="p-5 bg-gray-50/90 hover:bg-gray-50 rounded-2xl border border-gray-200/80 flex flex-col justify-between space-y-4 transition-all group">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="p-2 bg-blue-100/70 text-blue-700 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                              <FileText size={18} />
+                            </span>
+                            <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                              Contratual
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-bold text-gray-900">Termos de Uso do Sistema</h4>
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            Regras de licenciamento, responsabilidades contratuais, termos de SLA e condições de suporte.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLegalModalTab("terms");
+                            setLegalModalOpen(true);
+                          }}
+                          className="w-full py-2.5 px-4 bg-white hover:bg-blue-600 text-gray-800 hover:text-white border border-gray-200 hover:border-blue-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+                        >
+                          <span>Acessar Termos de Uso</span>
+                          <ExternalLink size={14} />
+                        </button>
+                      </div>
+
+                      {/* Política de Privacidade Card */}
+                      <div className="p-5 bg-gray-50/90 hover:bg-gray-50 rounded-2xl border border-gray-200/80 flex flex-col justify-between space-y-4 transition-all group">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="p-2 bg-emerald-100/70 text-emerald-700 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                              <Lock size={18} />
+                            </span>
+                            <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                              LGPD / Segurança
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-bold text-gray-900">Política de Privacidade</h4>
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            Tratamento de dados, retenção de informações, criptografia e direitos do titular sob a LGPD.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLegalModalTab("privacy");
+                            setLegalModalOpen(true);
+                          }}
+                          className="w-full py-2.5 px-4 bg-white hover:bg-emerald-600 text-gray-800 hover:text-white border border-gray-200 hover:border-emerald-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+                        >
+                          <span>Acessar Política de Privacidade</span>
+                          <ExternalLink size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -908,6 +1055,82 @@ if (!canManage) {
                 </div>
               )}
 
+              {activeTab === "legal" && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4 pb-4 border-b border-gray-50">
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                      <FileText size={24} />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold">Termos de Uso e Políticas de Privacidade</h2>
+                      <p className="text-sm text-gray-500">Documentação contratual, termos de serviço e diretrizes de conformidade LGPD.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Card Termos de Uso */}
+                    <div className="p-6 bg-white rounded-3xl border border-gray-200/80 shadow-sm hover:shadow-md transition-all space-y-4 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                            <FileText size={22} />
+                          </div>
+                          <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">
+                            Contrato do Usuário
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">Termos de Uso do Sistema</h3>
+                        <p className="text-xs text-gray-600 leading-relaxed">
+                          Consulte as regras gerais de licença de uso, responsabilidades operacionais, acordos de nível de serviço (SLA) e termos de garantia do sistema PowerControl ERP.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLegalModalTab("terms");
+                          setLegalModalOpen(true);
+                        }}
+                        className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                      >
+                        <span>Visualizar Termos de Uso</span>
+                        <ExternalLink size={16} />
+                      </button>
+                    </div>
+
+                    {/* Card Política de Privacidade */}
+                    <div className="p-6 bg-white rounded-3xl border border-gray-200/80 shadow-sm hover:shadow-md transition-all space-y-4 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                            <Lock size={22} />
+                          </div>
+                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">
+                            LGPD & Privacidade
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">Política de Privacidade</h3>
+                        <p className="text-xs text-gray-600 leading-relaxed">
+                          Saiba como tratamos e armazenamos seus dados, direitos do titular segundo a LGPD (Lei 13.709/18), políticas de cookies e contatos do nosso Encarregado de Dados (DPO).
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLegalModalTab("privacy");
+                          setLegalModalOpen(true);
+                        }}
+                        className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                      >
+                        <span>Visualizar Política de Privacidade</span>
+                        <ExternalLink size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <TermsAcceptanceCard />
+                </div>
+              )}
+
               <div className="flex justify-end pt-8 border-t border-gray-50">
                 <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50">
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
@@ -927,6 +1150,12 @@ if (!canManage) {
         message={confirmModal.message}
         isLoading={isSaving}
         variant={confirmModal.variant || 'warning'}
+      />
+
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalModalTab}
       />
     </div>
   );

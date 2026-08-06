@@ -6,6 +6,7 @@ import { Shield, Mail, Lock, User, Phone, FileText, Loader2, AlertCircle } from 
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import { InputMask } from "../components/ui/InputMask";
+import LegalModal from "../components/LegalModal";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -22,6 +23,9 @@ export default function Register() {
     phone: "",
     cpf: "",
   });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<"terms" | "privacy">("terms");
 
   useEffect(() => {
     if (inviteId) {
@@ -59,8 +63,14 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!acceptedTerms) {
+      toast.error("Você precisa aceitar os Termos de Uso e a Política de Privacidade para se cadastrar.");
+      return;
+    }
     setIsLoading(true);
     try {
+      localStorage.setItem("powercontrol_terms_accepted", "true");
+      localStorage.setItem("powercontrol_terms_accepted_at", new Date().toISOString());
       await register({ ...formData, invite_id: inviteId });
       if (inviteId && inviteData) {
         toast.success(`Bem-vindo à ${inviteData.company_name || "sua nova empresa"}!`);
@@ -213,10 +223,55 @@ export default function Register() {
               </div>
             </div>
 
+            <div className="pt-2 pb-1">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input 
+                  type="checkbox"
+                  required
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="text-xs text-gray-600 leading-normal">
+                  Declaro que li e aceito os{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLegalModalTab("terms");
+                      setLegalModalOpen(true);
+                    }}
+                    className="text-blue-600 font-bold underline hover:text-blue-800 cursor-pointer"
+                  >
+                    Termos de Uso
+                  </button>{" "}
+                  e a{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLegalModalTab("privacy");
+                      setLegalModalOpen(true);
+                    }}
+                    className="text-blue-600 font-bold underline hover:text-blue-800 cursor-pointer"
+                  >
+                    Política de Privacidade
+                  </button>.
+                </span>
+              </label>
+            </div>
+
+            <LegalModal 
+              isOpen={legalModalOpen} 
+              onClose={() => setLegalModalOpen(false)} 
+              initialTab={legalModalTab}
+              onAccept={() => setAcceptedTerms(true)}
+            />
+
             <button 
               type="submit" 
-              disabled={isLoading}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-4"
+              disabled={isLoading || !acceptedTerms}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60 mt-2 cursor-pointer"
             >
               {isLoading ? <Loader2 className="animate-spin" size={24} /> : "Criar Minha Conta"}
             </button>
