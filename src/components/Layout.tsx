@@ -147,6 +147,8 @@ export default function Layout() {
   }[] = [
     { name: "Dashboard", path: "/", icon: LayoutDashboard, requiresCompany: true, permission: 'dashboard.view' },
     { name: "Meu Painel", path: "/PainelVendedor", icon: TrendingUp, requiresCompany: true, hideForAdmin: true },
+    { name: "Admin Master", path: "/PainelAdminMaster", icon: Crown, requiresSystemAdmin: true },
+    { name: "Dashboard Global", path: "/DashboardGlobal", icon: Globe, requiresSystemAdmin: true },
     { 
       name: "Catálogo", 
       icon: Package,
@@ -209,8 +211,6 @@ export default function Layout() {
         { name: "Certificado Digital", path: "/Certificado", permission: 'fiscal.manage' },
       ]
     },
-    { name: "Dashboard Global", path: "/DashboardGlobal", icon: Globe, requiresSystemAdmin: true },
-    { name: "Admin Master", path: "/PainelAdminMaster", icon: Crown, requiresSystemAdmin: true },
     { name: "Minha Empresa", path: "/Empresa", icon: Building2, requiresCompany: true, permission: 'settings.manage' },
     { name: "Funcionários", path: "/Funcionarios", icon: Users, requiresCompany: true, permission: 'employees.manage' },
     { name: "Convites", path: "/Convites", icon: UserPlus, requiresCompany: true, permission: 'employees.manage' },

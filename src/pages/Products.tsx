@@ -640,7 +640,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                   </div>
                 )}
                 {canManage && (
-                  <div className={`absolute ${disableProductImages ? 'top-2 right-2' : 'top-2 right-2'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                  <div className={`absolute ${disableProductImages ? 'top-2 right-2' : 'top-2 right-2'} flex gap-1.5 z-10`}>
                     <button 
                       onClick={() => { 
                         setEditingProduct(p); 
@@ -648,7 +648,8 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                         setBomItems(p.bom_items || []);
                         setIsModalOpen(true); 
                       }}
-                      className="p-2 bg-white rounded-lg shadow-md text-blue-600 hover:bg-blue-50"
+                      title="Editar Produto"
+                      className="p-2 bg-white/95 hover:bg-blue-600 text-blue-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer mt-[39px]"
                     >
                       <Edit2 size={16} />
                     </button>
@@ -664,7 +665,8 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                           }
                         });
                       }}
-                      className="p-2 bg-white rounded-lg shadow-md text-red-600 hover:bg-red-50"
+                      title="Excluir Produto"
+                      className="p-2 bg-white/95 hover:bg-red-600 text-red-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer mt-[39px]"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -730,10 +732,11 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                   <span className="font-bold text-gray-900">{c.name}</span>
                 </div>
                 {canManage && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1.5 items-center">
                     <button 
                       onClick={() => { setEditingCategory(c); setIsCategoryModalOpen(true); }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                      title="Editar Categoria"
+                      className="p-2 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200/80 rounded-xl transition-all cursor-pointer shadow-2xs"
                     >
                       <Edit2 size={16} />
                     </button>
@@ -749,7 +752,8 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                           }
                         });
                       }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Excluir Categoria"
+                      className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200/80 rounded-xl transition-all cursor-pointer shadow-2xs"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -790,10 +794,11 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                   <span className="font-bold text-gray-900">{b.name}</span>
                 </div>
                 {canManage && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1.5 items-center">
                     <button 
                       onClick={() => { setEditingBrand(b); setIsBrandModalOpen(true); }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                      title="Editar Marca"
+                      className="p-2 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200/80 rounded-xl transition-all cursor-pointer shadow-2xs"
                     >
                       <Edit2 size={16} />
                     </button>
@@ -809,7 +814,8 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                           }
                         });
                       }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Excluir Marca"
+                      className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200/80 rounded-xl transition-all cursor-pointer shadow-2xs"
                     >
                       <Trash2 size={16} />
                     </button>

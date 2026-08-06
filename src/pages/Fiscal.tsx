@@ -590,11 +590,11 @@ if (!canManage) {
                     <NfeStatusBadge status={invoice.status as NfeStatus} />
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end gap-1.5 items-center">
                       {invoice.status === "Pendente" && (
                         <button 
                           onClick={() => checkStatusMutation.mutate(invoice)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                          className="p-2 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200/80 rounded-xl transition-all cursor-pointer shadow-2xs" 
                           title="Sincronizar Status"
                         >
                           <Clock size={18} />
@@ -605,7 +605,7 @@ if (!canManage) {
                           setSelectedInvoice(invoice);
                           setIsDanfeOpen(true);
                         }}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                        className="p-2 bg-gray-50 hover:bg-blue-600 text-gray-600 hover:text-white border border-gray-200/80 rounded-xl transition-all cursor-pointer shadow-2xs disabled:opacity-40" 
                         title="Imprimir DANFE"
                         disabled={!invoice.pdf_url && invoice.status !== "Emitida"}
                       >

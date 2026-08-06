@@ -185,19 +185,21 @@ export default function Services() {
               <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
                 <Wrench size={24} />
               </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-1.5 items-center">
                 <button 
                   onClick={() => {
                     setEditingService(service);
                     setIsModalOpen(true);
                   }}
-                  className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Editar Serviço"
+                  className="p-2 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200/80 rounded-xl transition-all cursor-pointer shadow-2xs"
                 >
                   <Edit size={18} />
                 </button>
                 <button 
                   onClick={() => handleDelete(service.id)}
-                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Excluir Serviço"
+                  className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200/80 rounded-xl transition-all cursor-pointer shadow-2xs"
                 >
                   <Trash2 size={18} />
                 </button>
