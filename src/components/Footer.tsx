@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useGlobalKeyboardShortcuts } from "../hooks/useGlobalKeyboardShortcuts";
+import { useAuth } from "../lib/auth";
 import { FooterConfig, FooterLink, DEFAULT_FOOTER_CONFIG } from "../types/footer";
 
 export type { FooterConfig, FooterLink };
@@ -29,6 +30,7 @@ export { DEFAULT_FOOTER_CONFIG };
 
 export default function Footer() {
   const { openModal } = useGlobalKeyboardShortcuts();
+  const { user } = useAuth();
 
   const { data: footerConfig = DEFAULT_FOOTER_CONFIG } = useQuery({
     queryKey: ["system_settings", "footer"],
@@ -80,11 +82,11 @@ export default function Footer() {
   const statusStyle = getStatusColorBadge(footerConfig.status_color || "green");
 
   return (
-    <footer className="mt-12 pt-8 pb-12 border-t border-gray-200/80 bg-slate-900 text-slate-300 rounded-2xl shadow-inner px-6 md:px-10 space-y-8">
+    <footer className="mt-12 pt-8 pb-12 border border-gray-200 bg-white text-gray-600 rounded-2xl shadow-xs px-6 md:px-10 space-y-8">
       {/* Announcement Banner if Enabled */}
       {footerConfig.announcement_enabled && footerConfig.announcement_text && (
-        <div className="p-3.5 px-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs sm:text-sm font-medium flex items-center gap-2.5">
-          <Sparkles size={16} className="text-amber-400 shrink-0" />
+        <div className="p-3.5 px-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs sm:text-sm font-medium flex items-center gap-2.5">
+          <Sparkles size={16} className="text-amber-600 shrink-0" />
           <span className="flex-1">{footerConfig.announcement_text}</span>
         </div>
       )}
@@ -98,24 +100,24 @@ export default function Footer() {
               <ShieldCheck size={18} />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base tracking-tight leading-tight">
+              <h3 className="font-extrabold text-gray-900 text-base tracking-tight leading-tight">
                 {footerConfig.system_name || "PowerControl ERP"}
               </h3>
               {footerConfig.show_version && (
-                <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.2 rounded-md inline-block">
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-md inline-block">
                   {footerConfig.system_version || "v2.5.0"}
                 </span>
               )}
             </div>
           </div>
 
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-gray-500 leading-relaxed">
             {footerConfig.tagline || "Plataforma integrada de gestão empresarial e controle financeiro."}
           </p>
 
           {/* Status Indicator */}
           {footerConfig.show_status && footerConfig.status_badge_enabled && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-all bg-slate-800/80 border-slate-700/80 text-slate-200">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-all bg-gray-50 border-gray-200 text-gray-700">
               <span className={`w-2 h-2 rounded-full animate-pulse ${statusStyle.dot}`} />
               {statusStyle.icon}
               <span>{footerConfig.status_text || "Sistemas Operacionais"}</span>
@@ -126,8 +128,8 @@ export default function Footer() {
         {/* Quick Links */}
         {footerConfig.show_links && (
           <div className="space-y-3">
-            <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <HelpCircle size={14} className="text-blue-400" />
+            <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+              <HelpCircle size={14} className="text-blue-600" />
               Links & Navegação
             </h4>
             <ul className="space-y-2 text-xs">
@@ -137,9 +139,9 @@ export default function Footer() {
                     <li key={link.id || link.label}>
                       <button 
                         onClick={openModal}
-                        className="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer text-left"
+                        className="text-gray-600 hover:text-blue-600 transition-colors flex items-center gap-1.5 cursor-pointer text-left font-medium"
                       >
-                        <Keyboard size={13} className="text-blue-400" />
+                        <Keyboard size={13} className="text-blue-600" />
                         <span>{link.label}</span>
                       </button>
                     </li>
@@ -153,10 +155,10 @@ export default function Footer() {
                         href={link.url}
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
+                        className="text-gray-600 hover:text-blue-600 transition-colors flex items-center gap-1.5 font-medium"
                       >
                         <span>{link.label}</span>
-                        <ExternalLink size={12} className="text-slate-500" />
+                        <ExternalLink size={12} className="text-gray-400" />
                       </a>
                     </li>
                   );
@@ -166,7 +168,7 @@ export default function Footer() {
                   <li key={link.id || link.label}>
                     <Link 
                       to={link.url}
-                      className="text-slate-400 hover:text-white transition-colors block"
+                      className="text-gray-600 hover:text-blue-600 transition-colors block font-medium"
                     >
                       {link.label}
                     </Link>
@@ -180,28 +182,28 @@ export default function Footer() {
         {/* Support & Contacts */}
         {footerConfig.show_contacts && (
           <div className="space-y-3">
-            <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Mail size={14} className="text-blue-400" />
+            <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Mail size={14} className="text-blue-600" />
               Atendimento & Suporte
             </h4>
-            <ul className="space-y-2 text-xs text-slate-400">
+            <ul className="space-y-2 text-xs text-gray-600 font-medium">
               {footerConfig.support_email && (
                 <li className="flex items-center gap-2">
-                  <Mail size={13} className="text-slate-500 shrink-0" />
-                  <a href={`mailto:${footerConfig.support_email}`} className="hover:text-white transition-colors truncate">
+                  <Mail size={13} className="text-gray-400 shrink-0" />
+                  <a href={`mailto:${footerConfig.support_email}`} className="hover:text-blue-600 transition-colors truncate">
                     {footerConfig.support_email}
                   </a>
                 </li>
               )}
               {footerConfig.support_phone && (
                 <li className="flex items-center gap-2">
-                  <Phone size={13} className="text-slate-500 shrink-0" />
+                  <Phone size={13} className="text-gray-400 shrink-0" />
                   <span className="truncate">{footerConfig.support_phone}</span>
                 </li>
               )}
               {footerConfig.support_hours && (
                 <li className="flex items-center gap-2">
-                  <Clock size={13} className="text-slate-500 shrink-0" />
+                  <Clock size={13} className="text-gray-400 shrink-0" />
                   <span>{footerConfig.support_hours}</span>
                 </li>
               )}
@@ -212,8 +214,8 @@ export default function Footer() {
         {/* External & Social Media */}
         {footerConfig.show_social && (
           <div className="space-y-3">
-            <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Globe size={14} className="text-blue-400" />
+            <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Globe size={14} className="text-blue-600" />
               Canais Oficiais
             </h4>
             <div className="flex flex-wrap gap-2 pt-1">
@@ -222,7 +224,7 @@ export default function Footer() {
                   href={`https://wa.me/${footerConfig.whatsapp_number.replace(/\D/g, "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 text-xs font-semibold"
+                  className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-all border border-emerald-200 flex items-center gap-2 text-xs font-semibold"
                   title="WhatsApp"
                 >
                   <MessageCircle size={15} />
@@ -234,7 +236,7 @@ export default function Footer() {
                   href={footerConfig.website_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl transition-all border border-blue-500/20 flex items-center gap-2 text-xs font-semibold"
+                  className="p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl transition-all border border-blue-200 flex items-center gap-2 text-xs font-semibold"
                   title="Website Oficial"
                 >
                   <Globe size={15} />
@@ -246,7 +248,7 @@ export default function Footer() {
                   href={`https://instagram.com/${footerConfig.instagram_handle.replace("@", "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 rounded-xl transition-all border border-pink-500/20"
+                  className="p-2 bg-pink-50 hover:bg-pink-100 text-pink-700 rounded-xl transition-all border border-pink-200"
                   title="Instagram"
                 >
                   <Instagram size={15} />
@@ -257,7 +259,7 @@ export default function Footer() {
                   href={footerConfig.linkedin_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 rounded-xl transition-all border border-sky-500/20"
+                  className="p-2 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-xl transition-all border border-sky-200"
                   title="LinkedIn"
                 >
                   <Linkedin size={15} />
@@ -269,20 +271,24 @@ export default function Footer() {
       </div>
 
       {/* Bottom Bar / Copyright */}
-      <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <div className="pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500 font-medium">
         <p>{footerConfig.copyright_text || DEFAULT_FOOTER_CONFIG.copyright_text}</p>
         <div className="flex items-center gap-4 text-[11px]">
-          <Link to="/BaseConhecimento" className="hover:text-slate-300 transition-colors">
+          <Link to="/BaseConhecimento" className="hover:text-blue-600 transition-colors">
             Base de Conhecimento
           </Link>
           <span>•</span>
-          <Link to="/Suporte" className="hover:text-slate-300 transition-colors">
+          <Link to="/Suporte" className="hover:text-blue-600 transition-colors">
             Suporte
           </Link>
-          <span>•</span>
-          <Link to="/PainelMaster" className="hover:text-blue-400 transition-colors">
-            Painel Master
-          </Link>
+          {user?.role === "master" && (
+            <>
+              <span>•</span>
+              <Link to="/PainelAdminMaster" className="hover:text-blue-600 transition-colors">
+                Painel Master
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </footer>
