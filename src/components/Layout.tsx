@@ -145,7 +145,7 @@ export default function Layout() {
       permission?: PermissionId;
     }[];
   }[] = [
-    { name: "Dashboard", path: "/", icon: LayoutDashboard, requiresCompany: true, permission: 'dashboard.view' },
+    { name: "Dashboard", path: "/", icon: LayoutDashboard, permission: 'dashboard.view' },
     { name: "Meu Painel", path: "/PainelVendedor", icon: TrendingUp, requiresCompany: true, hideForAdmin: true },
     { name: "Admin Master", path: "/PainelAdminMaster", icon: Crown, requiresSystemAdmin: true },
     { name: "Dashboard Global", path: "/DashboardGlobal", icon: Globe, requiresSystemAdmin: true },
@@ -229,7 +229,7 @@ export default function Layout() {
     if (item.requiresSystemAdmin && user?.role !== 'master') return false;
     if (item.requiresAdmin && !isUserAdmin) return false;
     if (item.hideForAdmin && isUserAdmin) return false;
-    if (item.requiresCompany && !hasCompany) return false;
+    if (item.requiresCompany && !hasCompany && user?.role !== 'master') return false;
     if (item.permission && !hasPermission(item.permission)) return false;
     
     // If it's a submenu, check if at least one sub-item is visible
@@ -308,15 +308,15 @@ export default function Layout() {
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col fixed h-full z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-gray-100">
-          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+        <Link to="/" className="p-6 flex items-center gap-3 border-b border-gray-100 hover:bg-gray-50/80 transition-colors group">
+          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white group-hover:scale-105 transition-transform">
             <Zap size={24} fill="currentColor" />
           </div>
           <div>
-            <h1 className="font-bold text-xl text-gray-900 leading-tight">PowerControl</h1>
+            <h1 className="font-bold text-xl text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">PowerControl</h1>
             <p className="text-xs text-gray-500">Sistema de Gestão</p>
           </div>
-        </div>
+        </Link>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {filteredMenuItems.map((item) => (
