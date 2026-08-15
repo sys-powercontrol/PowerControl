@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { notificationApi } from "../services/notificationApi";
@@ -24,10 +26,39 @@ import {
   ChevronDown,
   X,
   Keyboard,
-  Info
+  Info,
+  Edit
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatBR } from "../lib/dateUtils";
+
+interface SupportChannelsConfig {
+  email_title: string;
+  email_address: string;
+  email_sla: string;
+  whatsapp_title: string;
+  whatsapp_number: string;
+  whatsapp_hours: string;
+  whatsapp_link: string;
+  phone_title: string;
+  phone_number: string;
+  phone_hours: string;
+  phone_badge: string;
+}
+
+const DEFAULT_SUPPORT_CHANNELS: SupportChannelsConfig = {
+  email_title: "E-mail Oficial",
+  email_address: "suporte@powercontrol.com.br",
+  email_sla: "SLA 2h",
+  whatsapp_title: "WhatsApp Comercial",
+  whatsapp_number: "(11) 99999-9999",
+  whatsapp_hours: "Seg à Sáb",
+  whatsapp_link: "https://wa.me/5511999999999",
+  phone_title: "Central 0800",
+  phone_number: "0800 789 4000",
+  phone_hours: "08:00 - 18:00",
+  phone_badge: "Gratuito"
+};
 
 const FAQS = [
   {
@@ -70,10 +101,59 @@ const FAQS = [
 
 export default function Support() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const selectedTicket = selectedTicketId ? tickets.find(t => t.id === selectedTicketId) : null;
   const [replyText, setReplyText] = useState("");
+
+  // Support Channels Config (Firestore system_settings/support_channels)
+  const { data: channelsConfig = DEFAULT_SUPPORT_CHANNELS, refetch: refetchChannels } = useQuery({
+    queryKey: ["system_settings", "support_channels"],
+    queryFn: async () => {
+      try {
+        const docRef = doc(db, "system_settings", "support_channels");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          return { ...DEFAULT_SUPPORT_CHANNELS, ...docSnap.data() } as SupportChannelsConfig;
+        }
+      } catch (err) {
+        console.error("Erro ao carregar canais de atendimento:", err);
+      }
+      return DEFAULT_SUPPORT_CHANNELS;
+    }
+  });
+
+  const [isEditChannelsOpen, setIsEditChannelsOpen] = useState(false);
+  const [channelsForm, setChannelsForm] = useState<SupportChannelsConfig>(DEFAULT_SUPPORT_CHANNELS);
+
+  const saveChannelsMutation = useMutation({
+    mutationFn: async (updatedConfig: SupportChannelsConfig) => {
+      const docRef = doc(db, "system_settings", "support_channels");
+      await setDoc(docRef, {
+        ...updatedConfig,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+
+      await api.log({
+        action: 'UPDATE',
+        entity: 'system_settings',
+        entity_id: 'support_channels',
+        description: `Atualizou os canais diretos de atendimento do sistema`,
+        metadata: updatedConfig as any
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system_settings", "support_channels"] });
+      refetchChannels();
+      setIsEditChannelsOpen(false);
+      toast.success("Canais de atendimento salvos com sucesso!");
+    },
+    onError: (err: any) => {
+      toast.error(`Erro ao salvar canais de atendimento: ${err.message}`);
+    }
+  });
 
   // Filters & Search for FAQs & Tickets
   const [faqSearch, setFaqSearch] = useState("");
@@ -575,9 +655,24 @@ export default function Support() {
           
           {/* Contact Channels Cards */}
           <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
-            <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-              <PhoneCall size={18} className="text-blue-600" /> Canais Diretos de Atendimento
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                <PhoneCall size={18} className="text-blue-600" /> Canais Diretos de Atendimento
+              </h3>
+              {user?.role === "master" && (
+                <button
+                  onClick={() => {
+                    setChannelsForm(channelsConfig);
+                    setIsEditChannelsOpen(true);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg border border-blue-200 transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Editar Canais de Atendimento"
+                >
+                  <Edit size={13} />
+                  <span>Editar</span>
+                </button>
+              )}
+            </div>
 
             <div className="space-y-3">
               <div className="p-3.5 bg-blue-50/70 rounded-2xl border border-blue-100 flex items-center justify-between">
@@ -586,13 +681,15 @@ export default function Support() {
                     <Mail size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-900">E-mail Oficial</p>
-                    <p className="text-[11px] text-gray-500">suporte@powercontrol.com.br</p>
+                    <p className="text-xs font-bold text-gray-900">{channelsConfig.email_title || "E-mail Oficial"}</p>
+                    <p className="text-[11px] text-gray-500">{channelsConfig.email_address || "suporte@powercontrol.com.br"}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md">
-                  SLA 2h
-                </span>
+                {channelsConfig.email_sla && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md">
+                    {channelsConfig.email_sla}
+                  </span>
+                )}
               </div>
 
               <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-100 flex items-center justify-between">
@@ -601,18 +698,20 @@ export default function Support() {
                     <MessageSquare size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-900">WhatsApp Comercial</p>
-                    <p className="text-[11px] text-gray-500">(11) 99999-9999 • Seg à Sáb</p>
+                    <p className="text-xs font-bold text-gray-900">{channelsConfig.whatsapp_title || "WhatsApp Comercial"}</p>
+                    <p className="text-[11px] text-gray-500">{channelsConfig.whatsapp_number}{channelsConfig.whatsapp_hours ? ` • ${channelsConfig.whatsapp_hours}` : ""}</p>
                   </div>
                 </div>
-                <a 
-                  href="https://wa.me/5511999999999" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors"
-                >
-                  Conversar
-                </a>
+                {channelsConfig.whatsapp_link && (
+                  <a 
+                    href={channelsConfig.whatsapp_link} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors"
+                  >
+                    Conversar
+                  </a>
+                )}
               </div>
 
               <div className="p-3.5 bg-purple-50/70 rounded-2xl border border-purple-100 flex items-center justify-between">
@@ -621,13 +720,15 @@ export default function Support() {
                     <PhoneCall size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-900">Central 0800</p>
-                    <p className="text-[11px] text-gray-500">0800 789 4000 (08:00 - 18:00)</p>
+                    <p className="text-xs font-bold text-gray-900">{channelsConfig.phone_title || "Central 0800"}</p>
+                    <p className="text-[11px] text-gray-500">{channelsConfig.phone_number}{channelsConfig.phone_hours ? ` (${channelsConfig.phone_hours})` : ""}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md">
-                  Gratuito
-                </span>
+                {channelsConfig.phone_badge && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md">
+                    {channelsConfig.phone_badge}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -882,6 +983,191 @@ export default function Support() {
                  </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Canais Diretos de Atendimento (Admin Master) */}
+      {isEditChannelsOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 space-y-6 my-8 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
+                  <PhoneCall size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-extrabold text-gray-900">Editar Canais Diretos de Atendimento</h2>
+                  <p className="text-xs text-gray-500">Altere os dados dos canais de contato e suporte exibidos aos usuários</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsEditChannelsOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveChannelsMutation.mutate(channelsForm);
+              }} 
+              className="space-y-6 text-xs sm:text-sm"
+            >
+              {/* E-mail Oficial */}
+              <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
+                <div className="flex items-center gap-2 text-blue-900 font-bold">
+                  <Mail size={16} className="text-blue-600" />
+                  <span>E-mail Oficial</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Título do Canal</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.email_title}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, email_title: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Endereço de E-mail</label>
+                    <input 
+                      type="email" 
+                      value={channelsForm.email_address}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, email_address: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">SLA / Tempo de Resposta (ex: SLA 2h)</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.email_sla}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, email_sla: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* WhatsApp Comercial */}
+              <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold">
+                  <MessageSquare size={16} className="text-emerald-600" />
+                  <span>WhatsApp Comercial</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Título do Canal</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.whatsapp_title}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, whatsapp_title: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Número Formatado</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.whatsapp_number}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, whatsapp_number: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Horário / Dias de Funcionamento</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.whatsapp_hours}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, whatsapp_hours: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Link Direto (wa.me/...)</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.whatsapp_link}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, whatsapp_link: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Central 0800 / Telefone */}
+              <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-100 space-y-3">
+                <div className="flex items-center gap-2 text-purple-900 font-bold">
+                  <PhoneCall size={16} className="text-purple-600" />
+                  <span>Central 0800 / Telefone</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Título do Canal</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.phone_title}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, phone_title: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500 font-medium text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Número de Telefone</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.phone_number}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500 font-medium text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Horário de Atendimento</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.phone_hours}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, phone_hours: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500 font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">Selo / Badge (ex: Gratuito)</label>
+                    <input 
+                      type="text" 
+                      value={channelsForm.phone_badge}
+                      onChange={e => setChannelsForm(prev => ({ ...prev, phone_badge: e.target.value }))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500 font-medium text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditChannelsOpen(false)}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-all cursor-pointer text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saveChannelsMutation.isPending}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 text-xs flex items-center gap-2 disabled:opacity-50"
+                >
+                  {saveChannelsMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
