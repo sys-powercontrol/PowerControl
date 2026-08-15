@@ -13,7 +13,7 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FileText,
-  User as Loader2
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
@@ -26,6 +26,7 @@ export default function Clients() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [isSearchingCEP, setIsSearchingCEP] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [zipCode, setZipCode] = useState("");
   const [addressData, setAddressData] = useState<any>({});
 
@@ -94,6 +95,7 @@ export default function Clients() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
     
@@ -108,6 +110,10 @@ export default function Clients() {
         queryClient.invalidateQueries({ queryKey: ["clients"] });
         toast.success("Cliente atualizado!");
         setIsModalOpen(false);
+      }).catch((error) => {
+        toast.error("Erro ao atualizar cliente: " + error.message);
+      }).finally(() => {
+        setIsSaving(false);
       });
     } else {
       api.post("clients", clientData).then(() => {
@@ -123,6 +129,8 @@ export default function Clients() {
         } else {
            toast.error("Erro ao cadastrar cliente: " + error.message);
         }
+      }).finally(() => {
+        setIsSaving(false);
       });
     }
   };
@@ -407,15 +415,23 @@ if (!canView) {
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-2 text-gray-600 font-bold hover:bg-gray-50 rounded-xl"
+                  className="px-6 py-2.5 text-gray-600 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
-                  className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                  disabled={isSaving}
+                  className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 text-sm"
                 >
-                  {editingClient ? "Salvar Alterações" : "Cadastrar Cliente"}
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Processando...</span>
+                    </>
+                  ) : (
+                    <span>{editingClient ? "Salvar Alterações" : "Cadastrar Cliente"}</span>
+                  )}
                 </button>
               </div>
             </form>

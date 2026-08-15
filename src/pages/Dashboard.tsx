@@ -394,7 +394,7 @@ export default function Dashboard() {
               className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-xl text-xs font-bold hover:brightness-110 transition-all shadow-md shadow-indigo-100"
             >
               <Globe size={16} />
-              Dashboard Global Master
+              Dashboard Global
             </Link>
           )}
 

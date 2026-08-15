@@ -1744,10 +1744,19 @@ if (currentUser?.role !== 'master') {
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-                <button type="button" onClick={() => setIsUserModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
-                <button type="submit" disabled={userMutation.isPending} className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2">
-                  <Save size={18} />
-                  {userMutation.isPending ? "Salvando..." : "Salvar"}
+                <button type="button" onClick={() => setIsUserModalOpen(false)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
+                <button type="submit" disabled={userMutation.isPending} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-60 text-sm">
+                  {userMutation.isPending ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Processando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      <span>Salvar Usuário</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1990,10 +1999,19 @@ if (currentUser?.role !== 'master') {
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 bg-white sticky bottom-0 z-10">
-                <button type="button" onClick={() => setIsCompanyModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
-                <button type="submit" disabled={companyMutation.isPending} className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100">
-                  <Save size={18} />
-                  {companyMutation.isPending ? "Salvando..." : "Salvar Empresa"}
+                <button type="button" onClick={() => setIsCompanyModalOpen(false)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
+                <button type="submit" disabled={companyMutation.isPending} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-60 text-sm">
+                  {companyMutation.isPending ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Processando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      <span>Salvar Empresa</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

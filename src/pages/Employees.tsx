@@ -22,7 +22,8 @@ import {
   Power,
   Trash2,
   UserCheck,
-  UserX
+  UserX,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -456,14 +457,21 @@ if (!canManage) {
                 </div>
               )}
               
-              <div className="flex justify-end gap-3 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
                 <button 
                   type="submit" 
                   disabled={employeeMutation.isPending || linkMutation.isPending} 
-                  className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100"
+                  className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 text-sm"
                 >
-                  {employeeMutation.isPending || linkMutation.isPending ? "Processando..." : editingEmployee ? "Salvar" : "Vincular"}
+                  {employeeMutation.isPending || linkMutation.isPending ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Processando...</span>
+                    </>
+                  ) : (
+                    <span>{editingEmployee ? "Salvar Alterações" : "Vincular Funcionário"}</span>
+                  )}
                 </button>
               </div>
             </form>

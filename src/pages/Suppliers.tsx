@@ -35,6 +35,7 @@ export default function Suppliers() {
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [isSearchingCEP, setIsSearchingCEP] = useState(false);
   const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [zipCode, setZipCode] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [fetchedData, setFetchedData] = useState<any>({});
@@ -128,6 +129,7 @@ export default function Suppliers() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
     
@@ -137,12 +139,20 @@ export default function Suppliers() {
         toast.success("Fornecedor atualizado!");
         setIsModalOpen(false);
         setEditingSupplier(null);
+      }).catch((err) => {
+        toast.error("Erro ao atualizar fornecedor: " + err.message);
+      }).finally(() => {
+        setIsSaving(false);
       });
     } else {
       api.post("suppliers", { ...data, company_id: user?.company_id }).then(() => {
         queryClient.invalidateQueries({ queryKey: ["suppliers"] });
         toast.success("Fornecedor cadastrado!");
         setIsModalOpen(false);
+      }).catch((err) => {
+        toast.error("Erro ao cadastrar fornecedor: " + err.message);
+      }).finally(() => {
+        setIsSaving(false);
       });
     }
   };
@@ -477,9 +487,22 @@ if (!canView) {
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-50">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold">Cancelar</button>
-                <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold">Salvar</button>
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 text-sm"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Processando...</span>
+                    </>
+                  ) : (
+                    <span>{editingSupplier ? "Salvar Alterações" : "Cadastrar Fornecedor"}</span>
+                  )}
+                </button>
               </div>
             </form>
           </div>
