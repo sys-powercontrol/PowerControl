@@ -137,6 +137,31 @@ export default function AccountsReceivable() {
     return true;
   });
 
+  const stats = React.useMemo(() => {
+    const currentMonth = getTodayBR().substring(0, 7); // 'YYYY-MM'
+
+    const totalPendente = accountsWithDynamicStatus
+      .filter((a: any) => a.status === "Pendente")
+      .reduce((acc: number, a: any) => acc + (parseFloat(a.amount) || 0), 0);
+
+    const totalRecebidoMes = accountsWithDynamicStatus
+      .filter((a: any) => {
+        if (a.status !== "Recebido") return false;
+        const dateStr = a.receipt_date || a.due_date || a.created_at;
+        return dateStr ? String(dateStr).startsWith(currentMonth) : false;
+      })
+      .reduce((acc: number, a: any) => acc + (parseFloat(a.amount) || 0), 0);
+
+    const countAtrasadas = accountsWithDynamicStatus
+      .filter((a: any) => a.status === "Atrasado").length;
+
+    return {
+      totalPendente,
+      totalRecebidoMes,
+      countAtrasadas
+    };
+  }, [accountsWithDynamicStatus]);
+
   const receiveMutation = useMutation({
     mutationFn: async ({ id, account }: { id: string, account: { type: string, id: string } }) => {
       // Get current account data to check for recurrence
@@ -575,19 +600,19 @@ if (!canView) {
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-blue-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Pendente</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">
-            {formatCurrency(accountsWithDynamicStatus.filter((a: any) => a.status === "Pendente").reduce((acc: number, a: any) => acc + (a.amount || 0), 0))}
+            {formatCurrency(stats.totalPendente)}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-green-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Total Recebido (Mês)</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
-            {formatCurrency(accountsWithDynamicStatus.filter((a: any) => a.status === "Recebido").reduce((acc: number, a: any) => acc + (a.amount || 0), 0))}
+            {formatCurrency(stats.totalRecebidoMes)}
           </p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-orange-500">
           <p className="text-xs font-bold text-gray-500 uppercase">Contas Atrasadas</p>
           <p className="text-2xl font-bold text-orange-600 mt-1">
-            {accountsWithDynamicStatus.filter((a: any) => a.status === "Atrasado").length}
+            {stats.countAtrasadas}
           </p>
         </div>
       </div>
