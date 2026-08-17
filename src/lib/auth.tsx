@@ -58,8 +58,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           
           if (userData) {
-            if (userData.company_id) {
-              api.setCompanyId(userData.company_id);
+            const userCompanyIds = Array.isArray(userData.company_ids) && userData.company_ids.length > 0
+              ? userData.company_ids
+              : (userData.company_id ? [userData.company_id] : []);
+
+            if (userData.role === "master") {
+              if (userData.company_id) {
+                api.setCompanyId(userData.company_id);
+              }
+            } else if (userData.is_active && userCompanyIds.length > 0) {
+              const activeCompany = api.getCompanyId();
+              if (!activeCompany || !userCompanyIds.includes(activeCompany)) {
+                api.setCompanyId(userCompanyIds[0]);
+              }
+            } else {
+              api.setCompanyId(null);
             }
             api.setIsSystemAdmin(userData.role === "master");
             setUser(userData);
@@ -125,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: inviteData ? inviteData.role : (isSystemAdmin ? "master" : "user"),
       is_active: inviteData ? true : (isSystemAdmin ? true : false),
       company_id: inviteData ? inviteData.company_id : null,
+      company_ids: inviteData ? [inviteData.company_id] : [],
       created_at: serverTimestamp()
     };
 
@@ -170,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: isMasterEmail ? "master" : "user",
           is_active: isMasterEmail ? true : false,
           company_id: null,
+          company_ids: [],
           avatar: googleUser.photoURL || null,
           created_at: serverTimestamp()
         };

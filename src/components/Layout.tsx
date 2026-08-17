@@ -26,7 +26,7 @@ import {
   WifiOff,
   Keyboard
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -56,7 +56,52 @@ export default function Layout() {
   const queryClient = useQueryClient();
   const { isModalOpen, openModal, closeModal } = useGlobalKeyboardShortcuts();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(api.getCompanyId());
-  const hasCompany = !!(user?.company_id || selectedCompanyId);
+
+  const { data: allCompanies = [] } = useQuery({
+    queryKey: ["companies", "all"],
+    queryFn: () => api.get("companies", { _all: true }),
+    enabled: !!user
+  });
+
+  const availableCompanies = useMemo(() => {
+    if (!user) return [];
+    if (user.role === 'master') return allCompanies;
+    if (!user.is_active) return [];
+
+    const userCompanyIds = Array.isArray(user.company_ids) && user.company_ids.length > 0
+      ? user.company_ids
+      : (user.company_id ? [user.company_id] : []);
+
+    return allCompanies.filter((c: any) => 
+      c.is_active !== false && userCompanyIds.includes(c.id)
+    );
+  }, [user, allCompanies]);
+
+  const effectiveCompanyId = useMemo(() => {
+    if (!user) return null;
+    if (user.role === 'master') {
+      return selectedCompanyId;
+    }
+    if (!user.is_active || availableCompanies.length === 0) {
+      return null;
+    }
+    if (selectedCompanyId && availableCompanies.some((c: any) => c.id === selectedCompanyId)) {
+      return selectedCompanyId;
+    }
+    return availableCompanies[0].id;
+  }, [user, availableCompanies, selectedCompanyId]);
+
+  useEffect(() => {
+    if (api.getCompanyId() !== effectiveCompanyId) {
+      api.setCompanyId(effectiveCompanyId);
+    }
+  }, [effectiveCompanyId]);
+
+  const hasCompany = Boolean(
+    user && 
+    user.is_active && 
+    (user.role === 'master' || (availableCompanies.length > 0 && effectiveCompanyId))
+  );
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineQueueLength, setOfflineQueueLength] = useState(0);
@@ -97,20 +142,21 @@ export default function Layout() {
     };
   }, []);
 
-  const { data: companies = [] } = useQuery({
-    queryKey: ["companies", "all"],
-    queryFn: () => api.get("companies", { _all: true }),
-    enabled: user?.role === 'master'
-  });
-
   const { data: company } = useQuery({ 
-    queryKey: ["company", user?.company_id || selectedCompanyId], 
-    queryFn: () => (user?.company_id || selectedCompanyId) ? api.get(`companies/${user?.company_id || selectedCompanyId}`) : null,
-    enabled: !!(user?.company_id || selectedCompanyId)
+    queryKey: ["company", effectiveCompanyId], 
+    queryFn: () => effectiveCompanyId ? api.get(`companies/${effectiveCompanyId}`) : null,
+    enabled: !!effectiveCompanyId
   });
 
   const handleCompanyChange = (id: string | null) => {
+    if (user?.role !== 'master' && id === "global") {
+      return;
+    }
     const newId = id === "global" ? null : id;
+    if (user?.role !== 'master' && newId && !availableCompanies.some((c: any) => c.id === newId)) {
+      toast.error("Você não tem permissão para acessar esta empresa.");
+      return;
+    }
     setSelectedCompanyId(newId);
     api.setCompanyId(newId);
     queryClient.invalidateQueries();
@@ -372,37 +418,56 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-gray-100">
-          {user?.role === 'master' && (
-            <div className="mb-4 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-2">Trocar Empresa</label>
+          {user?.role === 'master' ? (
+            <div className="mb-4 space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 flex items-center gap-1">
+                <Crown size={12} className="text-amber-500" />
+                Empresa Ativa
+              </label>
               <select 
                 value={selectedCompanyId || "global"}
                 onChange={(e) => handleCompanyChange(e.target.value)}
-                className="w-full p-2 text-xs bg-gray-50 border border-gray-100 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full p-2 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
               >
-                <option value="global">Visão Global</option>
-                {companies.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                <option value="global">🌐 Visão Global (Todas)</option>
+                {allCompanies.map((c: any) => (
+                  <option key={c.id} value={c.id}>🏢 {c.name}</option>
                 ))}
               </select>
             </div>
-          )}
+          ) : availableCompanies.length > 1 ? (
+            <div className="mb-4 space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 flex items-center gap-1">
+                <Building2 size={12} className="text-blue-500" />
+                Trocar Empresa ({availableCompanies.length})
+              </label>
+              <select 
+                value={selectedCompanyId || ""}
+                onChange={(e) => handleCompanyChange(e.target.value)}
+                className="w-full p-2 text-xs bg-blue-50/60 border border-blue-200 text-blue-900 font-semibold rounded-xl outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                {availableCompanies.map((c: any) => (
+                  <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="flex items-center gap-3 p-2">
-            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold overflow-hidden">
+            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold overflow-hidden shrink-0">
               {user?.avatar ? (
                 <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 user?.full_name?.charAt(0) || "U"
               )}
             </div>
-            <div className="overflow-hidden">
+            <div className="overflow-hidden min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">{user?.full_name || "Carregando..."}</p>
-              <p className="text-xs text-gray-500 truncate">{company?.name || "Sem empresa"}</p>
+              <p className="text-xs text-gray-500 truncate">{company?.name || (user?.role === 'master' && !selectedCompanyId ? "Visão Global" : "Sem empresa")}</p>
             </div>
           </div>
           <button 
             onClick={handleLogout}
-            className="w-full mt-2 p-2 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors"
+            className="w-full mt-2 p-2 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer"
           >
             <LogOut size={18} />
             Sair do Sistema
@@ -599,6 +664,52 @@ export default function Layout() {
                 </div>
               ))}
             </nav>
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+              {user?.role === 'master' ? (
+                <div className="mb-3 space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Empresa Ativa</label>
+                  <select 
+                    value={selectedCompanyId || "global"}
+                    onChange={(e) => {
+                      handleCompanyChange(e.target.value);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full p-2 text-xs bg-white border border-gray-200 rounded-xl outline-none"
+                  >
+                    <option value="global">🌐 Visão Global</option>
+                    {allCompanies.map((c: any) => (
+                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : availableCompanies.length > 1 ? (
+                <div className="mb-3 space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Trocar Empresa</label>
+                  <select 
+                    value={selectedCompanyId || ""}
+                    onChange={(e) => {
+                      handleCompanyChange(e.target.value);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full p-2 text-xs bg-white border border-blue-200 text-blue-900 font-semibold rounded-xl outline-none"
+                  >
+                    {availableCompanies.map((c: any) => (
+                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <button 
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleLogout();
+                }}
+                className="w-full p-2 text-red-600 hover:bg-red-50 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-colors cursor-pointer"
+              >
+                <LogOut size={16} />
+                Sair da Conta
+              </button>
+            </div>
           </div>
         </div>
       )}

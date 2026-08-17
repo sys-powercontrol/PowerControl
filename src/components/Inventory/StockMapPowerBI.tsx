@@ -258,7 +258,7 @@ export default function StockMapPowerBI({ products, onSelectProductForAdjustment
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono text-[11px] font-bold tracking-wider uppercase border border-cyan-500/30 flex items-center gap-1.5">
                 <Sparkles size={12} className="text-cyan-400" />
-                Power BI Stock Analytics
+                KPIs
               </span>
               <span className="text-xs text-slate-400 font-medium">Layout Físico & Endereçamento</span>
             </div>
@@ -308,7 +308,7 @@ export default function StockMapPowerBI({ products, onSelectProductForAdjustment
                 }`}
               >
                 <BarChart3 size={14} />
-                Gráficos BI
+                KPIs Gráficos
               </button>
             </div>
 

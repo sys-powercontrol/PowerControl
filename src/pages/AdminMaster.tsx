@@ -35,7 +35,8 @@ import {
   Globe,
   Link2,
   Eye,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from "lucide-react";
 import { DEFAULT_FOOTER_CONFIG, FooterConfig, FooterLink } from "../types/footer";
 import { 
@@ -80,6 +81,41 @@ export default function AdminMaster() {
   const [auditFilterAction, setAuditFilterAction] = useState("");
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [selectedUserCompanyIds, setSelectedUserCompanyIds] = useState<string[]>([]);
+  const [userCompanySearchTerm, setUserCompanySearchTerm] = useState("");
+
+  const handleOpenNewUserModal = () => {
+    setEditingUser(null);
+    setSelectedUserCompanyIds([]);
+    setUserCompanySearchTerm("");
+    setIsUserModalOpen(true);
+  };
+
+  const handleOpenEditUserModal = (u: any) => {
+    setEditingUser(u);
+    const existingCompanyIds = Array.isArray(u.company_ids) && u.company_ids.length > 0
+      ? u.company_ids
+      : (u.company_id ? [u.company_id] : []);
+    setSelectedUserCompanyIds(existingCompanyIds);
+    setUserCompanySearchTerm("");
+    setIsUserModalOpen(true);
+  };
+
+  const toggleUserCompany = (companyId: string) => {
+    setSelectedUserCompanyIds(prev => 
+      prev.includes(companyId)
+        ? prev.filter(id => id !== companyId)
+        : [...prev, companyId]
+    );
+  };
+
+  const selectAllUserCompanies = () => {
+    setSelectedUserCompanyIds(companies.map((c: any) => c.id));
+  };
+
+  const clearAllUserCompanies = () => {
+    setSelectedUserCompanyIds([]);
+  };
 
   
 
@@ -360,21 +396,19 @@ export default function AdminMaster() {
     return data;
   }, [sales]);
 
-  const revenueByCompany = React.useMemo(() => {
-    const companyRevenue: Record<string, number> = {};
-    sales.forEach((s: any) => {
-      if (s.company_id) {
-        companyRevenue[s.company_id] = (companyRevenue[s.company_id] || 0) + (s.total || 0);
-      }
-    });
+  const companyRevenue: Record<string, number> = {};
+  (sales || []).forEach((s: any) => {
+    if (s?.company_id) {
+      companyRevenue[s.company_id] = (companyRevenue[s.company_id] || 0) + (Number(s.total) || 0);
+    }
+  });
 
-    return Object.entries(companyRevenue)
-      .map(([id, total]) => ({
-        name: companies.find((c: any) => c.id === id)?.name || "Desconhecida",
-        value: total
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [sales, companies]);
+  const revenueByCompany = Object.entries(companyRevenue)
+    .map(([id, total]) => ({
+      name: companies.find((c: any) => c.id === id)?.name || "Desconhecida",
+      value: total
+    }))
+    .sort((a, b) => b.value - a.value);
 
   const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
@@ -482,7 +516,8 @@ export default function AdminMaster() {
     
     const userData: any = {
       ...data,
-      company_id: data.company_id || null,
+      company_ids: selectedUserCompanyIds,
+      company_id: selectedUserCompanyIds.length > 0 ? selectedUserCompanyIds[0] : null,
       is_active: data.is_active === "on"
     };
 
@@ -833,7 +868,7 @@ if (currentUser?.role !== 'master') {
               />
             </div>
             <button 
-              onClick={() => { setEditingUser(null); setIsUserModalOpen(true); }}
+              onClick={handleOpenNewUserModal}
               className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 hover:bg-blue-700 transition-colors"
             >
               <Plus size={20} />
@@ -846,7 +881,7 @@ if (currentUser?.role !== 'master') {
               <thead>
                 <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-50 bg-gray-50/50">
                   <th className="px-6 py-4 font-medium">Usuário</th>
-                  <th className="px-6 py-4 font-medium">Empresa</th>
+                  <th className="px-6 py-4 font-medium">Empresas Autorizadas</th>
                   <th className="px-6 py-4 font-medium">Role</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium text-right">Ações</th>
@@ -867,7 +902,40 @@ if (currentUser?.role !== 'master') {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-600">
-                      {companies.find((c: any) => c.id === u.company_id)?.name || "Nenhuma"}
+                      {u.role === 'master' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                          <Crown size={12} /> Todas (Acesso Global)
+                        </span>
+                      ) : (() => {
+                        const userCompIds: string[] = Array.isArray(u.company_ids) && u.company_ids.length > 0
+                          ? u.company_ids
+                          : (u.company_id ? [u.company_id] : []);
+
+                        if (userCompIds.length === 0) {
+                          return <span className="text-xs text-gray-400 italic">Nenhuma vinculada</span>;
+                        }
+
+                        const userCompanies = companies.filter((c: any) => userCompIds.includes(c.id));
+
+                        if (userCompanies.length === 1) {
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                              <Building2 size={12} /> {userCompanies[0].name}
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <div className="flex flex-wrap gap-1 items-center">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800">
+                              <Building2 size={12} /> {userCompanies.length} empresas
+                            </span>
+                            <span className="text-xs text-gray-500 truncate max-w-[200px]" title={userCompanies.map((c: any) => c.name).join(", ")}>
+                              ({userCompanies.map((c: any) => c.name).slice(0, 2).join(", ")}{userCompanies.length > 2 ? "..." : ""})
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -917,7 +985,7 @@ if (currentUser?.role !== 'master') {
                           <Power size={16} />
                         </button>
                         <button 
-                          onClick={() => { setEditingUser(u); setIsUserModalOpen(true); }}
+                          onClick={() => handleOpenEditUserModal(u)}
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
                           title="Editar Usuário"
                         >
@@ -1719,14 +1787,121 @@ if (currentUser?.role !== 'master') {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">Empresa</label>
-                  <select name="company_id" defaultValue={editingUser?.company_id} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Nenhuma</option>
-                    {companies.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                {/* Seleção de Múltiplas Empresas com Opção de Marcação */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                        <Building2 size={16} className="text-blue-600" />
+                        Empresas Autorizadas (Acesso)
+                      </label>
+                      <p className="text-xs text-gray-500">
+                        Marque as empresas que este usuário poderá acessar no sistema.
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                      {selectedUserCompanyIds.length} {selectedUserCompanyIds.length === 1 ? "selecionada" : "selecionadas"}
+                    </span>
+                  </div>
+
+                  {companies.length > 0 && (
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Filtrar empresas..."
+                          value={userCompanySearchTerm}
+                          onChange={(e) => setUserCompanySearchTerm(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={selectAllUserCompanies}
+                          className="px-2.5 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Marcar Todas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearAllUserCompanies}
+                          className="px-2.5 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Desmarcar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {companies.length === 0 ? (
+                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+                      <AlertCircle size={16} />
+                      <span>Nenhuma empresa cadastrada no sistema. Cadastre uma empresa primeiro na aba Empresas.</span>
+                    </div>
+                  ) : (
+                    <div className="max-h-56 overflow-y-auto space-y-2 pr-1 border border-gray-200 rounded-2xl p-2.5 bg-gray-50/50">
+                      {companies
+                        .filter((c: any) => 
+                          c.name?.toLowerCase().includes(userCompanySearchTerm.toLowerCase()) ||
+                          c.cnpj?.toLowerCase().includes(userCompanySearchTerm.toLowerCase()) ||
+                          c.city?.toLowerCase().includes(userCompanySearchTerm.toLowerCase())
+                        )
+                        .map((c: any) => {
+                          const isChecked = selectedUserCompanyIds.includes(c.id);
+                          const isFirst = selectedUserCompanyIds[0] === c.id;
+                          return (
+                            <div
+                              key={c.id}
+                              onClick={() => toggleUserCompany(c.id)}
+                              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                isChecked
+                                  ? "bg-blue-50/70 border-blue-300 shadow-sm"
+                                  : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs font-bold text-gray-900 truncate">{c.name}</p>
+                                    {isFirst && (
+                                      <span className="px-1.5 py-0.5 text-[9px] font-bold bg-blue-600 text-white rounded">
+                                        Principal
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                                    {c.cnpj && <span>CNPJ: {c.cnpj}</span>}
+                                    {c.city && <span>• {c.city}{c.state ? `/${c.state}` : ""}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                c.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                              }`}>
+                                {c.is_active !== false ? "Ativa" : "Inativa"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      {companies.filter((c: any) => 
+                        c.name?.toLowerCase().includes(userCompanySearchTerm.toLowerCase()) ||
+                        c.cnpj?.toLowerCase().includes(userCompanySearchTerm.toLowerCase()) ||
+                        c.city?.toLowerCase().includes(userCompanySearchTerm.toLowerCase())
+                      ).length === 0 && (
+                        <p className="text-center py-4 text-xs text-gray-400 italic">
+                          Nenhuma empresa encontrada com o termo pesquisado.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">Role</label>

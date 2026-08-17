@@ -354,7 +354,7 @@ export default function GlobalDashboard() {
       link.click();
       document.body.removeChild(link);
       toast.success("Relatório CSV gerado e baixado!");
-    } catch (err) {
+    } catch {
       toast.error("Erro ao exportar relatório em CSV");
     }
   };

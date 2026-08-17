@@ -69,8 +69,11 @@ export const api = {
             userData.role = "master";
             currentUserData.role = "master";
           }
-          if (userData.company_id) {
-            api.setCompanyId(userData.company_id);
+          if (userData.company_id || (Array.isArray(userData.company_ids) && userData.company_ids.length > 0)) {
+            const initialCompanyId = userData.company_id || userData.company_ids[0];
+            if (initialCompanyId && (userData.role === "master" || userData.is_active)) {
+              api.setCompanyId(initialCompanyId);
+            }
           }
           return currentUserData as T;
         } else {
@@ -79,6 +82,7 @@ export const api = {
             full_name: user.displayName || user.email?.split("@")[0] || "Usuário",
             role: isMasterEmail ? "master" : "user",
             company_id: null,
+            company_ids: [],
             created_at: serverTimestamp(),
             is_active: isMasterEmail ? true : false,
             avatar: user.photoURL || null
@@ -98,6 +102,7 @@ export const api = {
           full_name: user.displayName || user.email?.split("@")[0] || "Usuário",
           role: isMasterEmail ? "master" : "user",
           company_id: null,
+          company_ids: [],
           is_active: isMasterEmail ? true : false,
           avatar: user.photoURL || null,
           created_at: new Date().toISOString()

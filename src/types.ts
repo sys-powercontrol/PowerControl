@@ -23,6 +23,7 @@ export interface User {
   full_name: string;
   role: 'master' | 'admin' | 'user';
   company_id: string | null;
+  company_ids?: string[];
   is_active: boolean;
   phone?: string;
   cpf?: string;
