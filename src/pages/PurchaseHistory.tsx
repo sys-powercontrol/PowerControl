@@ -37,13 +37,14 @@ export default function PurchaseHistory() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [purchaseToCancel, setPurchaseToCancel] = useState<string | null>(null);
-  const { data: company } = useQuery({ 
-    queryKey: ["company", user?.company_id], 
-    queryFn: () => api.get(`companies/${user?.company_id}`),
-    enabled: !!user?.company_id
-  });
 
-  const currentCompanyId = api.getCompanyId();
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
+
+  const { data: company } = useQuery({ 
+    queryKey: ["company", currentCompanyId], 
+    queryFn: () => api.get(`companies/${currentCompanyId}`),
+    enabled: !!currentCompanyId
+  });
 
   const { data: purchasesData = [], isLoading } = useQuery({ 
     queryKey: ["purchases", currentCompanyId], 

@@ -27,13 +27,12 @@ export default function Invite() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-
-  
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
 
   const { data: invites = [] } = useQuery({
-    queryKey: ["invites", user?.company_id],
-    queryFn: () => api.get("invites", { company_id: user?.company_id }),
-    enabled: !!user?.company_id
+    queryKey: ["invites", currentCompanyId],
+    queryFn: () => api.get("invites", { company_id: currentCompanyId }),
+    enabled: !!currentCompanyId
   });
 
   const inviteMutation = useMutation({
@@ -43,7 +42,7 @@ export default function Invite() {
 
       const inviteData = {
         ...data,
-        company_id: user?.company_id,
+        company_id: currentCompanyId,
         status: "PENDING",
         created_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString()

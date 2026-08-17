@@ -27,6 +27,18 @@ const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
 
 export const api = {
   setCompanyId: (id: string | null) => {
+    if (id && currentUserData && currentUserData.role !== 'master') {
+      const userCompanyIds = Array.isArray(currentUserData.company_ids) && currentUserData.company_ids.length > 0
+        ? currentUserData.company_ids
+        : (currentUserData.company_id ? [currentUserData.company_id] : []);
+      
+      if (userCompanyIds.length > 0 && !userCompanyIds.includes(id)) {
+        console.warn(`Tentativa de acesso não autorizado à empresa ${id}. Redirecionando para empresa padrão.`);
+        currentCompanyId = userCompanyIds[0];
+        if (companyResolver) companyResolver(userCompanyIds[0]);
+        return;
+      }
+    }
     currentCompanyId = id;
     if (id && companyResolver) {
       companyResolver(id);
@@ -113,8 +125,23 @@ export const api = {
 
     const pathSegments = entityPath.split("/");
     const isDocumentPath = pathSegments.length % 2 === 0;
+    const baseEntity = pathSegments[0];
+    const isCompanyEntity = baseEntity === "companies";
 
     if (typeof paramsOrId === "string" || isDocumentPath) {
+      const targetId = typeof paramsOrId === "string" ? paramsOrId : pathSegments[pathSegments.length - 1];
+      
+      // Access security check for specific company document
+      if (isCompanyEntity && !isSystemAdminStatus && currentUserData && currentUserData.role !== 'master') {
+        const userCompanyIds = Array.isArray(currentUserData.company_ids) && currentUserData.company_ids.length > 0
+          ? currentUserData.company_ids
+          : (currentUserData.company_id ? [currentUserData.company_id] : []);
+        
+        if (targetId && !userCompanyIds.includes(targetId)) {
+          throw new Error("Acesso negado: você não tem permissão para acessar esta empresa.");
+        }
+      }
+
       let docRef;
       if (typeof paramsOrId === "string") {
         docRef = doc(db, entityPath, paramsOrId);
@@ -137,9 +164,6 @@ export const api = {
           }
         });
       }
-
-      const baseEntity = pathSegments[0];
-      const isCompanyEntity = baseEntity === "companies";
 
       const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
 
@@ -170,17 +194,32 @@ export const api = {
       }
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => {
+      const results = snapshot.docs.map(doc => {
         const data = doc.data();
         return { id: doc.id, ...(typeof data === 'object' && data !== null ? data : {}) };
       }) as T[];
+
+      // Filter company list for non-master users to only assigned & active companies
+      if (isCompanyEntity && !isSystemAdminStatus && currentUserData && currentUserData.role !== 'master') {
+        const userCompanyIds = Array.isArray(currentUserData.company_ids) && currentUserData.company_ids.length > 0
+          ? currentUserData.company_ids
+          : (currentUserData.company_id ? [currentUserData.company_id] : []);
+        
+        return (results as any[]).filter((c: any) => 
+          c.is_active !== false && userCompanyIds.includes(c.id)
+        ) as T[];
+      }
+
+      return results;
     }
   },
   post: async <T = any>(entity: string, data: Partial<T> | Record<string, any>): Promise<T> => {
     const payload = cleanObject({ ...data }) as Record<string, any>;
     
-    if (!payload.company_id && currentCompanyId && entity !== "companies" && entity !== "users") {
-      payload.company_id = currentCompanyId;
+    if (currentCompanyId && entity !== "companies" && entity !== "users") {
+      if (!isSystemAdminStatus || !payload.company_id) {
+        payload.company_id = currentCompanyId;
+      }
     }
 
     if (!payload.created_at) {

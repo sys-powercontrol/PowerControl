@@ -96,7 +96,7 @@ export default function SalesHistory() {
 
   
 
-  const currentCompanyId = api.getCompanyId();
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
 
   const { data: salesData = [], isLoading } = useQuery({ 
     queryKey: ["sales", currentCompanyId], 
@@ -112,10 +112,11 @@ export default function SalesHistory() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [saleToCancel, setSaleToCancel] = useState<string | null>(null);
+
   const { data: company } = useQuery({ 
-    queryKey: ["company", user?.company_id], 
-    queryFn: () => api.get(`companies/${user?.company_id}`),
-    enabled: !!user?.company_id
+    queryKey: ["company", currentCompanyId], 
+    queryFn: () => api.get(`companies/${currentCompanyId}`),
+    enabled: !!currentCompanyId
   });
 
   const filteredSales = sales.filter((s: any) => {

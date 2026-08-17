@@ -12,7 +12,7 @@ import { externalApi } from "../services/externalApi";
 export default function Company() {
   const queryClient = useQueryClient();
   const { user, hasPermission } = useAuth();
-  const companyId = user?.company_id;
+  const companyId = api.getCompanyId() || user?.company_id;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);

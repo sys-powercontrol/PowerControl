@@ -232,7 +232,7 @@ export default function AccountsPayable() {
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post("accountsPayable", {
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId || user?.company_id,
       amount: parseFloat(data.amount as string),
       status: "Pendente",
       is_recurring: data.is_recurring === "on"
@@ -278,7 +278,7 @@ export default function AccountsPayable() {
        supplier_id: supplier_id,
        category_id: selectedCategoryId || null,
        category_name: category_name || null,
-       company_id: user?.company_id,
+       company_id: currentCompanyId || user?.company_id,
        amount: parseFloat(data.amount as string),
        status: newStatus,
        is_recurring: data.is_recurring === "on"

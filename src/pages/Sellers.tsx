@@ -36,9 +36,12 @@ export default function Sellers() {
   const [sellerToDelete, setSellerToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
+
   const { data: sellers = [], isLoading } = useQuery({ 
-    queryKey: ["sellers", user?.company_id], 
-    queryFn: () => api.get("sellers") 
+    queryKey: ["sellers", currentCompanyId], 
+    queryFn: () => api.get("sellers"),
+    enabled: !!currentCompanyId
   });
 
   const filteredSellers = sellers.filter((s: any) => 

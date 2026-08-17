@@ -227,7 +227,7 @@ export default function Sales() {
     };
   }, []);
 
-  const currentCompanyId = user?.company_id || api.getCompanyId();
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
   const canEditPrices = hasPermission('prices.edit');
   const canCreate = hasPermission('sales.create');
 
@@ -539,7 +539,7 @@ export default function Sales() {
       }
 
       const saleData = {
-        company_id: user?.company_id,
+        company_id: currentCompanyId || user?.company_id,
         client_id: selectedClient.id,
         client_name: selectedClient.name,
         client_document: selectedClient.document || "",
@@ -576,10 +576,10 @@ export default function Sales() {
       });
 
       try {
-        const companyData: any = queryClient.getQueryData(["company", user?.company_id]);
+        const companyData: any = queryClient.getQueryData(["company", currentCompanyId]);
         if (!companyData || (companyData.notify_new_sale !== false && companyData.notify_new_sale !== "false")) {
           api.post("notifications", {
-            company_id: user?.company_id,
+            company_id: currentCompanyId || user?.company_id,
             title: "Nova Venda Realizada",
             message: `Venda #${sale.id.substr(0, 8).toUpperCase()} (R$ ${saleData.total.toFixed(2)}) realizada para ${selectedClient.name}.`,
             type: "success",

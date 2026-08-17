@@ -134,7 +134,7 @@ export default function Suppliers() {
     const data = Object.fromEntries(formData.entries());
     
     if (editingSupplier) {
-      api.put("suppliers", editingSupplier.id, { ...data, company_id: user?.company_id }).then(() => {
+      api.put("suppliers", editingSupplier.id, { ...data, company_id: currentCompanyId || user?.company_id }).then(() => {
         queryClient.invalidateQueries({ queryKey: ["suppliers"] });
         toast.success("Fornecedor atualizado!");
         setIsModalOpen(false);
@@ -145,7 +145,7 @@ export default function Suppliers() {
         setIsSaving(false);
       });
     } else {
-      api.post("suppliers", { ...data, company_id: user?.company_id }).then(() => {
+      api.post("suppliers", { ...data, company_id: currentCompanyId || user?.company_id }).then(() => {
         queryClient.invalidateQueries({ queryKey: ["suppliers"] });
         toast.success("Fornecedor cadastrado!");
         setIsModalOpen(false);

@@ -101,7 +101,7 @@ export default function Clients() {
     
     const clientData = {
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId || user?.company_id,
       is_active: true
     };
 

@@ -168,7 +168,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
         await inventory.recordMovement({
           product_id: result.id,
           product_name: data.name,
-          company_id: user?.company_id || "",
+          company_id: currentCompanyId || user?.company_id || "",
           type: 'IN',
           reason: 'MANUAL',
           quantity: parseFloat(stock_quantity) || 0,
@@ -211,7 +211,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
         await inventory.recordMovement({
           product_id: id,
           product_name: data.name || oldProduct?.name,
-          company_id: user?.company_id || "",
+          company_id: currentCompanyId || user?.company_id || "",
           type: diff > 0 ? 'IN' : 'OUT',
           reason: 'MANUAL',
           quantity: Math.abs(diff),
@@ -313,7 +313,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
     
     const productData = {
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId || user?.company_id,
       storage_room: storageRoom || (data.storage_room as string) || "",
       storage_rack: storageRack || (data.storage_rack as string) || "",
       storage_shelf: storageShelf || (data.storage_shelf as string) || "",
@@ -358,14 +358,14 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    categoryMutation.mutate({ ...data, company_id: user?.company_id, is_active: true });
+    categoryMutation.mutate({ ...data, company_id: currentCompanyId || user?.company_id, is_active: true });
   };
 
   const handleBrandSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    brandMutation.mutate({ ...data, company_id: user?.company_id, is_active: true });
+    brandMutation.mutate({ ...data, company_id: currentCompanyId || user?.company_id, is_active: true });
   };
 
   const productExportHeaders = {

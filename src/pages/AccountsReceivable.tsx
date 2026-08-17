@@ -214,7 +214,7 @@ export default function AccountsReceivable() {
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post("accountsReceivable", {
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId || user?.company_id,
       amount: parseFloat(data.amount as string),
       status: "Pendente",
       is_recurring: data.is_recurring === "on"
@@ -241,7 +241,7 @@ export default function AccountsReceivable() {
 
     const accountData = {
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId || user?.company_id,
       amount: parseFloat(data.amount as string),
       status: newStatus,
       is_recurring: data.is_recurring === "on"

@@ -31,7 +31,7 @@ export default function Purchases() {
 
   
 
-  const currentCompanyId = user?.company_id || api.getCompanyId();
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
 
   const { data: productsData = [] } = useQuery({ 
     queryKey: ["products", currentCompanyId], 
@@ -158,7 +158,7 @@ export default function Purchases() {
       const totalTaxes = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_taxes, 0);
 
       const purchaseData = {
-        company_id: user?.company_id,
+        company_id: currentCompanyId || user?.company_id,
         supplier_id: selectedSupplier.id,
         supplier_name: selectedSupplier.name,
         items: itemsWithTaxes,
@@ -217,7 +217,7 @@ export default function Purchases() {
          const totalTaxes = itemsWithTaxes.reduce((acc, item) => acc + item.taxes.total_taxes, 0);
 
          const purchaseDataOffline = {
-           company_id: user?.company_id,
+           company_id: currentCompanyId || user?.company_id,
            supplier_id: selectedSupplier.id,
            supplier_name: selectedSupplier.name,
            items: itemsWithTaxes,

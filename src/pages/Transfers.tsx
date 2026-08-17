@@ -36,18 +36,23 @@ export default function Transfers() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
+
   const { data: movements = [], isLoading } = useQuery({ 
-    queryKey: ["movements", user?.company_id], 
-    queryFn: () => api.get("movements", { company_id: user?.company_id }) 
+    queryKey: ["movements", currentCompanyId], 
+    queryFn: () => api.get("movements", { company_id: currentCompanyId }),
+    enabled: !!currentCompanyId
   });
 
   const { data: bankAccounts = [] } = useQuery({ 
-    queryKey: ["bankAccounts", user?.company_id], 
-    queryFn: () => api.get("bankAccounts", { company_id: user?.company_id }) 
+    queryKey: ["bankAccounts", currentCompanyId], 
+    queryFn: () => api.get("bankAccounts", { company_id: currentCompanyId }),
+    enabled: !!currentCompanyId
   });
   const { data: cashiers = [] } = useQuery({ 
-    queryKey: ["cashiers", user?.company_id], 
-    queryFn: () => api.get("cashiers", { company_id: user?.company_id }) 
+    queryKey: ["cashiers", currentCompanyId], 
+    queryFn: () => api.get("cashiers", { company_id: currentCompanyId }),
+    enabled: !!currentCompanyId
   });
 
   const allAccounts = useMemo(() => [
@@ -58,7 +63,7 @@ export default function Transfers() {
   const createMutation = useMutation({
     mutationFn: (data: any) => processMovement({
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId,
       user_id: user?.id,
       user_name: user?.full_name || user?.email || "Sistema",
       amount: parseFloat(data.amount as string)

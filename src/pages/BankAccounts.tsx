@@ -79,7 +79,7 @@ export default function BankAccounts() {
     
     const accountData = {
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId || user?.company_id,
       balance: parseFloat(data.balance as string) || 0,
       is_active: true
     };

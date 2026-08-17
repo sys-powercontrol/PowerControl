@@ -183,17 +183,19 @@ export default function Support() {
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: any) => {
+      const activeCompanyId = api.getCompanyId() || user?.company_id;
       return api.post("support_tickets", {
         ...data,
         user_id: user?.id,
         user_name: user?.full_name,
         user_email: user?.email,
-        company_id: user?.company_id,
+        company_id: activeCompanyId,
         status: "OPEN",
         updated_at: new Date().toISOString()
       });
     },
     onSuccess: async (_, variables) => {
+      const activeCompanyId = api.getCompanyId() || user?.company_id;
       toast.success("Chamado registrado com sucesso! Nossa equipe técnica retornará em breve.");
       
       // Send notification webhook
@@ -201,7 +203,7 @@ export default function Support() {
         ...variables,
         user_name: user?.full_name,
         user_email: user?.email,
-        company_id: user?.company_id,
+        company_id: activeCompanyId,
       });
 
       // Reset form

@@ -64,7 +64,7 @@ export default function TaxSettings() {
     
     const ruleData = {
       ...data,
-      company_id: user?.company_id,
+      company_id: currentCompanyId || user?.company_id,
       icms_rate: parseFloat(data.icms_rate as string) || 0,
       ipi_rate: parseFloat(data.ipi_rate as string) || 0,
       pis_rate: parseFloat(data.pis_rate as string) || 0,

@@ -26,9 +26,12 @@ export default function Services() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
 
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
+
   const { data: services = [], isLoading } = useQuery({ 
-    queryKey: ["services", user?.company_id], 
-    queryFn: () => api.get("services", { company_id: user?.company_id }) 
+    queryKey: ["services", currentCompanyId], 
+    queryFn: () => api.get("services", { company_id: currentCompanyId }),
+    enabled: !!currentCompanyId
   });
 
   const filteredServices = services.filter((s: any) => 
