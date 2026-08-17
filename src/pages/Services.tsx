@@ -32,7 +32,7 @@ export default function Services() {
   });
 
   const filteredServices = services.filter((s: any) => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const serviceExportHeaders = {

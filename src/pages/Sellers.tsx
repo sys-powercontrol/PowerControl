@@ -42,7 +42,7 @@ export default function Sellers() {
   });
 
   const filteredSellers = sellers.filter((s: any) => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

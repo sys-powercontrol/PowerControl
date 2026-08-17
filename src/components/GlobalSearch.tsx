@@ -104,7 +104,7 @@ export default function GlobalSearch() {
 
         const saleResults: SearchResult[] = sales
           .filter((s: { id: string, client_name?: string, total: number }) => 
-            s.id.toLowerCase().includes(searchLower) || 
+            (s.id || '').toLowerCase().includes(searchLower) || 
             s.client_name?.toLowerCase().includes(searchLower)
           )
           .slice(0, 3)

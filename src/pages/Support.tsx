@@ -314,8 +314,8 @@ export default function Support() {
     return FAQS.filter(faq => {
       const matchesCat = activeFaqCategory === "all" || faq.cat === activeFaqCategory;
       const matchesSearch = !faqSearch.trim() || 
-        faq.q.toLowerCase().includes(faqSearch.toLowerCase()) || 
-        faq.a.toLowerCase().includes(faqSearch.toLowerCase());
+        (faq.q || '').toLowerCase().includes(faqSearch.toLowerCase()) || 
+        (faq.a || '').toLowerCase().includes(faqSearch.toLowerCase());
       return matchesCat && matchesSearch;
     });
   }, [faqSearch, activeFaqCategory]);

@@ -13,7 +13,7 @@ export function useGlobalKeyboardShortcuts() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-      const keyLower = e.key.toLowerCase();
+      const keyLower = (e.key || "").toLowerCase();
 
       const target = e.target as HTMLElement | null;
       const isTyping = target && (

@@ -43,7 +43,7 @@ export default function InventoryAdjustments() {
   });
 
   const filteredProducts = products.filter((p: any) => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

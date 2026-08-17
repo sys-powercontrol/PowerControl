@@ -51,7 +51,7 @@ export default function BankAccounts() {
     // Deduplicate the list by name, bank name and account number to prevent UI cluttering from old duplicate entries
     const seen = new Set();
     list = list.filter((a: any) => {
-      const key = `${a.name}-${a.bank_name || ''}-${a.account_number || ''}`.toLowerCase().trim();
+      const key = `${a?.name || ''}-${a?.bank_name || ''}-${a?.account_number || ''}`.toLowerCase().trim();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

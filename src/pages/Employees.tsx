@@ -339,14 +339,14 @@ if (!canManage) {
 
       {/* Modal Vincular/Editar Funcionário */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-hidden">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col my-auto">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0 bg-white">
               <h2 className="text-xl font-bold">{editingEmployee ? "Editar Funcionário" : "Vincular Novo Funcionário"}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto overscroll-contain">
               {!editingEmployee ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3">

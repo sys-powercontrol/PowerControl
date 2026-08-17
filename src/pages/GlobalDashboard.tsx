@@ -335,7 +335,7 @@ export default function GlobalDashboard() {
   const filteredRanking = useMemo(() => {
     if (!companySearch.trim()) return metrics.ranking;
     return metrics.ranking.filter(c => 
-      c.name.toLowerCase().includes(companySearch.toLowerCase())
+      (c.name || '').toLowerCase().includes(companySearch.toLowerCase())
     );
   }, [metrics.ranking, companySearch]);
 

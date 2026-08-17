@@ -119,7 +119,7 @@ export default function InventoryTurnoverReport() {
         isCritical: (product.stock_quantity || 0) <= (product.min_stock || 0)
       };
     }).filter((p: any) => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === "all" || p.category_id === selectedCategory;
       const matchesSupplier = selectedSupplier === "all" || p.supplier_id === selectedSupplier;
       return matchesSearch && matchesCategory && matchesSupplier;

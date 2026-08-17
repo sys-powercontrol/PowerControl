@@ -181,8 +181,8 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
     const matchingRule = rules.find((r: any) => {
       if (r.target_type !== (isExpense ? 'PAYABLE' : 'RECEIVABLE')) return false;
       
-      const memo = t.memo.toLowerCase();
-      const pattern = r.pattern.toLowerCase();
+      const memo = (t.memo || "").toLowerCase();
+      const pattern = (r.pattern || "").toLowerCase();
 
       if (r.type === 'EXACT') return memo === pattern;
       if (r.type === 'CONTAINS') return memo.includes(pattern);
@@ -311,8 +311,8 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
           // Check for rule to pre-fill metadata
           const matchingRule = rules.find((r: any) => {
             if (r.target_type !== (isExpense ? 'PAYABLE' : 'RECEIVABLE')) return false;
-            const memo = t.memo.toLowerCase();
-            const pattern = r.pattern.toLowerCase();
+            const memo = (t.memo || "").toLowerCase();
+            const pattern = (r.pattern || "").toLowerCase();
             if (r.type === 'EXACT') return memo === pattern;
             if (r.type === 'CONTAINS') return memo.includes(pattern);
             return false;
@@ -362,7 +362,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".ofx")) {
+    if (!file.name?.toLowerCase().endsWith(".ofx")) {
       toast.error("Por favor, selecione um arquivo .ofx válido.");
       return;
     }

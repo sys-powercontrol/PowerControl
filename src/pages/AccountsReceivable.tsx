@@ -79,7 +79,7 @@ export default function AccountsReceivable() {
     // Deduplicate the list by name, bank name and account number
     const seen = new Set();
     list = list.filter((a: any) => {
-      const key = `${a.name}-${a.bank_name || ''}-${a.account_number || ''}`.toLowerCase().trim();
+      const key = `${a?.name || ''}-${a?.bank_name || ''}-${a?.account_number || ''}`.toLowerCase().trim();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -533,7 +533,7 @@ if (!canView) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch">
           <ExportButton 
             data={filteredAccounts} 
-            filename={`contas-receber-${activeTab.toLowerCase()}`} 
+            filename={`contas-receber-${(activeTab || '').toLowerCase()}`} 
             format="xlsx" 
             title={`Relatório de Contas a Receber - ${activeTab}`}
             headers={{
@@ -560,7 +560,7 @@ if (!canView) {
 
           <ExportButton 
             data={filteredAccounts} 
-            filename={`contas-receber-${activeTab.toLowerCase()}`} 
+            filename={`contas-receber-${(activeTab || '').toLowerCase()}`} 
             format="pdf" 
             title={`Relatório de Contas a Receber - ${activeTab}`}
             headers={{

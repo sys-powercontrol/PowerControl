@@ -283,14 +283,14 @@ if (!canView) {
 
       {/* Modal Novo/Editar */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-hidden">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col my-auto">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0 bg-white">
               <h2 className="text-xl font-bold">{editingClient ? "Editar Cliente" : "Novo Cliente"}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
+            <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 overscroll-contain">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-bold text-gray-700">Nome Completo *</label>

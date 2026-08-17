@@ -86,7 +86,7 @@ export default function AccountsPayable() {
     // Deduplicate the list by name, bank name and account number
     const seen = new Set();
     list = list.filter((a: any) => {
-      const key = `${a.name}-${a.bank_name || ''}-${a.account_number || ''}`.toLowerCase().trim();
+      const key = `${a?.name || ''}-${a?.bank_name || ''}-${a?.account_number || ''}`.toLowerCase().trim();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -586,7 +586,7 @@ if (!canView) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch">
           <ExportButton 
             data={filteredAccounts} 
-            filename={`contas-pagar-${activeTab.toLowerCase()}`} 
+            filename={`contas-pagar-${(activeTab || '').toLowerCase()}`} 
             format="xlsx" 
             title={`Relatório de Contas a Pagar - ${activeTab}`}
             headers={{
@@ -613,7 +613,7 @@ if (!canView) {
 
           <ExportButton 
             data={filteredAccounts} 
-            filename={`contas-pagar-${activeTab.toLowerCase()}`} 
+            filename={`contas-pagar-${(activeTab || '').toLowerCase()}`} 
             format="pdf" 
             title={`Relatório de Contas a Pagar - ${activeTab}`}
             headers={{
@@ -1054,13 +1054,13 @@ if (!canView) {
                   {supplierSearch.length > 0 && !selectedSupplierId && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto">
                       {suppliers.filter((s: any) => 
-                        s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                        (s.name || '').toLowerCase().includes((supplierSearch || '').toLowerCase()) ||
                         s.document?.includes(supplierSearch)
                       ).length === 0 ? (
                         <div className="p-4 text-center text-xs text-gray-400">Nenhum fornecedor encontrado</div>
                       ) : (
                         suppliers.filter((s: any) => 
-                          s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                          (s.name || '').toLowerCase().includes((supplierSearch || '').toLowerCase()) ||
                           s.document?.includes(supplierSearch)
                         ).map((s: any) => (
                           <button
@@ -1068,7 +1068,7 @@ if (!canView) {
                             type="button"
                             onClick={() => {
                               setSelectedSupplierId(s.id);
-                              setSupplierSearch(s.name);
+                              setSupplierSearch(s.name || '');
                             }}
                             className="w-full p-3 text-left hover:bg-red-50 transition-colors border-b border-gray-50 last:border-0"
                           >
@@ -1101,13 +1101,13 @@ if (!canView) {
                   {categorySearch.length > 0 && !selectedCategoryId && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto">
                       {categories.filter((c: any) => 
-                        c.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                        (c.name || '').toLowerCase().includes((categorySearch || '').toLowerCase()) ||
                         c.code?.includes(categorySearch)
                       ).length === 0 ? (
                         <div className="p-4 text-center text-xs text-gray-400">Nenhuma categoria encontrada</div>
                       ) : (
                         categories.filter((c: any) => 
-                          c.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                          (c.name || '').toLowerCase().includes((categorySearch || '').toLowerCase()) ||
                           c.code?.includes(categorySearch)
                         ).map((c: any) => (
                           <button
@@ -1115,7 +1115,7 @@ if (!canView) {
                             type="button"
                             onClick={() => {
                               setSelectedCategoryId(c.id);
-                              setCategorySearch(c.name);
+                              setCategorySearch(c.name || '');
                             }}
                             className="w-full p-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0"
                           >

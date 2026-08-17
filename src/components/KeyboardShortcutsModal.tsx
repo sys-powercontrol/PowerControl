@@ -58,7 +58,7 @@ export default function KeyboardShortcutsModal({
       );
 
       // Toggle modal on Alt+H or Shift+? (when not typing in input)
-      if ((e.altKey && e.key.toLowerCase() === "h") || (!isInputFocused && e.key === "?")) {
+      if ((e.altKey && e.key?.toLowerCase() === "h") || (!isInputFocused && e.key === "?")) {
         e.preventDefault();
         onClose(); // toggles or triggers
         return;

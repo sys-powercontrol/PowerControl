@@ -77,7 +77,7 @@ export default function LabelPrinter({ isOpen, onClose, products }: LabelPrinter
   const barcodeRef = useRef<HTMLCanvasElement>(null);
 
   const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
