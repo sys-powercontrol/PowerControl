@@ -1682,13 +1682,13 @@ if (currentUser?.role !== 'master') {
       {isUserModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsUserModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
               <h2 className="text-xl font-bold">{editingUser ? "Editar Usuário" : "Novo Usuário"}</h2>
-              <button onClick={() => setIsUserModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              <button onClick={() => setIsUserModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
             </div>
-            <form onSubmit={handleUserSubmit} className="p-6 space-y-6">
-              <div className="space-y-4">
+            <form onSubmit={handleUserSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">Nome Completo</label>
                   <input name="full_name" defaultValue={editingUser?.full_name} required className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
@@ -1743,7 +1743,7 @@ if (currentUser?.role !== 'master') {
                   </label>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-100 bg-white shrink-0">
                 <button type="button" onClick={() => setIsUserModalOpen(false)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
                 <button type="submit" disabled={userMutation.isPending} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-60 text-sm">
                   {userMutation.isPending ? (
@@ -1769,37 +1769,38 @@ if (currentUser?.role !== 'master') {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsCompanyModalOpen(false)} />
           <div className="relative bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
               <h2 className="text-xl font-bold">{editingCompany ? "Editar Empresa" : "Nova Empresa"}</h2>
-              <button onClick={() => setIsCompanyModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              <button onClick={() => setIsCompanyModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
             </div>
-            <form onSubmit={handleCompanySubmit} className="p-6 space-y-8 overflow-y-auto">
-              {/* Logo and Basic Info */}
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-6 items-start">
-                  <div className="relative group">
-                    <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-50 flex items-center justify-center">
-                      {logoBase64 || editingCompany?.logo_url ? (
-                        <img src={logoBase64 || editingCompany?.logo_url} alt="Logo" className="w-full h-full object-cover" />
-                      ) : (
-                        <Building2 size={32} className="text-gray-300" />
-                      )}
+            <form onSubmit={handleCompanySubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+              <div className="p-6 space-y-8 overflow-y-auto flex-1">
+                {/* Logo and Basic Info */}
+                <div className="space-y-6">
+                  <div className="flex flex-col md:flex-row gap-6 items-start">
+                    <div className="relative group">
+                      <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-50 flex items-center justify-center">
+                        {logoBase64 || editingCompany?.logo_url ? (
+                          <img src={logoBase64 || editingCompany?.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                        ) : (
+                          <Building2 size={32} className="text-gray-300" />
+                        )}
+                      </div>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={handleFileChange} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="absolute -bottom-2 -right-2 p-2 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Upload size={14} />
+                      </button>
                     </div>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      accept="image/*" 
-                      onChange={handleFileChange} 
-                    />
-                    <button 
-                      type="button" 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-2 -right-2 p-2 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Upload size={14} />
-                    </button>
-                  </div>
 
                     <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                       <div className="space-y-1">
@@ -1997,8 +1998,9 @@ if (currentUser?.role !== 'master') {
                   </div>
                 </div>
               </div>
+              </div>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 bg-white sticky bottom-0 z-10">
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-100 bg-white shrink-0">
                 <button type="button" onClick={() => setIsCompanyModalOpen(false)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
                 <button type="submit" disabled={companyMutation.isPending} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-60 text-sm">
                   {companyMutation.isPending ? (

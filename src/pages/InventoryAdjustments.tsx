@@ -11,16 +11,18 @@ import {
   Search,
   Plus,
   Minus,
-  Info
+  Info,
+  Warehouse
 } from "lucide-react";
 import { toast } from "sonner";
+import StockMapPowerBI from "../components/Inventory/StockMapPowerBI";
 
 export default function InventoryAdjustments() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const currentCompanyId = api.getCompanyId();
 
-  const [activeTab, setActiveTab] = useState<'SIMPLE' | 'TRANSFER'>('SIMPLE');
+  const [activeTab, setActiveTab] = useState<'SIMPLE' | 'TRANSFER' | 'MAP'>('SIMPLE');
 
   const [selectedProductId, setSelectedProductId] = useState("");
   const [type, setType] = useState<'IN' | 'OUT'>('IN');
@@ -126,17 +128,18 @@ export default function InventoryAdjustments() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div>
-         <h1 className="text-2xl font-bold text-gray-900">Ajuste de Estoque</h1>
-         <p className="text-gray-500">Realize correções manuais ou transfira saldo entre filiais de forma rápida e segura.</p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-8 pb-12">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+           <h1 className="text-2xl font-bold text-gray-900">Ajuste de Estoque</h1>
+           <p className="text-gray-500">Realize correções manuais, transfira saldo entre filiais ou visualize o mapa físico de armazenagem.</p>
+        </div>
 
-      {(user?.role === 'master' || user?.role === 'admin') && (
-        <div className="flex bg-gray-100 p-1 rounded-2xl w-full max-w-sm">
+        <div className="flex bg-gray-100 p-1 rounded-2xl w-full sm:w-auto min-w-[320px] max-w-lg shadow-2xs">
            <button
+             type="button"
              onClick={() => setActiveTab('SIMPLE')}
-             className={`flex-1 py-2 px-4 rounded-xl font-bold text-sm transition-all ${
+             className={`flex-1 py-2 px-3 sm:px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
                activeTab === 'SIMPLE' 
                ? 'bg-white text-blue-600 shadow-md' 
                : 'text-gray-500 hover:bg-gray-200'
@@ -144,20 +147,46 @@ export default function InventoryAdjustments() {
            >
              Ajuste Simples
            </button>
+           {(user?.role === 'master' || user?.role === 'admin') && (
+             <button
+               type="button"
+               onClick={() => setActiveTab('TRANSFER')}
+               className={`flex-1 py-2 px-3 sm:px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+                 activeTab === 'TRANSFER' 
+                 ? 'bg-white text-blue-600 shadow-md' 
+                 : 'text-gray-500 hover:bg-gray-200'
+               }`}
+             >
+               Transferência
+             </button>
+           )}
            <button
-             onClick={() => setActiveTab('TRANSFER')}
-             className={`flex-1 py-2 px-4 rounded-xl font-bold text-sm transition-all ${
-               activeTab === 'TRANSFER' 
-               ? 'bg-white text-blue-600 shadow-md' 
+             type="button"
+             onClick={() => setActiveTab('MAP')}
+             className={`flex-1 py-2 px-3 sm:px-4 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+               activeTab === 'MAP' 
+               ? 'bg-white text-cyan-600 shadow-md border border-cyan-100' 
                : 'text-gray-500 hover:bg-gray-200'
              }`}
            >
-             Transferência
+             <Warehouse size={15} className="text-cyan-600" />
+             Mapa de Estoque
            </button>
         </div>
-      )}
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {activeTab === 'MAP' ? (
+        <StockMapPowerBI 
+          products={products}
+          onSelectProductForAdjustment={(productId) => {
+            setSelectedProductId(productId);
+            const prod = products.find((p: any) => p.id === productId);
+            if (prod) setSearchTerm(prod.name);
+            setActiveTab('SIMPLE');
+          }}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-6">
           <form onSubmit={handleSubmit} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
             {/* Seleção de Produto */}
@@ -394,6 +423,7 @@ export default function InventoryAdjustments() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -22,7 +22,9 @@ import {
   ShieldCheck,
   Cloud,
   TrendingUp,
-  Box
+  Box,
+  Warehouse,
+  MapPin
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -33,6 +35,28 @@ import ExportButton from "../components/ExportButton";
 interface ProductsProps {
   defaultTab?: string;
 }
+
+const cleanStoragePart = (val: string) => {
+  if (!val) return "";
+  const trimmed = val.trim();
+  const cleaned = trimmed.replace(/^(sala|arm[aá]rio|gaveta|estante|prateleira|setor|box|posi[cç][aã]o)\s+/i, "");
+  return cleaned.toUpperCase().trim();
+};
+
+const generateStorageCode = (room: string, rack: string, shelf: string) => {
+  const r = cleanStoragePart(room);
+  const k = cleanStoragePart(rack);
+  const s = cleanStoragePart(shelf);
+
+  if (r && k && s) return `${r}-${k}/${s}`;
+  if (r && k) return `${r}-${k}`;
+  if (r && s) return `${r}/${s}`;
+  if (k && s) return `${k}/${s}`;
+  if (r) return r;
+  if (k) return k;
+  if (s) return s;
+  return "";
+};
 
 export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   const { user, hasPermission } = useAuth();
@@ -53,6 +77,10 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [bomItems, setBomItems] = useState<any[]>([]);
+  const [storageRoom, setStorageRoom] = useState("");
+  const [storageRack, setStorageRack] = useState("");
+  const [storageShelf, setStorageShelf] = useState("");
+  const [storageLocation, setStorageLocation] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -286,6 +314,10 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
     const productData = {
       ...data,
       company_id: user?.company_id,
+      storage_room: storageRoom || (data.storage_room as string) || "",
+      storage_rack: storageRack || (data.storage_rack as string) || "",
+      storage_shelf: storageShelf || (data.storage_shelf as string) || "",
+      storage_location: storageLocation || (data.storage_location as string) || generateStorageCode(storageRoom, storageRack, storageShelf),
       price: parseFloat(data.price as string) || 0,
       cost_price: parseFloat(data.cost_price as string) || 0,
       stock_quantity: parseInt(data.stock_quantity as string) || 0,
@@ -341,6 +373,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
     name: "Produto",
     category_name: "Categoria",
     brand_name: "Marca",
+    storage_location: "Armazenagem",
     price: "Preço Venda",
     cost_price: "Preço Custo",
     stock_quantity: "Estoque",
@@ -436,6 +469,10 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                     setEditingProduct(null); 
                     setImageBase64(null); 
                     setBomItems([]);
+                    setStorageRoom("");
+                    setStorageRack("");
+                    setStorageShelf("");
+                    setStorageLocation("");
                     setIsModalOpen(true); 
                   }
                   if (activeTab === "Categorias") { setEditingCategory(null); setIsCategoryModalOpen(true); }
@@ -646,6 +683,10 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                         setEditingProduct(p); 
                         setImageBase64(p.image_url || null); 
                         setBomItems(p.bom_items || []);
+                        setStorageRoom(p.storage_room || "");
+                        setStorageRack(p.storage_rack || "");
+                        setStorageShelf(p.storage_shelf || "");
+                        setStorageLocation(p.storage_location || p.storage_code || "");
                         setIsModalOpen(true); 
                       }}
                       title="Editar Produto"
@@ -677,13 +718,19 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                     <h3 className="font-bold text-gray-900 truncate flex-1">{p.name}</h3>
                     <span className="text-blue-600 font-bold">{formatCurrency(p.price || 0)}</span>
                   </div>
-                  <div className="flex gap-2 mb-3">
+                  <div className="flex flex-wrap gap-1.5 mb-3">
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase">
                       {p.category_name || "Geral"}
                     </span>
                     {p.brand_name && (
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase">
                         {p.brand_name}
+                      </span>
+                    )}
+                    {(p.storage_location || p.storage_code) && (
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded text-[10px] font-bold flex items-center gap-1" title={`Localização de Armazenagem: ${p.storage_location || p.storage_code}`}>
+                        <Warehouse size={10} className="text-emerald-600" />
+                        {p.storage_location || p.storage_code}
                       </span>
                     )}
                   </div>
@@ -1075,6 +1122,125 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                         placeholder="102"
                         className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seção Armazenagem no Estoque */}
+                <div className="md:col-span-2 pt-4 border-t border-gray-100 space-y-4 bg-slate-50/70 p-4.5 rounded-2xl border border-slate-200/60">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                        <Warehouse size={19} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-gray-900 text-sm">
+                            Armazenagem e Localização no Estoque
+                          </h3>
+                          <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
+                            Opcional
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500">Defina o endereço físico (Sala, Armário, Gaveta) para localização rápida.</p>
+                      </div>
+                    </div>
+                    {storageLocation && (
+                      <div className="flex items-center gap-1.5 self-start sm:self-auto bg-blue-50 border border-blue-200/80 px-3 py-1.5 rounded-xl shadow-2xs">
+                        <span className="text-[11px] font-bold text-blue-700">Código Gerado:</span>
+                        <span className="font-mono text-xs font-black text-blue-900 bg-white px-2 py-0.5 rounded-lg border border-blue-200 shadow-2xs">
+                          {storageLocation}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                        1. Sala / Setor
+                      </label>
+                      <input 
+                        name="storage_room" 
+                        type="text"
+                        placeholder="Ex: Sala A1"
+                        value={storageRoom}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStorageRoom(val);
+                          setStorageLocation(generateStorageCode(val, storageRack, storageShelf));
+                        }}
+                        className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm placeholder:text-gray-400" 
+                      />
+                      <p className="text-[10px] text-gray-400">Exemplo: Sala A1 ou Setor A</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                        2. Armário / Estante
+                      </label>
+                      <input 
+                        name="storage_rack" 
+                        type="text"
+                        placeholder="Ex: Armário A1"
+                        value={storageRack}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStorageRack(val);
+                          setStorageLocation(generateStorageCode(storageRoom, val, storageShelf));
+                        }}
+                        className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm placeholder:text-gray-400" 
+                      />
+                      <p className="text-[10px] text-gray-400">Exemplo: Armário A1 ou Estante 02</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                        3. Gaveta / Prateleira
+                      </label>
+                      <input 
+                        name="storage_shelf" 
+                        type="text"
+                        placeholder="Ex: Gaveta A1"
+                        value={storageShelf}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStorageShelf(val);
+                          setStorageLocation(generateStorageCode(storageRoom, storageRack, val));
+                        }}
+                        className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm placeholder:text-gray-400" 
+                      />
+                      <p className="text-[10px] text-gray-400">Exemplo: Gaveta A1 ou Prateleira 03</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="space-y-1 w-full sm:w-auto">
+                      <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                        <MapPin size={13} className="text-blue-600" />
+                        Código Padrão Abreviado
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          name="storage_location" 
+                          type="text"
+                          placeholder="Ex: A1-A1/A1"
+                          value={storageLocation}
+                          onChange={(e) => setStorageLocation(e.target.value)}
+                          className="px-3 py-1.5 font-mono text-sm font-bold bg-white border border-blue-200 text-blue-900 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-full sm:w-48 shadow-2xs" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setStorageLocation(generateStorageCode(storageRoom, storageRack, storageShelf))}
+                          className="text-xs px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold transition-colors border border-blue-200/60 shrink-0 cursor-pointer"
+                          title="Recalcular código a partir dos 3 campos"
+                        >
+                          Recalcular
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-gray-500 bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200/60">
+                      Padrão de abreviação: <strong className="text-blue-700 font-mono font-bold">SALA-ARMÁRIO/GAVETA</strong> (ex: <span className="font-mono text-emerald-700 font-bold">A1-A1/A1</span>)
                     </div>
                   </div>
                 </div>
