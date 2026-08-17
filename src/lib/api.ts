@@ -167,6 +167,34 @@ export const api = {
 
       const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
 
+      if (entityPath === "users" && requiresIsolation) {
+        const companyId = await api.waitForCompany(2000);
+        if (!companyId) {
+          console.warn(`Race condition avoided: Cannot query users without company_id. Throwing to trigger retry.`);
+          throw new Error("Pendente de company_id");
+        }
+
+        const [q1Snap, q2Snap] = await Promise.all([
+          getDocs(query(collection(db, "users"), where("company_ids", "array-contains", companyId))),
+          getDocs(query(collection(db, "users"), where("company_id", "==", companyId)))
+        ]);
+
+        const userMap = new Map<string, any>();
+        q1Snap.docs.forEach(d => userMap.set(d.id, { id: d.id, ...d.data() }));
+        q2Snap.docs.forEach(d => userMap.set(d.id, { id: d.id, ...d.data() }));
+        let combined = Array.from(userMap.values());
+
+        if (paramsOrId && typeof paramsOrId === "object") {
+          Object.keys(paramsOrId).forEach(key => {
+            if (paramsOrId[key] !== undefined && key !== "_all" && key !== "_orderBy" && key !== "_orderDir" && key !== "_limit") {
+              combined = combined.filter(item => item[key] === paramsOrId[key]);
+            }
+          });
+        }
+
+        return combined as T[];
+      }
+
       if (requiresIsolation) {
         const companyId = await api.waitForCompany(2000);
         if (!companyId) {

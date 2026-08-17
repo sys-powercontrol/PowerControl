@@ -48,7 +48,7 @@ export default function Employees() {
   const [showPermissions, setShowPermissions] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState<PermissionId[]>([]);
 
-  const currentCompanyId = user?.company_id || api.getCompanyId();
+  const currentCompanyId = api.getCompanyId() || user?.company_id;
 
   const { data: employees = [], isLoading } = useQuery({ 
     queryKey: ["employees", currentCompanyId], 
@@ -94,11 +94,25 @@ export default function Employees() {
 
   const linkMutation = useMutation({
     mutationFn: async (email: string) => {
+      if (!currentCompanyId) throw new Error("Nenhuma empresa selecionada.");
       const foundUser: any = await api.findUserByEmail(email);
       if (!foundUser) throw new Error("Usuário não encontrado com este e-mail.");
-      if (foundUser.company_id) throw new Error("Este usuário já está vinculado a uma empresa.");
       
-      return api.put("users", foundUser.id, { company_id: currentCompanyId });
+      const existingCompanyIds: string[] = Array.isArray(foundUser.company_ids) && foundUser.company_ids.length > 0
+        ? foundUser.company_ids
+        : (foundUser.company_id ? [foundUser.company_id] : []);
+
+      if (existingCompanyIds.includes(currentCompanyId)) {
+        throw new Error("Este usuário já está vinculado a esta empresa.");
+      }
+
+      const newCompanyIds = [...existingCompanyIds, currentCompanyId];
+      return api.put("users", foundUser.id, { 
+        company_ids: newCompanyIds,
+        company_id: foundUser.company_id || currentCompanyId,
+        is_active: true,
+        active: true
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees", currentCompanyId] });
@@ -127,13 +141,24 @@ export default function Employees() {
   };
 
   const handleUnlink = async () => {
-    if (!employeeToUnlink) return;
+    if (!employeeToUnlink || !currentCompanyId) return;
     
     setIsUnlinking(true);
     try {
-      await api.put("users", employeeToUnlink, { company_id: null });
+      const targetEmployee = employees.find((e: any) => e.id === employeeToUnlink);
+      const existingCompanyIds: string[] = Array.isArray(targetEmployee?.company_ids) && targetEmployee.company_ids.length > 0
+        ? targetEmployee.company_ids
+        : (targetEmployee?.company_id ? [targetEmployee.company_id] : []);
+
+      const newCompanyIds = existingCompanyIds.filter((cid: string) => cid !== currentCompanyId);
+      const newPrimaryCompanyId = newCompanyIds.length > 0 ? newCompanyIds[0] : null;
+
+      await api.put("users", employeeToUnlink, { 
+        company_ids: newCompanyIds,
+        company_id: newPrimaryCompanyId
+      });
       queryClient.invalidateQueries({ queryKey: ["employees", currentCompanyId] });
-      toast.success("Funcionário desvinculado!");
+      toast.success("Funcionário desvinculado desta empresa!");
       setIsConfirmModalOpen(false);
       setEmployeeToUnlink(null);
     } catch {
