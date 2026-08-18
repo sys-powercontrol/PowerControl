@@ -83,9 +83,9 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow read: if isAuthenticated() && (isMaster() || getUserCompanyId() == companyId || getUserCompanyId() == '' || companyId == '');
-      allow create: if isAuthenticated() && isMaster();
-      allow update: if isAuthenticated() && (isMaster() || (isAdmin() && getUserCompanyId() == companyId));
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isMaster() || (isAdmin() && (getUserCompanyId() == companyId || getUserCompanyId() == '')));
       allow delete: if isAuthenticated() && isMaster();
     }
 

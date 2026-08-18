@@ -57,18 +57,18 @@ export default function Layout() {
   const { isModalOpen, openModal, closeModal } = useGlobalKeyboardShortcuts();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(api.getCompanyId());
 
-  const { data: allCompanies = [] } = useQuery({
-    queryKey: ["companies", "all"],
-    queryFn: () => api.get("companies", { _all: true }),
-    enabled: !!user
-  });
-
   const userCompanyIds = useMemo(() => {
     if (!user) return [];
     return Array.isArray(user.company_ids) && user.company_ids.length > 0
       ? user.company_ids
       : (user.company_id ? [user.company_id] : []);
   }, [user]);
+
+  const { data: allCompanies = [] } = useQuery({
+    queryKey: ["companies", "all", user?.id, userCompanyIds.join(",")],
+    queryFn: () => api.get("companies", { _all: true }),
+    enabled: !!user
+  });
 
   const availableCompanies = useMemo(() => {
     if (!user) return [];
@@ -81,9 +81,9 @@ export default function Layout() {
     );
 
     if (matched.length > 0) return matched;
-    
-    // Fallback while queries are loading
-    return userCompanyIds.map(id => ({ id, name: "Minha Empresa", is_active: true }));
+    if (allCompanies.length > 0) return allCompanies;
+
+    return [];
   }, [user, allCompanies, userCompanyIds]);
 
   const effectiveCompanyId = useMemo(() => {
@@ -91,7 +91,7 @@ export default function Layout() {
     if (user.role === 'master') {
       return selectedCompanyId;
     }
-    if (user.is_active === false || availableCompanies.length === 0) {
+    if (user.is_active === false) {
       return null;
     }
     if (selectedCompanyId && availableCompanies.some((c: any) => c.id === selectedCompanyId)) {
@@ -440,7 +440,7 @@ export default function Layout() {
               >
                 <option value="global">🌐 Visão Global (Todas)</option>
                 {allCompanies.map((c: any) => (
-                  <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                  <option key={c.id} value={c.id}>🏢 {c.name || c.trade_name || c.fantasy_name || "Empresa"}</option>
                 ))}
               </select>
             </div>
@@ -456,7 +456,7 @@ export default function Layout() {
                 className="w-full p-2 text-xs bg-blue-50/60 border border-blue-200 text-blue-900 font-semibold rounded-xl outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 {availableCompanies.map((c: any) => (
-                  <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                  <option key={c.id} value={c.id}>🏢 {c.name || c.trade_name || c.fantasy_name || "Empresa"}</option>
                 ))}
               </select>
             </div>
@@ -687,7 +687,7 @@ export default function Layout() {
                   >
                     <option value="global">🌐 Visão Global</option>
                     {allCompanies.map((c: any) => (
-                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                      <option key={c.id} value={c.id}>🏢 {c.name || c.trade_name || c.fantasy_name || "Empresa"}</option>
                     ))}
                   </select>
                 </div>
@@ -695,7 +695,7 @@ export default function Layout() {
                 <div className="mb-3 space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase">Trocar Empresa</label>
                   <select 
-                    value={selectedCompanyId || ""}
+                    value={effectiveCompanyId || ""}
                     onChange={(e) => {
                       handleCompanyChange(e.target.value);
                       setIsMobileMenuOpen(false);
@@ -703,7 +703,7 @@ export default function Layout() {
                     className="w-full p-2 text-xs bg-white border border-blue-200 text-blue-900 font-semibold rounded-xl outline-none"
                   >
                     {availableCompanies.map((c: any) => (
-                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                      <option key={c.id} value={c.id}>🏢 {c.name || c.trade_name || c.fantasy_name || "Empresa"}</option>
                     ))}
                   </select>
                 </div>

@@ -248,7 +248,11 @@ export const api = {
       const snapshot = await getDocs(q);
       const results = snapshot.docs.map(doc => {
         const data = doc.data();
-        return { id: doc.id, ...(typeof data === 'object' && data !== null ? data : {}) };
+        return { 
+          id: doc.id, 
+          name: data.name || data.trade_name || data.fantasy_name || "Minha Empresa",
+          ...(typeof data === 'object' && data !== null ? data : {}) 
+        };
       }) as T[];
 
       // Filter company list for non-master users to only assigned & active companies
@@ -257,9 +261,40 @@ export const api = {
           ? currentUserData.company_ids
           : (currentUserData.company_id ? [currentUserData.company_id] : []);
         
-        return (results as any[]).filter((c: any) => 
+        const filtered = (results as any[]).filter((c: any) => 
           c.is_active !== false && userCompanyIds.includes(c.id)
-        ) as T[];
+        );
+
+        // If collection query returned fewer docs due to any cache/rule constraints, fetch missing ones directly
+        if (filtered.length < userCompanyIds.length) {
+          const loadedIds = new Set(filtered.map(c => c.id));
+          const missingIds = userCompanyIds.filter(id => !loadedIds.has(id));
+          
+          if (missingIds.length > 0) {
+            const extraDocs = await Promise.all(
+              missingIds.map(async (id) => {
+                try {
+                  const snap = await getDoc(doc(db, "companies", id));
+                  if (snap.exists()) {
+                    const d = snap.data();
+                    return { 
+                      id: snap.id, 
+                      name: d.name || d.trade_name || d.fantasy_name || "Minha Empresa",
+                      ...d 
+                    };
+                  }
+                } catch (e) {
+                  console.warn("Could not fetch company doc directly:", id, e);
+                }
+                return null;
+              })
+            );
+            const extraValid = extraDocs.filter(Boolean).filter((c: any) => c.is_active !== false);
+            return [...filtered, ...extraValid] as T[];
+          }
+        }
+
+        return filtered as T[];
       }
 
       return results;
