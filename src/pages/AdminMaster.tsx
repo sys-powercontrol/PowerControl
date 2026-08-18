@@ -1084,54 +1084,87 @@ if (currentUser?.role !== 'master') {
                   <th className="px-6 py-4 font-medium">Empresa</th>
                   <th className="px-6 py-4 font-medium">CNPJ</th>
                   <th className="px-6 py-4 font-medium">Cidade/UF</th>
+                  <th className="px-6 py-4 font-medium">Usuários Vinculados</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredCompanies.map((c: any) => (
-                  <tr key={c.id} className="text-sm hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                          {c.logo_url ? (
-                            <img src={c.logo_url} alt={c.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                {filteredCompanies.map((c: any) => {
+                  const linkedUsersList = users.filter((u: any) => {
+                    const uCompIds = Array.isArray(u.company_ids) && u.company_ids.length > 0
+                      ? u.company_ids
+                      : (u.company_id ? [u.company_id] : []);
+                    return uCompIds.includes(c.id);
+                  });
+
+                  return (
+                    <tr key={c.id} className="text-sm hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                            {c.logo_url ? (
+                              <img src={c.logo_url} alt={c.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <Building2 size={20} className="text-gray-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900">{c.name}</p>
+                            <p className="text-xs text-gray-500">{c.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 font-mono text-xs">
+                        {c.cnpj}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {c.city}/{c.state}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap items-center gap-1 max-w-xs">
+                          {linkedUsersList.length === 0 ? (
+                            <span className="text-xs text-gray-400 italic">Nenhum usuário vinculado</span>
                           ) : (
-                            <Building2 size={20} className="text-gray-400" />
+                            linkedUsersList.slice(0, 3).map((u: any) => (
+                              <span 
+                                key={u.id}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium"
+                                title={u.email}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                {u.full_name || u.email}
+                              </span>
+                            ))
+                          )}
+                          {linkedUsersList.length > 3 && (
+                            <span className="px-1.5 py-0.5 text-xs text-gray-500 bg-gray-100 rounded-md font-medium">
+                              +{linkedUsersList.length - 3} mais
+                            </span>
                           )}
                         </div>
-                        <div>
-                          <p className="font-bold text-gray-900">{c.name}</p>
-                          <p className="text-xs text-gray-500">{c.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600 font-mono text-xs">
-                      {c.cnpj}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {c.city}/{c.state}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${c.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {c.is_active ? "Ativa" : "Inativa"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => { 
-                          setEditingCompany(c); 
-                          setLogoBase64(c.logo_url || null); 
-                          setFetchedData({});
-                          setIsCompanyModalOpen(true); 
-                        }}
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${c.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {c.is_active ? "Ativa" : "Inativa"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => { 
+                            setEditingCompany(c); 
+                            setLogoBase64(c.logo_url || null); 
+                            setFetchedData({});
+                            setIsCompanyModalOpen(true); 
+                          }}
+                          className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

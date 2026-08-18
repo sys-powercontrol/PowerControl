@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { auth } from "../lib/firebase";
@@ -9,16 +10,18 @@ import {
   Phone, 
   Building2, 
   Copy, 
-  Camera,
-  LogOut,
-  ShieldCheck,
-  Shield,
-  Crown,
-  KeyRound,
-  X,
-  CheckCircle2,
-  ArrowRight,
-  Layers
+  Camera, 
+  LogOut, 
+  ShieldCheck, 
+  Shield, 
+  Crown, 
+  KeyRound, 
+  X, 
+  CheckCircle2, 
+  ArrowRight, 
+  Layers,
+  Users,
+  Plus
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
@@ -54,6 +57,28 @@ export default function Profile() {
 
   const currentSystemCompanyId = api.getCompanyId() || user?.company_id || (userCompanyIds.length > 0 ? userCompanyIds[0] : null);
   const activeCompany = linkedCompanies.find((c: any) => c.id === (activeTabCompanyId || currentSystemCompanyId)) || linkedCompanies[0] || {};
+
+  // Fetch all users linked to this active company
+  const { data: companyUsers = [], isLoading: isLoadingCompanyUsers } = useQuery({
+    queryKey: ["users", "company", activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany?.id) return [];
+      try {
+        const res = await api.get("users");
+        const list = Array.isArray(res) ? res : [];
+        return list.filter((u: any) => {
+          const uCompIds = Array.isArray(u.company_ids) && u.company_ids.length > 0
+            ? u.company_ids
+            : (u.company_id ? [u.company_id] : []);
+          return uCompIds.includes(activeCompany.id) || (u.role === 'master' && user?.role === 'master');
+        });
+      } catch (err) {
+        console.error("Erro ao buscar usuários vinculados:", err);
+        return [];
+      }
+    },
+    enabled: !!activeCompany?.id
+  });
 
   const handleSwitchActiveCompany = (companyId: string) => {
     api.setCompanyId(companyId);
@@ -427,14 +452,21 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Detailed Company Info of Current Active Company */}
-          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
+          {/* Detailed Company Info & Linked Users of Current Active Company */}
+          <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
               <div>
-                <h4 className="font-bold text-xl text-gray-900">Ficha Detalhada da Empresa Ativa</h4>
-                <p className="text-xs text-gray-500">Dados cadastrais, fiscais e endereço de {activeCompany.name}</p>
+                <h4 className="font-bold text-xl text-gray-900 flex items-center gap-2">
+                  <Building2 className="text-blue-600" size={24} />
+                  Ficha Detalhada da Empresa Ativa
+                </h4>
+                <p className="text-xs text-gray-500 mt-1">Dados cadastrais, fiscais e endereço de {activeCompany.name}</p>
               </div>
-              <Building2 className="text-blue-600" size={24} />
+              <span className={`self-start sm:self-auto px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                activeCompany.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+              }`}>
+                {activeCompany.is_active !== false ? "Empresa Ativa" : "Empresa Inativa"}
+              </span>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -512,6 +544,137 @@ export default function Profile() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* USERS LINKED TO THIS ACTIVE COMPANY */}
+            <div className="pt-6 border-t border-gray-100 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Users size={20} />
+                  </div>
+                  <div>
+                    <h5 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                      <span>Usuários Vinculados a Esta Empresa</span>
+                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 text-xs font-extrabold rounded-full">
+                        {companyUsers.length}
+                      </span>
+                    </h5>
+                    <p className="text-xs text-gray-500">Membros da equipe e administradores com acesso autorizado à {activeCompany.name || "esta empresa"}</p>
+                  </div>
+                </div>
+
+                {(user.role === 'master' || user.role === 'admin') && (
+                  <Link
+                    to="/Funcionarios"
+                    className="self-start sm:self-auto px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <Plus size={15} />
+                    <span>Gerenciar / Vincular Usuários</span>
+                  </Link>
+                )}
+              </div>
+
+              {isLoadingCompanyUsers ? (
+                <div className="p-8 text-center text-gray-400 text-xs flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <span>Carregando usuários vinculados...</span>
+                </div>
+              ) : companyUsers.length === 0 ? (
+                <div className="p-6 bg-gray-50 rounded-2xl text-center border border-dashed border-gray-200">
+                  <Users className="mx-auto text-gray-300 mb-2" size={32} />
+                  <p className="text-sm font-semibold text-gray-700">Nenhum outro usuário vinculado encontrado</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Você pode convidar ou vincular novos funcionários através da aba de Funcionários.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-2">
+                  {companyUsers.map((u: any) => {
+                    const isSelf = u.id === user?.id;
+                    const uRole = u.role || 'user';
+                    const uCompanyCount = Array.isArray(u.company_ids) && u.company_ids.length > 0
+                      ? u.company_ids.length
+                      : (u.company_id ? 1 : 0);
+
+                    return (
+                      <div 
+                        key={u.id}
+                        className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                          isSelf 
+                            ? "bg-indigo-50/40 border-indigo-200 shadow-sm ring-1 ring-indigo-500/20" 
+                            : "bg-white border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden shadow-sm">
+                                {u.avatar_url ? (
+                                  <img src={u.avatar_url} alt={u.full_name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span>{(u.full_name || u.email || "U").charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-bold text-gray-900 text-sm truncate" title={u.full_name || u.email}>
+                                    {u.full_name || "Usuário"}
+                                  </p>
+                                  {isSelf && (
+                                    <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 text-[9px] font-bold rounded">
+                                      Você
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 truncate" title={u.email}>
+                                  {u.email}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                              u.is_active !== false ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {u.is_active !== false ? "Ativo" : "Pendente"}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                              uRole === 'master' ? 'bg-red-50 text-red-700 border border-red-200' :
+                              uRole === 'admin' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                              'bg-blue-50 text-blue-700 border border-blue-200'
+                            }`}>
+                              {uRole === 'master' && <Crown size={12} />}
+                              {uRole === 'admin' && <ShieldCheck size={12} />}
+                              {uRole === 'user' && <Users size={12} />}
+                              {uRole === 'master' ? 'Admin Master' : uRole === 'admin' ? 'Administrador' : 'Colaborador'}
+                            </span>
+
+                            {uCompanyCount > 1 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700">
+                                <Layers size={11} /> {uCompanyCount} empresas
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-gray-100 text-[11px] text-gray-500 flex items-center justify-between">
+                          <span>Permissões:</span>
+                          <span className="font-semibold text-gray-700">
+                            {uRole === 'master' 
+                              ? 'Acesso Global Total' 
+                              : Array.isArray(u.permissions) && u.permissions.length > 0 
+                                ? `${u.permissions.length} módulos liberados` 
+                                : 'Padrão da Função'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -63,33 +63,42 @@ export default function Layout() {
     enabled: !!user
   });
 
+  const userCompanyIds = useMemo(() => {
+    if (!user) return [];
+    return Array.isArray(user.company_ids) && user.company_ids.length > 0
+      ? user.company_ids
+      : (user.company_id ? [user.company_id] : []);
+  }, [user]);
+
   const availableCompanies = useMemo(() => {
     if (!user) return [];
     if (user.role === 'master') return allCompanies;
-    if (!user.is_active) return [];
+    if (user.is_active === false) return [];
+    if (userCompanyIds.length === 0) return [];
 
-    const userCompanyIds = Array.isArray(user.company_ids) && user.company_ids.length > 0
-      ? user.company_ids
-      : (user.company_id ? [user.company_id] : []);
-
-    return allCompanies.filter((c: any) => 
+    const matched = allCompanies.filter((c: any) => 
       c.is_active !== false && userCompanyIds.includes(c.id)
     );
-  }, [user, allCompanies]);
+
+    if (matched.length > 0) return matched;
+    
+    // Fallback while queries are loading
+    return userCompanyIds.map(id => ({ id, name: "Minha Empresa", is_active: true }));
+  }, [user, allCompanies, userCompanyIds]);
 
   const effectiveCompanyId = useMemo(() => {
     if (!user) return null;
     if (user.role === 'master') {
       return selectedCompanyId;
     }
-    if (!user.is_active || availableCompanies.length === 0) {
+    if (user.is_active === false || availableCompanies.length === 0) {
       return null;
     }
     if (selectedCompanyId && availableCompanies.some((c: any) => c.id === selectedCompanyId)) {
       return selectedCompanyId;
     }
-    return availableCompanies[0]?.id || null;
-  }, [user, availableCompanies, selectedCompanyId]);
+    return availableCompanies[0]?.id || userCompanyIds[0] || null;
+  }, [user, availableCompanies, selectedCompanyId, userCompanyIds]);
 
   useEffect(() => {
     if (api.getCompanyId() !== effectiveCompanyId) {
@@ -99,8 +108,8 @@ export default function Layout() {
 
   const hasCompany = Boolean(
     user && 
-    user.is_active && 
-    (user.role === 'master' || (availableCompanies.length > 0 && effectiveCompanyId))
+    user.is_active !== false && 
+    (user.role === 'master' || userCompanyIds.length > 0 || (availableCompanies.length > 0 && effectiveCompanyId))
   );
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -332,8 +341,8 @@ export default function Layout() {
     return null;
   })();
 
-  // Redirect non-master users if pending approval or if they don't have a company
-  if (user && user.role !== 'master' && (!user.is_active || !hasCompany) && location.pathname !== "/MeuPerfil" && location.pathname !== "/Suporte") {
+  // Redirect non-master users if explicitly pending approval (is_active === false) or if they don't have any company assigned
+  if (user && user.role !== 'master' && (user.is_active === false || (!hasCompany && userCompanyIds.length === 0)) && location.pathname !== "/MeuPerfil" && location.pathname !== "/Suporte") {
     return <Navigate to="/MeuPerfil" replace />;
   }
 
