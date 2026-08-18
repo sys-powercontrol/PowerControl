@@ -371,8 +371,9 @@ if (!canManage) {
               <h2 className="text-xl font-bold">{editingEmployee ? "Editar Funcionário" : "Vincular Novo Funcionário"}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto overscroll-contain">
-              {!editingEmployee ? (
+            <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+              <div className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                {!editingEmployee ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3">
                     <Building2 className="text-blue-600 shrink-0" size={24} />
@@ -482,7 +483,9 @@ if (!canManage) {
                 </div>
               )}
               
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+              </div>
+              
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-100 bg-white shrink-0">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
                 <button 
                   type="submit" 
