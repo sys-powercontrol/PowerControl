@@ -78,15 +78,19 @@ export default function Profile() {
 
   const createCompanyMutation = useMutation({
     mutationFn: async (data: any) => {
-      const newCompany = await api.post("companies", data);
+      const newCompany = await api.post("companies", { ...data, is_active: true });
       const updatedCompanyIds = Array.from(new Set([...userCompanyIds, newCompany.id]));
       await api.put("users", user?.id, { 
         company_id: newCompany.id,
-        company_ids: updatedCompanyIds 
+        company_ids: updatedCompanyIds,
+        is_active: true,
+        role: user?.role === 'user' ? 'admin' : (user?.role || 'admin')
       });
+      api.setCompanyId(newCompany.id);
       return newCompany;
     },
-    onSuccess: () => {
+    onSuccess: (newCompany) => {
+      api.setCompanyId(newCompany.id);
       queryClient.invalidateQueries({ queryKey: ["me"] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       toast.success("Empresa criada e vinculada com sucesso!");

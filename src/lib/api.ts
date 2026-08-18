@@ -6,13 +6,7 @@ let currentCompanyId: string | null = null;
 let isSystemAdminStatus = false;
 let currentUserData: User | null = null;
 
-// Race condition protection: Deferred promise for company ID
-let companyResolver: ((id: string) => void) | null = null;
-const companyPromise = new Promise<string>((resolve) => {
-  companyResolver = resolve;
-});
-
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+let companyResolvers: Array<(id: string) => void> = [];
 
 const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
   if (!obj || typeof obj !== 'object') return obj;
@@ -26,6 +20,28 @@ const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
 };
 
 export const api = {
+  updateCurrentUserData: (userData: User | null) => {
+    currentUserData = userData;
+    if (userData) {
+      isSystemAdminStatus = userData.role === 'master';
+      const userCompanyIds = Array.isArray(userData.company_ids) && userData.company_ids.length > 0
+        ? userData.company_ids
+        : (userData.company_id ? [userData.company_id] : []);
+      
+      if (userData.role === 'master') {
+        // Master can keep current selection or null for global
+      } else if (userData.is_active && userCompanyIds.length > 0) {
+        if (!currentCompanyId || !userCompanyIds.includes(currentCompanyId)) {
+          api.setCompanyId(userCompanyIds[0]);
+        }
+      } else {
+        currentCompanyId = null;
+      }
+    } else {
+      currentCompanyId = null;
+      isSystemAdminStatus = false;
+    }
+  },
   setCompanyId: (id: string | null) => {
     if (id && currentUserData && currentUserData.role !== 'master') {
       const userCompanyIds = Array.isArray(currentUserData.company_ids) && currentUserData.company_ids.length > 0
@@ -35,24 +51,32 @@ export const api = {
       if (userCompanyIds.length > 0 && !userCompanyIds.includes(id)) {
         console.warn(`Tentativa de acesso não autorizado à empresa ${id}. Redirecionando para empresa padrão.`);
         currentCompanyId = userCompanyIds[0];
-        if (companyResolver) companyResolver(userCompanyIds[0]);
+        companyResolvers.forEach(resolve => resolve(userCompanyIds[0]));
+        companyResolvers = [];
         return;
       }
     }
     currentCompanyId = id;
-    if (id && companyResolver) {
-      companyResolver(id);
+    if (id) {
+      companyResolvers.forEach(resolve => resolve(id));
+      companyResolvers = [];
     }
   },
   getCompanyId: () => currentCompanyId,
   // Helper to wait for company ID with timeout
-  waitForCompany: async (timeout = 500): Promise<string | null> => {
+  waitForCompany: async (timeout = 800): Promise<string | null> => {
     if (currentCompanyId) return currentCompanyId;
     
-    return Promise.race([
-      companyPromise,
-      wait(timeout).then(() => null)
-    ]);
+    return new Promise<string | null>((resolve) => {
+      const timer = setTimeout(() => {
+        resolve(currentCompanyId);
+      }, timeout);
+
+      companyResolvers.push((id) => {
+        clearTimeout(timer);
+        resolve(id);
+      });
+    });
   },
   setIsSystemAdmin: (isMaster: boolean) => {
     isSystemAdminStatus = isMaster;
@@ -262,6 +286,9 @@ export const api = {
     const docRef = doc(db, entity, id);
     const payload = cleanObject(data) as Record<string, any>;
     await updateDoc(docRef, payload);
+    if (entity === "users" && currentUserData && (currentUserData.id === id || (currentUserData as any).uid === id)) {
+      api.updateCurrentUserData({ ...currentUserData, ...payload });
+    }
     return { id, ...payload } as T;
   },
   delete: async (entity: string, id: string): Promise<boolean> => {

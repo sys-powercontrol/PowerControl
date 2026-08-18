@@ -88,7 +88,7 @@ export default function Layout() {
     if (selectedCompanyId && availableCompanies.some((c: any) => c.id === selectedCompanyId)) {
       return selectedCompanyId;
     }
-    return availableCompanies[0].id;
+    return availableCompanies[0]?.id || null;
   }, [user, availableCompanies, selectedCompanyId]);
 
   useEffect(() => {
@@ -442,7 +442,7 @@ export default function Layout() {
                 Trocar Empresa ({availableCompanies.length})
               </label>
               <select 
-                value={selectedCompanyId || ""}
+                value={effectiveCompanyId || ""}
                 onChange={(e) => handleCompanyChange(e.target.value)}
                 className="w-full p-2 text-xs bg-blue-50/60 border border-blue-200 text-blue-900 font-semibold rounded-xl outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >

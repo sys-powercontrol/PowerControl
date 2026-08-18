@@ -9,7 +9,7 @@ import {
   signInWithPopup
 } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, onSnapshot, updateDoc } from "firebase/firestore";
 import { api } from "./api";
 
 import { PermissionId, DEFAULT_ROLE_PERMISSIONS } from "./permissions";
@@ -33,64 +33,75 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ExtendedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let unsubUserDoc: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (unsubUserDoc) {
+        unsubUserDoc();
+        unsubUserDoc = null;
+      }
+
       if (firebaseUser) {
         try {
-          // Fetch user data from backend
-          let userData = null;
-          try {
-            userData = await api.get("me");
-          } catch (error) {
-            console.error("Error fetching user data from backend:", error);
-            // Fallback user object if backend fails
-            userData = {
-              id: firebaseUser.uid,
-              email: firebaseUser.email,
-              full_name: firebaseUser.email?.split("@")[0] || "Usuário",
-              role: firebaseUser.email?.toLowerCase() === "sys.powercontrol@gmail.com" ? "master" : "user",
-              is_active: firebaseUser.email?.toLowerCase() === "sys.powercontrol@gmail.com",
-              company_id: null
-            };
-          }
-          
-          if (userData) {
-            const userCompanyIds = Array.isArray(userData.company_ids) && userData.company_ids.length > 0
-              ? userData.company_ids
-              : (userData.company_id ? [userData.company_id] : []);
+          const isMasterEmail = firebaseUser.email?.toLowerCase() === "sys.powercontrol@gmail.com";
+          const userRef = doc(db, "users", firebaseUser.uid);
 
-            if (userData.role === "master") {
-              if (userData.company_id) {
-                api.setCompanyId(userData.company_id);
+          unsubUserDoc = onSnapshot(userRef, async (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              const userData: ExtendedUser = { id: firebaseUser.uid, ...data } as ExtendedUser;
+              
+              if (isMasterEmail && (userData.role !== "master" || !userData.is_active)) {
+                await updateDoc(userRef, { role: "master", is_active: true });
+                userData.role = "master";
+                userData.is_active = true;
               }
-            } else if (userData.is_active && userCompanyIds.length > 0) {
-              const activeCompany = api.getCompanyId();
-              if (!activeCompany || !userCompanyIds.includes(activeCompany)) {
-                api.setCompanyId(userCompanyIds[0]);
-              }
+
+              api.updateCurrentUserData(userData);
+              setUser(userData);
+              setIsLoading(false);
             } else {
-              api.setCompanyId(null);
+              const newUser: ExtendedUser = {
+                id: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                full_name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Usuário",
+                role: isMasterEmail ? "master" : "user",
+                company_id: null,
+                company_ids: [],
+                created_at: serverTimestamp() as any,
+                is_active: isMasterEmail ? true : false,
+                avatar: firebaseUser.photoURL || null
+              };
+              await setDoc(userRef, newUser);
+              api.updateCurrentUserData(newUser);
+              setUser(newUser);
+              setIsLoading(false);
             }
-            api.setIsSystemAdmin(userData.role === "master");
-            setUser(userData);
-          }
-          setIsLoading(false);
+          }, (error) => {
+            console.error("Firestore onSnapshot error for user doc:", error);
+            setIsLoading(false);
+          });
         } catch (error) {
           console.error("Critical error in AuthProvider:", error);
           setIsLoading(false);
         }
       } else {
         setUser(null);
+        api.updateCurrentUserData(null);
         api.setCompanyId(null);
         api.setIsSystemAdmin(false);
         setIsLoading(false);
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (unsubUserDoc) unsubUserDoc();
+      unsubscribeAuth();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -207,12 +218,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return false;
     if (user.role === 'master') return true;
     
-    // Check user-specific permissions first
-    if ((user as ExtendedUser).permissions?.includes(permission)) return true;
+    // Check user-specific permissions first if explicitly set
+    if (Array.isArray((user as ExtendedUser).permissions) && (user as ExtendedUser).permissions!.length > 0) {
+      return (user as ExtendedUser).permissions!.includes(permission);
+    }
     
-    // Fallback to role-based defaults if no specific permissions are set
-    // In a real app, we'd fetch company.role_permissions here, but for now we use defaults
-    const rolePermissions = DEFAULT_ROLE_PERMISSIONS[user.role] || [];
+    // Fallback to role-based defaults
+    const rolePermissions = DEFAULT_ROLE_PERMISSIONS[user.role] || DEFAULT_ROLE_PERMISSIONS.user || [];
     return rolePermissions.includes(permission);
   };
 
