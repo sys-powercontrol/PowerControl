@@ -36,8 +36,11 @@ import {
   Link2,
   Eye,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
+import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, PermissionId } from "../lib/permissions";
 import { DEFAULT_FOOTER_CONFIG, FooterConfig, FooterLink } from "../types/footer";
 import { 
   ResponsiveContainer, 
@@ -83,11 +86,17 @@ export default function AdminMaster() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedUserCompanyIds, setSelectedUserCompanyIds] = useState<string[]>([]);
   const [userCompanySearchTerm, setUserCompanySearchTerm] = useState("");
+  const [selectedUserRole, setSelectedUserRole] = useState<string>("user");
+  const [selectedPermissions, setSelectedPermissions] = useState<PermissionId[]>([]);
+  const [showPermissionsSection, setShowPermissionsSection] = useState(false);
 
   const handleOpenNewUserModal = () => {
     setEditingUser(null);
     setSelectedUserCompanyIds([]);
     setUserCompanySearchTerm("");
+    setSelectedUserRole("user");
+    setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.user || []);
+    setShowPermissionsSection(false);
     setIsUserModalOpen(true);
   };
 
@@ -98,7 +107,37 @@ export default function AdminMaster() {
       : (u.company_id ? [u.company_id] : []);
     setSelectedUserCompanyIds(existingCompanyIds);
     setUserCompanySearchTerm("");
+    setSelectedUserRole(u.role || "user");
+    setSelectedPermissions(
+      Array.isArray(u.permissions) && u.permissions.length > 0
+        ? u.permissions
+        : (DEFAULT_ROLE_PERMISSIONS[u.role || 'user'] || DEFAULT_ROLE_PERMISSIONS.user || [])
+    );
+    setShowPermissionsSection(false);
     setIsUserModalOpen(true);
+  };
+
+  const handleRoleChange = (newRole: string) => {
+    setSelectedUserRole(newRole);
+    if (newRole === 'master' || newRole === 'admin') {
+      setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.admin || ALL_PERMISSIONS.map(p => p.id));
+    } else {
+      setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.user || []);
+    }
+  };
+
+  const togglePermission = (permId: PermissionId) => {
+    setSelectedPermissions(prev => 
+      prev.includes(permId) ? prev.filter(p => p !== permId) : [...prev, permId]
+    );
+  };
+
+  const selectAllPermissions = () => {
+    setSelectedPermissions(ALL_PERMISSIONS.map(p => p.id));
+  };
+
+  const clearAllPermissions = () => {
+    setSelectedPermissions([]);
   };
 
   const toggleUserCompany = (companyId: string) => {
@@ -516,6 +555,8 @@ export default function AdminMaster() {
     
     const userData: any = {
       ...data,
+      role: selectedUserRole,
+      permissions: selectedPermissions,
       company_ids: selectedUserCompanyIds,
       company_id: selectedUserCompanyIds.length > 0 ? selectedUserCompanyIds[0] : null,
       is_active: data.is_active === "on"
@@ -1904,17 +1945,122 @@ if (currentUser?.role !== 'master') {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">Role</label>
-                  <select name="role" defaultValue={editingUser?.role || "user"} className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="user">Usuário</option>
-                    <option value="admin">Administrador de Empresa</option>
-                    <option value="master">Administrador Master</option>
+                  <label className="text-sm font-bold text-gray-700">Nível de Acesso (Perfil / Role)</label>
+                  <select 
+                    name="role" 
+                    value={selectedUserRole} 
+                    onChange={(e) => handleRoleChange(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm bg-white"
+                  >
+                    <option value="user">Usuário Padrão (Colaborador / Operador)</option>
+                    <option value="admin">Administrador de Empresa (Acesso Total à Empresa)</option>
+                    <option value="master">Administrador Master (Acesso Global ao Sistema)</option>
                   </select>
+                  <p className="text-xs text-gray-500">
+                    {selectedUserRole === 'master' && "⚡ Master tem acesso irrestrito a todas as empresas e ferramentas globais do sistema."}
+                    {selectedUserRole === 'admin' && "🛡️ Administrador gerencia todos os módulos das empresas autorizadas."}
+                    {selectedUserRole === 'user' && "👤 Usuário opera apenas os módulos e telas autorizadas abaixo."}
+                  </p>
                 </div>
-                <div className="flex items-center gap-6 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
+
+                {/* RBAC Granular Permissions Section */}
+                <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck size={16} className="text-blue-600" />
+                        <h4 className="text-sm font-bold text-gray-800">Permissões de Acesso (RBAC)</h4>
+                        <span className="px-2 py-0.5 text-xs font-extrabold rounded-full bg-blue-100 text-blue-800">
+                          {selectedPermissions.length}/{ALL_PERMISSIONS.length} ativas
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Defina exatamente quais telas e ações o usuário poderá visualizar e executar.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPermissionsSection(!showPermissionsSection)}
+                      className="p-1.5 hover:bg-gray-200/70 rounded-lg transition-colors text-gray-600 cursor-pointer"
+                      title={showPermissionsSection ? "Recolher permissões" : "Expandir permissões"}
+                    >
+                      {showPermissionsSection ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </button>
+                  </div>
+
+                  {showPermissionsSection && (
+                    <div className="space-y-4 pt-2 border-t border-gray-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={selectAllPermissions}
+                            className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-blue-100/60 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Marcar Todas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={clearAllPermissions}
+                            className="px-2.5 py-1 text-[11px] font-bold text-gray-600 bg-gray-200/70 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Desmarcar Todas
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.admin)}
+                            className="px-2 py-1 text-[10px] font-bold text-purple-700 bg-purple-100/60 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Preset Admin
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPermissions(DEFAULT_ROLE_PERMISSIONS.user)}
+                            className="px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/60 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Preset Padrão
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Categories */}
+                      {Array.from(new Set(ALL_PERMISSIONS.map(p => p.category))).map(category => (
+                        <div key={category} className="space-y-1.5 bg-white p-3 rounded-xl border border-gray-200">
+                          <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wider">{category}</h5>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {ALL_PERMISSIONS.filter(p => p.category === category).map(permission => {
+                              const isChecked = selectedPermissions.includes(permission.id);
+                              return (
+                                <label 
+                                  key={permission.id}
+                                  className={`flex items-center gap-2 p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                    isChecked ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-gray-50 text-gray-700"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => togglePermission(permission.id)}
+                                    className="w-3.5 h-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>{permission.name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-6 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input type="checkbox" name="is_active" defaultChecked={editingUser?.is_active ?? true} className="w-4 h-4 text-blue-600 rounded" />
-                    <span className="text-sm font-bold text-gray-700">Ativo</span>
+                    <span className="text-sm font-bold text-gray-700">Conta Ativa e Liberada para Acesso</span>
                   </label>
                 </div>
               </div>

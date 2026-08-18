@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -15,7 +15,10 @@ import {
   Shield,
   Crown,
   KeyRound,
-  X
+  X,
+  CheckCircle2,
+  ArrowRight,
+  Layers
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
@@ -23,11 +26,41 @@ import { InputMask } from "../components/ui/InputMask";
 export default function Profile() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
-  const { data: company = {} } = useQuery({ 
-    queryKey: ["company", user?.company_id], 
-    queryFn: () => user?.company_id ? api.get("companies", user.company_id) : Promise.resolve({}),
-    enabled: !!user?.company_id
+
+  const [activeTabCompanyId, setActiveTabCompanyId] = useState<string | null>(null);
+
+  // Fetch all companies to resolve all linked company documents
+  const { data: allCompaniesList = [] } = useQuery({
+    queryKey: ["companies", "all"],
+    queryFn: () => api.get("companies", { _all: true }),
+    enabled: !!user
   });
+
+  const userCompanyIds: string[] = React.useMemo(() => {
+    if (!user) return [];
+    if (Array.isArray(user.company_ids) && user.company_ids.length > 0) {
+      return user.company_ids;
+    }
+    return user.company_id ? [user.company_id] : [];
+  }, [user]);
+
+  const linkedCompanies = React.useMemo(() => {
+    if (!user) return [];
+    if (user.role === 'master') {
+      return allCompaniesList;
+    }
+    return allCompaniesList.filter((c: any) => userCompanyIds.includes(c.id));
+  }, [user, allCompaniesList, userCompanyIds]);
+
+  const currentSystemCompanyId = api.getCompanyId() || user?.company_id || (userCompanyIds.length > 0 ? userCompanyIds[0] : null);
+  const activeCompany = linkedCompanies.find((c: any) => c.id === (activeTabCompanyId || currentSystemCompanyId)) || linkedCompanies[0] || {};
+
+  const handleSwitchActiveCompany = (companyId: string) => {
+    api.setCompanyId(companyId);
+    setActiveTabCompanyId(companyId);
+    queryClient.invalidateQueries();
+    toast.success("Empresa ativa alterada com sucesso!");
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showReauthModal, setShowReauthModal] = React.useState(false);
@@ -46,7 +79,11 @@ export default function Profile() {
   const createCompanyMutation = useMutation({
     mutationFn: async (data: any) => {
       const newCompany = await api.post("companies", data);
-      await api.put("users", user?.id, { company_id: newCompany.id });
+      const updatedCompanyIds = Array.from(new Set([...userCompanyIds, newCompany.id]));
+      await api.put("users", user?.id, { 
+        company_id: newCompany.id,
+        company_ids: updatedCompanyIds 
+      });
       return newCompany;
     },
     onSuccess: () => {
@@ -167,6 +204,7 @@ export default function Profile() {
   if (!user) return null;
 
   const isPendingUser = !user.is_active && user.role !== 'master';
+  const hasLinkedCompanies = linkedCompanies.length > 0;
 
   return (
     <div className="space-y-8">
@@ -194,45 +232,204 @@ export default function Profile() {
       )}
 
       {/* Company Section */}
-      {user.company_id ? (
+      {hasLinkedCompanies ? (
         <div className="space-y-6">
-          <div className="bg-blue-600 p-8 rounded-3xl text-white shadow-xl shadow-blue-100 relative overflow-hidden">
-            <div className="absolute right-0 top-0 opacity-10 translate-x-1/4 -translate-y-1/4">
-              <Building2 size={240} />
+          {/* Hero Banner for Active Company & Multi-Company Overview */}
+          <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 p-8 rounded-3xl text-white shadow-xl shadow-blue-100 relative overflow-hidden">
+            <div className="absolute right-0 top-0 opacity-10 translate-x-1/4 -translate-y-1/4 pointer-events-none">
+              <Building2 size={260} />
             </div>
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <Building2 size={24} />
+            
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-4 max-w-2xl">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
+                    <Building2 size={22} className="text-white" />
                   </div>
-                  <h2 className="text-xl font-bold">Empresa Vinculada</h2>
+                  <h2 className="text-lg font-bold tracking-tight">Empresa Ativa no Sistema</h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    Sessão Conectada
+                  </span>
+                  {user.role === 'master' && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-amber-400/20 text-amber-200 border border-amber-400/30 flex items-center gap-1">
+                      <Crown size={12} />
+                      Admin Master (Global)
+                    </span>
+                  )}
                 </div>
+
                 <div>
-                  <p className="text-3xl font-bold">{company.name || "Nenhuma empresa vinculada"}</p>
-                  <p className="opacity-80">{company.cnpj || "CNPJ não informado"}</p>
+                  <p className="text-3xl font-extrabold tracking-tight">{activeCompany.name || "Nenhuma empresa vinculada"}</p>
+                  <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-blue-100">
+                    <span className="font-mono bg-white/10 px-2.5 py-0.5 rounded-lg text-xs font-semibold">
+                      CNPJ: {activeCompany.cnpj || "Não informado"}
+                    </span>
+                    {activeCompany.city && (
+                      <span>• {activeCompany.city}{activeCompany.state ? `/${activeCompany.state}` : ""}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-4 text-sm opacity-90">
-                  <span className="flex items-center gap-1"><Mail size={14} /> {company.email || "contato@empresa.com"}</span>
-                  <span className="flex items-center gap-1"><Phone size={14} /> {company.phone || "(00) 0000-0000"}</span>
+
+                <div className="flex flex-wrap gap-4 text-xs text-blue-100/90 pt-1">
+                  <span className="flex items-center gap-1.5"><Mail size={13} /> {activeCompany.email || "contato@empresa.com"}</span>
+                  <span className="flex items-center gap-1.5"><Phone size={13} /> {activeCompany.phone || "(00) 0000-0000"}</span>
                 </div>
               </div>
-              <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/20">
-                <p className="text-xs font-bold uppercase opacity-60 mb-2">ID da Empresa</p>
-                <div className="flex items-center gap-3">
-                  <code className="font-mono text-sm">{company.id || "---"}</code>
-                  <button onClick={() => copyToClipboard(company.id)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
-                    <Copy size={16} />
-                  </button>
+
+              <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-3 shrink-0">
+                <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/20 w-full sm:w-auto">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200 mb-1.5 flex items-center justify-between gap-4">
+                    <span>ID da Empresa Ativa</span>
+                    <span className="text-[9px] font-normal text-blue-200">Clique p/ copiar</span>
+                  </p>
+                  <div className="flex items-center gap-3 justify-between">
+                    <code className="font-mono text-xs text-white select-all">{activeCompany.id || "---"}</code>
+                    <button 
+                      onClick={() => copyToClipboard(activeCompany.id)} 
+                      className="p-1.5 bg-white/10 hover:bg-white/25 rounded-lg transition-colors cursor-pointer"
+                      title="Copiar ID"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
                 </div>
+
+                {linkedCompanies.length > 1 && (
+                  <div className="px-3.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md text-xs font-semibold text-white flex items-center gap-2 border border-white/20">
+                    <Layers size={14} />
+                    <span>{linkedCompanies.length} empresas disponíveis para sua conta</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Detailed Company Info */}
+          {/* ALL LINKED COMPANIES DISPLAY & QUICK SWITCHER */}
+          <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-100">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <Building2 size={20} />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Todas as Empresas Vinculadas ao Usuário
+                  </h3>
+                  <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 text-xs font-extrabold rounded-full">
+                    {linkedCompanies.length}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 ml-10">
+                  Lista completa de organizações às quais você possui permissão e credenciais de acesso.
+                </p>
+              </div>
+
+              {user.role === 'master' && (
+                <span className="self-start sm:self-auto px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                  <Crown size={14} /> Modo Master: Acesso Ilimitado a Todas as Empresas
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {linkedCompanies.map((c: any, index: number) => {
+                const isCurrentActive = c.id === (activeCompany.id || currentSystemCompanyId);
+                const isPrimary = index === 0 || c.id === user.company_id;
+                
+                return (
+                  <div 
+                    key={c.id}
+                    className={`p-5 rounded-2xl border transition-all flex flex-col justify-between gap-4 ${
+                      isCurrentActive 
+                        ? "bg-blue-50/50 border-blue-300 shadow-md ring-2 ring-blue-500/20" 
+                        : "bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden ${
+                            isCurrentActive ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 border border-gray-200"
+                          }`}>
+                            {c.logo_url ? (
+                              <img src={c.logo_url} alt={c.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <Building2 size={22} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-gray-900 text-sm truncate" title={c.name}>
+                                {c.name}
+                              </h4>
+                              {isPrimary && (
+                                <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 text-[9px] font-bold rounded">
+                                  Principal
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 font-mono">
+                              {c.cnpj ? `CNPJ: ${c.cnpj}` : "CNPJ não informado"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                          c.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                        }`}>
+                          {c.is_active !== false ? "Ativa" : "Inativa"}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-xs text-gray-600 bg-gray-50/80 p-3 rounded-xl border border-gray-100">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-400">Cidade / UF:</span>
+                          <span className="font-semibold text-gray-800 truncate">{c.city || "---"}{c.state ? `/${c.state}` : ""}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-400">Contato:</span>
+                          <span className="font-medium text-gray-700 truncate">{c.phone || c.email || "---"}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-200/60 text-[11px]">
+                          <span className="text-gray-400">Nível de Acesso:</span>
+                          <span className="font-bold text-blue-700">
+                            {user.role === 'master' ? 'Admin Master' : user.role === 'admin' ? 'Administrador' : 'Colaborador'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      {isCurrentActive ? (
+                        <div className="w-full py-2.5 px-3 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm shadow-blue-200">
+                          <CheckCircle2 size={15} />
+                          <span>Empresa em Uso</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchActiveCompany(c.id)}
+                          className="w-full py-2.5 px-3 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                        >
+                          <ArrowRight size={14} />
+                          <span>Alternar para Esta</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Detailed Company Info of Current Active Company */}
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-6">
-              <h4 className="font-bold text-xl text-gray-900">Dados da Empresa</h4>
+              <div>
+                <h4 className="font-bold text-xl text-gray-900">Ficha Detalhada da Empresa Ativa</h4>
+                <p className="text-xs text-gray-500">Dados cadastrais, fiscais e endereço de {activeCompany.name}</p>
+              </div>
               <Building2 className="text-blue-600" size={24} />
             </div>
             
@@ -241,20 +438,20 @@ export default function Profile() {
                 <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Identificação</h5>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-gray-400">Nome Fantasia</p>
-                    <p className="font-bold text-gray-900">{company.name}</p>
+                    <p className="text-xs text-gray-400">Nome Fantasia / Razão</p>
+                    <p className="font-bold text-gray-900">{activeCompany.name || "---"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">CNPJ</p>
-                    <p className="font-bold text-gray-900">{company.cnpj || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.cnpj || "---"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Inscrição Estadual (IE)</p>
-                    <p className="font-bold text-gray-900">{company.ie || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.ie || "---"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Inscrição Municipal (IM)</p>
-                    <p className="font-bold text-gray-900">{company.im || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.im || "---"}</p>
                   </div>
                 </div>
               </div>
@@ -265,22 +462,22 @@ export default function Profile() {
                   <div>
                     <p className="text-xs text-gray-400">Regime Tributário</p>
                     <p className="font-bold text-gray-900">
-                      {company.regime_tributario === "1" ? "Simples Nacional" : 
-                       company.regime_tributario === "2" ? "Simples Nacional - excesso de sublimite" : 
-                       company.regime_tributario === "3" ? "Regime Normal" : "---"}
+                      {activeCompany.regime_tributario === "1" ? "Simples Nacional" : 
+                       activeCompany.regime_tributario === "2" ? "Simples Nacional - excesso de sublimite" : 
+                       activeCompany.regime_tributario === "3" ? "Regime Normal" : "---"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">CNAE / CRT</p>
-                    <p className="font-bold text-gray-900">{company.cnae || "---"} / {company.crt || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.cnae || "---"} / {activeCompany.crt || "---"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">E-mail de Contato</p>
-                    <p className="font-bold text-gray-900">{company.email || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.email || "---"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Telefone</p>
-                    <p className="font-bold text-gray-900">{company.phone || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.phone || "---"}</p>
                   </div>
                 </div>
               </div>
@@ -291,22 +488,22 @@ export default function Profile() {
                   <div>
                     <p className="text-xs text-gray-400">Endereço</p>
                     <p className="font-bold text-gray-900">
-                      {company.address}{company.address_number ? `, ${company.address_number}` : ""}
+                      {activeCompany.address ? `${activeCompany.address}${activeCompany.address_number ? `, ${activeCompany.address_number}` : ""}` : "---"}
                     </p>
-                    {company.complement && <p className="text-xs text-gray-500">{company.complement}</p>}
+                    {activeCompany.complement && <p className="text-xs text-gray-500">{activeCompany.complement}</p>}
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Bairro / CEP</p>
-                    <p className="font-bold text-gray-900">{company.neighborhood || "---"} / {company.zip_code || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.neighborhood || "---"} / {activeCompany.zip_code || "---"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Cidade / UF</p>
-                    <p className="font-bold text-gray-900">{company.city || "---"} / {company.state || "---"}</p>
+                    <p className="font-bold text-gray-900">{activeCompany.city || "---"} / {activeCompany.state || "---"}</p>
                   </div>
-                  {company.pix_key && (
+                  {activeCompany.pix_key && (
                     <div>
                       <p className="text-xs text-gray-400">Chave PIX</p>
-                      <p className="font-bold text-blue-600">{company.pix_key}</p>
+                      <p className="font-bold text-blue-600">{activeCompany.pix_key}</p>
                     </div>
                   )}
                 </div>
@@ -322,14 +519,14 @@ export default function Profile() {
                 <Building2 size={40} />
               </div>
               <div className="max-w-md mx-auto">
-                <h2 className="text-xl font-bold text-gray-900">Você ainda não tem uma empresa</h2>
-                <p className="text-gray-500 mt-2">Para começar a usar o sistema, você precisa criar uma empresa ou ser convidado por uma existente.</p>
+                <h2 className="text-xl font-bold text-gray-900">Você ainda não tem uma empresa vinculada</h2>
+                <p className="text-gray-500 mt-2">Para começar a usar o sistema, você pode cadastrar sua empresa abaixo ou ser vinculado pelo Administrador Master.</p>
               </div>
               
               <form onSubmit={handleCreateCompany} className="max-w-md mx-auto grid grid-cols-1 gap-4 text-left">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">Nome da Empresa</label>
-                  <input name="name" required placeholder="Ex: Minha Loja LTDA" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input name="name" required placeholder="Ex: Minha Empresa LTDA" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">CNPJ (Opcional)</label>
@@ -342,7 +539,7 @@ export default function Profile() {
                 <button 
                   type="submit" 
                   disabled={createCompanyMutation.isPending}
-                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 disabled:opacity-50"
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 disabled:opacity-50 cursor-pointer"
                 >
                   {createCompanyMutation.isPending ? "Criando..." : "Criar Minha Empresa"}
                 </button>
@@ -357,8 +554,8 @@ export default function Profile() {
                 <h2 className="text-xl font-bold text-gray-900">Acesso Restrito</h2>
                 <p className="text-gray-500 mt-2">
                   Você ainda não está vinculado a nenhuma empresa. 
-                  Apenas o Administrador Master pode criar novas empresas. 
-                  Por favor, solicite um convite ao seu administrador.
+                  Apenas o Administrador Master pode criar e vincular novas empresas. 
+                  Por favor, solicite a vinculação ao seu administrador.
                 </p>
               </div>
             </>
