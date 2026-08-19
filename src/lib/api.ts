@@ -25,6 +25,7 @@ const getCacheKey = (path: string, params?: any) => `api_cache_${path}_${JSON.st
 const memoryCache = new Map<string, { data: any; timestamp: number }>();
 const inFlightRequests = new Map<string, Promise<any>>();
 const CACHE_TTL = 3 * 60 * 1000; // 3 minutes memory cache
+const LOCAL_CACHE_TTL = 10 * 60 * 1000; // 10 minutes localStorage cache
 
 const getFromLocalCache = <T>(key: string): T | null => {
   const mem = memoryCache.get(key);
@@ -35,8 +36,18 @@ const getFromLocalCache = <T>(key: string): T | null => {
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
-      memoryCache.set(key, { data: parsed, timestamp: Date.now() });
-      return parsed as T;
+      if (parsed && typeof parsed === 'object' && 'timestamp' in parsed && 'data' in parsed) {
+        if (Date.now() - parsed.timestamp < LOCAL_CACHE_TTL) {
+          memoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp });
+          return parsed.data as T;
+        } else {
+          localStorage.removeItem(key);
+        }
+      } else {
+        // Legacy unwrapped data
+        memoryCache.set(key, { data: parsed, timestamp: Date.now() });
+        return parsed as T;
+      }
     }
   } catch {
     // ignore
@@ -45,19 +56,32 @@ const getFromLocalCache = <T>(key: string): T | null => {
 };
 
 const saveToLocalCache = (key: string, data: any) => {
-  memoryCache.set(key, { data, timestamp: Date.now() });
+  const now = Date.now();
+  memoryCache.set(key, { data, timestamp: now });
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    localStorage.setItem(key, JSON.stringify({ data, timestamp: now }));
   } catch (e) {
     console.warn("Could not save to localStorage cache:", e);
   }
 };
 
-const invalidateMemoryCache = (entity: string) => {
-  for (const key of memoryCache.keys()) {
+const invalidateCache = (entity: string) => {
+  for (const key of Array.from(memoryCache.keys())) {
     if (key.includes(`api_cache_${entity}`)) {
       memoryCache.delete(key);
     }
+  }
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.includes(`api_cache_${entity}`)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn("Could not clear localStorage cache:", e);
   }
 };
 
@@ -453,7 +477,7 @@ export const api = {
     }
 
     // Invalidate local cache for entity
-    invalidateMemoryCache(entity);
+    invalidateCache(entity);
     try {
       const listCacheKey = getCacheKey(entity, undefined);
       const cachedList = getFromLocalCache<any[]>(listCacheKey) || [];
@@ -471,7 +495,7 @@ export const api = {
 
     try {
       const docRef = doc(db, entity, id);
-      await updateDoc(docRef, payload);
+      await setDoc(docRef, payload, { merge: true });
     } catch (e: any) {
       console.warn(`Firestore put to ${entity}/${id} error (fallback to local state):`, e?.message || e);
     }
@@ -481,7 +505,7 @@ export const api = {
     }
 
     // Invalidate and update local cache for entity
-    invalidateMemoryCache(entity);
+    invalidateCache(entity);
     try {
       const listCacheKey = getCacheKey(entity, undefined);
       const cachedList = getFromLocalCache<any[]>(listCacheKey) || [];
@@ -502,7 +526,7 @@ export const api = {
     }
 
     // Update local cache
-    invalidateMemoryCache(entity);
+    invalidateCache(entity);
     try {
       const listCacheKey = getCacheKey(entity, undefined);
       const cachedList = getFromLocalCache<any[]>(listCacheKey) || [];
