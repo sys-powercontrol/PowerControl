@@ -9,7 +9,7 @@ import {
   signInWithPopup
 } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { doc, setDoc, getDoc, serverTimestamp, onSnapshot, updateDoc, collection, query, where, getDocs, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, updateDoc, collection, query, where, getDocs, deleteDoc } from "firebase/firestore";
 import { api } from "./api";
 
 import { PermissionId, DEFAULT_ROLE_PERMISSIONS } from "./permissions";
@@ -46,27 +46,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (firebaseUser) {
+        const userEmail = (firebaseUser.email || "").toLowerCase();
+        const isMasterEmail = userEmail === "sys.powercontrol@gmail.com";
+        const cacheKey = `user_profile_${firebaseUser.uid}`;
+
+        // Helper to apply user data and save cache
+        const applyUserData = (userData: ExtendedUser) => {
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(userData));
+          } catch (e) {
+            console.warn("Could not save user profile to localStorage:", e);
+          }
+          api.updateCurrentUserData(userData);
+          setUser(userData);
+          setIsLoading(false);
+        };
+
+        // Load cached user profile if exists to ensure immediate render
+        const cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          try {
+            const parsed = JSON.parse(cachedRaw);
+            if (isMasterEmail) {
+              parsed.role = "master";
+              parsed.is_active = true;
+              parsed.permissions = DEFAULT_ROLE_PERMISSIONS.master;
+            }
+            applyUserData(parsed);
+          } catch (e) {
+            console.warn("Failed to parse cached user:", e);
+          }
+        }
+
         try {
-          const userEmail = (firebaseUser.email || "").toLowerCase();
-          const isMasterEmail = userEmail === "sys.powercontrol@gmail.com";
           const userRef = doc(db, "users", firebaseUser.uid);
 
-          unsubUserDoc = onSnapshot(userRef, async (docSnap) => {
+          // First try a single getDoc to minimize onSnapshot quota consumption
+          try {
+            const docSnap = await getDoc(userRef);
             if (docSnap.exists()) {
               const data = docSnap.data();
               const userData: ExtendedUser = { id: firebaseUser.uid, ...data } as ExtendedUser;
               
               if (isMasterEmail && (userData.role !== "master" || !userData.is_active)) {
-                await updateDoc(userRef, { role: "master", is_active: true });
+                try {
+                  await updateDoc(userRef, { role: "master", is_active: true });
+                } catch (e) {
+                  console.warn("Could not update master doc:", e);
+                }
                 userData.role = "master";
                 userData.is_active = true;
+                userData.permissions = DEFAULT_ROLE_PERMISSIONS.master;
               }
 
-              api.updateCurrentUserData(userData);
-              setUser(userData);
-              setIsLoading(false);
+              applyUserData(userData);
+              return;
             } else {
-              // Check if user document was previously created with another ID by matching email
+              // Check legacy documents
               let legacyData: any = null;
               let legacyDocId: string | null = null;
 
@@ -94,9 +130,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 avatar: legacyData?.avatar || firebaseUser.photoURL || null
               };
 
-              await setDoc(userRef, newUser);
+              try {
+                await setDoc(userRef, newUser);
+              } catch (e) {
+                console.warn("Could not set user document (quota or offline):", e);
+              }
 
-              // Clean up legacy auto-generated document if different
               if (legacyDocId && legacyDocId !== firebaseUser.uid) {
                 try {
                   await deleteDoc(doc(db, "users", legacyDocId));
@@ -105,17 +144,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
               }
 
-              api.updateCurrentUserData(newUser);
-              setUser(newUser);
-              setIsLoading(false);
+              applyUserData(newUser);
+              return;
             }
-          }, (error) => {
-            console.error("Firestore onSnapshot error for user doc:", error);
-            setIsLoading(false);
-          });
+          } catch (fetchErr: any) {
+            console.warn("Firestore getDoc error (falling back to local profile):", fetchErr?.message || fetchErr);
+            
+            // Build resilient user fallback
+            const fallbackUser: ExtendedUser = {
+              id: firebaseUser.uid,
+              email: userEmail,
+              full_name: firebaseUser.displayName || userEmail.split("@")[0] || "Usuário",
+              role: isMasterEmail ? "master" : "admin",
+              company_id: null,
+              company_ids: [],
+              permissions: isMasterEmail ? DEFAULT_ROLE_PERMISSIONS.master : DEFAULT_ROLE_PERMISSIONS.admin,
+              created_at: new Date().toISOString() as any,
+              is_active: true,
+              avatar: firebaseUser.photoURL || null
+            };
+
+            applyUserData(fallbackUser);
+          }
         } catch (error) {
           console.error("Critical error in AuthProvider:", error);
-          setIsLoading(false);
+          const fallbackUser: ExtendedUser = {
+            id: firebaseUser.uid,
+            email: userEmail,
+            full_name: firebaseUser.displayName || userEmail.split("@")[0] || "Usuário",
+            role: isMasterEmail ? "master" : "admin",
+            company_id: null,
+            company_ids: [],
+            permissions: isMasterEmail ? DEFAULT_ROLE_PERMISSIONS.master : DEFAULT_ROLE_PERMISSIONS.admin,
+            created_at: new Date().toISOString() as any,
+            is_active: true,
+            avatar: firebaseUser.photoURL || null
+          };
+          applyUserData(fallbackUser);
         }
       } else {
         setUser(null);

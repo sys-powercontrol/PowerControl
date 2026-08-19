@@ -1,6 +1,6 @@
 import { initializeApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeFirestore, Firestore, persistentLocalCache, persistentMultipleTabManager, getFirestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 import firebaseConfig from "../../firebase-applet-config.json";
 
@@ -18,7 +18,18 @@ try {
 
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    }, firebaseConfig.firestoreDatabaseId);
+  } catch (cacheErr) {
+    console.warn("Falling back to standard getFirestore:", cacheErr);
+    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  }
+
   storage = getStorage(app);
 } catch (error) {
   console.error("CRITICAL ERROR: Failed to initialize Firebase.", error);
@@ -26,3 +37,4 @@ try {
 }
 
 export { app, auth, db, storage };
+

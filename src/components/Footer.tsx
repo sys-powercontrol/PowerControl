@@ -39,10 +39,22 @@ export default function Footer() {
         const docRef = doc(db, "system_settings", "footer");
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          return { ...DEFAULT_FOOTER_CONFIG, ...docSnap.data() } as FooterConfig;
+          const data = { ...DEFAULT_FOOTER_CONFIG, ...docSnap.data() } as FooterConfig;
+          try {
+            localStorage.setItem("system_settings_footer", JSON.stringify(data));
+          } catch {
+            // ignore
+          }
+          return data;
         }
       } catch (err) {
-        console.error("Erro ao carregar configurações do rodapé:", err);
+        console.warn("Notice loading footer config (using fallback):", err);
+      }
+      try {
+        const cached = localStorage.getItem("system_settings_footer");
+        if (cached) return JSON.parse(cached);
+      } catch {
+        // ignore
       }
       return DEFAULT_FOOTER_CONFIG;
     },

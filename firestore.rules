@@ -80,15 +80,38 @@ service cloud.firestore {
         isOwner(userId) || 
         isMaster() || 
         (resource.data.get('email', '') == request.auth.token.email) ||
-        (isAdmin() && (resource.data.get('company_id', '') == getUserCompanyId() || getUserCompanyId() == ''))
+        (hasPermission('employees.view') && (
+          resource.data.get('company_id', '') == getUserCompanyId() || 
+          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
+          getUserCompanyId() == ''
+        )) ||
+        (isAdmin() && (
+          resource.data.get('company_id', '') == getUserCompanyId() || 
+          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
+          getUserCompanyId() == ''
+        ))
       );
-      allow create: if isAuthenticated() && (isOwner(userId) || isMaster() || isAdmin());
+      allow create: if isAuthenticated() && (isOwner(userId) || isMaster() || isAdmin() || hasPermission('employees.manage'));
       allow update: if isAuthenticated() && (
         isOwner(userId) || 
         isMaster() || 
-        (isAdmin() && (resource.data.get('company_id', '') == getUserCompanyId() || getUserCompanyId() == ''))
+        (isAdmin() && (
+          resource.data.get('company_id', '') == getUserCompanyId() || 
+          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
+          getUserCompanyId() == ''
+        )) ||
+        (hasPermission('employees.manage') && (
+          resource.data.get('company_id', '') == getUserCompanyId() || 
+          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
+          getUserCompanyId() == ''
+        ))
       );
-      allow delete: if isAuthenticated() && (isMaster() || isOwner(userId));
+      allow delete: if isAuthenticated() && (isMaster() || isAdmin() || hasPermission('employees.manage') || isOwner(userId));
+    }
+
+    match /employees/{id} {
+      allow read: if isAuthenticated() && (isMaster() || belongsToCompany(resource.data.get('company_id', '')));
+      allow create, update, delete: if isAuthenticated() && (isMaster() || (belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('employees.manage')));
     }
 
     match /companies/{companyId} {

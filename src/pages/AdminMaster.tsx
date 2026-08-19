@@ -189,10 +189,22 @@ export default function AdminMaster() {
         const docRef = doc(db, "api_configurations", "global");
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          return docSnap.data();
+          const data = docSnap.data();
+          try {
+            localStorage.setItem("api_configurations_global", JSON.stringify(data));
+          } catch {
+            // ignore
+          }
+          return data;
         }
       } catch (err) {
-        console.error("Error loading global api configs:", err);
+        console.warn("Notice loading global api configs (using fallback):", err);
+      }
+      try {
+        const cached = localStorage.getItem("api_configurations_global");
+        if (cached) return JSON.parse(cached);
+      } catch {
+        // ignore
       }
       return {
         sefaz_production: "",
@@ -251,10 +263,22 @@ export default function AdminMaster() {
         const docRef = doc(db, "system_settings", "footer");
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          return { ...DEFAULT_FOOTER_CONFIG, ...docSnap.data() } as FooterConfig;
+          const data = { ...DEFAULT_FOOTER_CONFIG, ...docSnap.data() } as FooterConfig;
+          try {
+            localStorage.setItem("system_settings_footer", JSON.stringify(data));
+          } catch {
+            // ignore
+          }
+          return data;
         }
       } catch (err) {
-        console.error("Erro ao carregar configurações de rodapé:", err);
+        console.warn("Notice loading footer settings (using fallback):", err);
+      }
+      try {
+        const cached = localStorage.getItem("system_settings_footer");
+        if (cached) return JSON.parse(cached);
+      } catch {
+        // ignore
       }
       return DEFAULT_FOOTER_CONFIG;
     },
@@ -386,17 +410,39 @@ export default function AdminMaster() {
     }
   };
 
-  const filteredUsers = users.filter((u: any) => {
-    const search = searchTerm.toLowerCase();
-    const name = (u.full_name || u.name || "").toLowerCase();
-    const email = (u.email || "").toLowerCase();
-    return name.includes(search) || email.includes(search);
-  });
+  const getTimestamp = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (val && typeof val.toMillis === 'function') return val.toMillis();
+    if (val && typeof val.seconds === 'number') return val.seconds * 1000 + (val.nanoseconds || 0) / 1e6;
+    if (val && typeof val._seconds === 'number') return val._seconds * 1000;
+    const parsed = new Date(val).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
-  const filteredCompanies = companies.filter((c: any) => 
-    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.cnpj?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter((u: any) => {
+      const search = searchTerm.toLowerCase();
+      const name = (u.full_name || u.name || "").toLowerCase();
+      const email = (u.email || "").toLowerCase();
+      return name.includes(search) || email.includes(search);
+    })
+    .sort((a: any, b: any) => {
+      const timeA = getTimestamp(a.created_at || a.updated_at);
+      const timeB = getTimestamp(b.created_at || b.updated_at);
+      return timeB - timeA;
+    });
+
+  const filteredCompanies = companies
+    .filter((c: any) => 
+      c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.cnpj?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a: any, b: any) => {
+      const timeA = getTimestamp(a.created_at || a.updated_at);
+      const timeB = getTimestamp(b.created_at || b.updated_at);
+      return timeB - timeA;
+    });
 
   const filteredAuditLogs = auditLogs
     .filter((log: AuditLog) => {
@@ -443,10 +489,14 @@ export default function AdminMaster() {
   });
 
   const revenueByCompany = Object.entries(companyRevenue)
-    .map(([id, total]) => ({
-      name: companies.find((c: any) => c.id === id)?.name || "Desconhecida",
-      value: total
-    }))
+    .map(([id, total]) => {
+      const comp = companies.find((c: any) => c.id === id);
+      return {
+        id,
+        name: comp?.name || comp?.trade_name || (id ? `Empresa #${id.slice(0, 6)}` : "Geral"),
+        value: total
+      };
+    })
     .sort((a, b) => b.value - a.value);
 
   const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
@@ -797,7 +847,7 @@ if (currentUser?.role !== 'master') {
                 </ResponsiveContainer>
                 <div className="w-1/2 space-y-3">
                   {revenueByCompany.slice(0, 4).map((item, index) => (
-                    <div key={item.name} className="flex items-center justify-between">
+                    <div key={item.id || `${item.name}-${index}`} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                         <span className="text-sm font-medium text-gray-600 truncate max-w-[120px]">{item.name}</span>
@@ -830,8 +880,8 @@ if (currentUser?.role !== 'master') {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {topCompanies.map((c) => (
-                      <tr key={c.name} className="hover:bg-gray-50/50 transition-colors">
+                    {topCompanies.map((c, idx) => (
+                      <tr key={c.id || `${c.name}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-8 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center font-bold text-gray-600">
