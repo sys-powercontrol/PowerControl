@@ -472,10 +472,13 @@ export default function AdminMaster() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      toast.success(editingUser ? "Usuário atualizado!" : "Usuário criado!");
+      toast.success(editingUser ? "Usuário atualizado com sucesso!" : "Usuário cadastrado com sucesso!");
       setIsUserModalOpen(false);
       setEditingUser(null);
     },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao salvar usuário.");
+    }
   });
 
   const toggleUserStatusMutation = useMutation({

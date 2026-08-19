@@ -76,10 +76,19 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isOwner(userId) || isMaster() || (isAdmin() && resource.data.get('company_id', '') == getUserCompanyId()));
-      allow create: if isAuthenticated() && (isOwner(userId) || isMaster());
-      allow update: if isAuthenticated() && (isOwner(userId) || isMaster() || (isAdmin() && resource.data.get('company_id', '') == getUserCompanyId()));
-      allow delete: if isAuthenticated() && isMaster();
+      allow read: if isAuthenticated() && (
+        isOwner(userId) || 
+        isMaster() || 
+        (resource.data.get('email', '') == request.auth.token.email) ||
+        (isAdmin() && (resource.data.get('company_id', '') == getUserCompanyId() || getUserCompanyId() == ''))
+      );
+      allow create: if isAuthenticated() && (isOwner(userId) || isMaster() || isAdmin());
+      allow update: if isAuthenticated() && (
+        isOwner(userId) || 
+        isMaster() || 
+        (isAdmin() && (resource.data.get('company_id', '') == getUserCompanyId() || getUserCompanyId() == ''))
+      );
+      allow delete: if isAuthenticated() && (isMaster() || isOwner(userId));
     }
 
     match /companies/{companyId} {

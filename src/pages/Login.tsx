@@ -65,8 +65,9 @@ export default function Login() {
       });
       toast.success("Bem-vindo de volta!");
       navigate("/");
-    } catch {
-      toast.error("E-mail ou senha incorretos.");
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      toast.error(err?.message || "E-mail ou senha incorretos.");
     } finally {
       setIsLoading(false);
     }

@@ -9,7 +9,7 @@ import {
   signInWithPopup
 } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { doc, setDoc, getDoc, serverTimestamp, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, onSnapshot, updateDoc, collection, query, where, getDocs, deleteDoc } from "firebase/firestore";
 import { api } from "./api";
 
 import { PermissionId, DEFAULT_ROLE_PERMISSIONS } from "./permissions";
@@ -47,7 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser) {
         try {
-          const isMasterEmail = firebaseUser.email?.toLowerCase() === "sys.powercontrol@gmail.com";
+          const userEmail = (firebaseUser.email || "").toLowerCase();
+          const isMasterEmail = userEmail === "sys.powercontrol@gmail.com";
           const userRef = doc(db, "users", firebaseUser.uid);
 
           unsubUserDoc = onSnapshot(userRef, async (docSnap) => {
@@ -65,18 +66,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(userData);
               setIsLoading(false);
             } else {
+              // Check if user document was previously created with another ID by matching email
+              let legacyData: any = null;
+              let legacyDocId: string | null = null;
+
+              try {
+                const legacyQuery = query(collection(db, "users"), where("email", "==", userEmail));
+                const legacySnap = await getDocs(legacyQuery);
+                if (!legacySnap.empty) {
+                  legacyDocId = legacySnap.docs[0].id;
+                  legacyData = legacySnap.docs[0].data();
+                }
+              } catch (e) {
+                console.warn("Could not query legacy user document:", e);
+              }
+
               const newUser: ExtendedUser = {
                 id: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                full_name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Usuário",
-                role: isMasterEmail ? "master" : "user",
-                company_id: null,
-                company_ids: [],
-                created_at: serverTimestamp() as any,
-                is_active: isMasterEmail ? true : false,
-                avatar: firebaseUser.photoURL || null
+                email: userEmail,
+                full_name: legacyData?.full_name || firebaseUser.displayName || userEmail.split("@")[0] || "Usuário",
+                role: isMasterEmail ? "master" : (legacyData?.role || "user"),
+                company_id: legacyData?.company_id || (legacyData?.company_ids?.[0] || null),
+                company_ids: legacyData?.company_ids || (legacyData?.company_id ? [legacyData.company_id] : []),
+                permissions: legacyData?.permissions || (isMasterEmail ? DEFAULT_ROLE_PERMISSIONS.master : (legacyData?.role === 'admin' ? DEFAULT_ROLE_PERMISSIONS.admin : DEFAULT_ROLE_PERMISSIONS.user)),
+                created_at: legacyData?.created_at || serverTimestamp() as any,
+                is_active: isMasterEmail ? true : (legacyData?.is_active !== false),
+                avatar: legacyData?.avatar || firebaseUser.photoURL || null
               };
+
               await setDoc(userRef, newUser);
+
+              // Clean up legacy auto-generated document if different
+              if (legacyDocId && legacyDocId !== firebaseUser.uid) {
+                try {
+                  await deleteDoc(doc(db, "users", legacyDocId));
+                } catch (delErr) {
+                  console.warn("Could not delete legacy user doc:", delErr);
+                }
+              }
+
               api.updateCurrentUserData(newUser);
               setUser(newUser);
               setIsLoading(false);
@@ -105,7 +133,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const cleanEmail = email.trim().toLowerCase();
+    
+    try {
+      await signInWithEmailAndPassword(auth, cleanEmail, password);
+    } catch (err: any) {
+      console.warn("Firebase Auth sign in failed with code:", err.code);
+
+      // If user does not exist in Firebase Auth yet, try auto-provisioning via createUserWithEmailAndPassword
+      if (
+        err.code === "auth/user-not-found" || 
+        err.code === "auth/invalid-credential" || 
+        err.code === "auth/invalid-login-credentials"
+      ) {
+        if (password && password.length >= 6) {
+          try {
+            await createUserWithEmailAndPassword(auth, cleanEmail, password);
+            return;
+          } catch (createErr: any) {
+            console.warn("Account fallback creation code:", createErr.code);
+            if (createErr.code === "auth/email-already-in-use") {
+              throw new Error("Senha incorreta. Verifique sua senha.", { cause: createErr });
+            } else if (createErr.code === "auth/weak-password") {
+              throw new Error("A senha deve conter no mínimo 6 caracteres.", { cause: createErr });
+            } else if (createErr.code === "auth/invalid-email") {
+              throw new Error("E-mail em formato inválido.", { cause: createErr });
+            }
+          }
+        }
+        throw new Error("E-mail ou senha incorretos. Verifique suas credenciais.", { cause: err });
+      } else if (err.code === "auth/wrong-password") {
+        throw new Error("Senha incorreta. Verifique suas credenciais.", { cause: err });
+      } else if (err.code === "auth/too-many-requests") {
+        throw new Error("Muitas tentativas incorretas. Aguarde alguns instantes e tente novamente.", { cause: err });
+      } else if (err.code === "auth/user-disabled") {
+        throw new Error("Esta conta foi desativada pelo administrador.", { cause: err });
+      } else {
+        throw new Error(err.message || "E-mail ou senha incorretos.", { cause: err });
+      }
+    }
   };
 
   const register = async (data: any) => {
