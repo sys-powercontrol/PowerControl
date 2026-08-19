@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -103,7 +103,9 @@ export default function Support() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  const [tickets, setTickets] = useState<any[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const selectedTicket = selectedTicketId ? tickets.find(t => t.id === selectedTicketId) : null;
   const [replyText, setReplyText] = useState("");
 
   // Support Channels Config (Firestore system_settings/support_channels)
@@ -179,21 +181,17 @@ export default function Support() {
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [includeDiagnostics, setIncludeDiagnostics] = useState(true);
 
-  const { data: tickets = [] } = useQuery({
-    queryKey: ["support_tickets", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const data = (await api.get("support_tickets", { user_id: user.id })) as any[];
-      return (data || []).sort((a, b) => {
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = api.subscribe("support_tickets", { user_id: user.id }, (data) => {
+      setTickets(data.sort((a, b) => {
         const dateA = a.created_at?.seconds || a.created_at || 0;
         const dateB = b.created_at?.seconds || b.created_at || 0;
         return dateB > dateA ? 1 : -1;
-      });
-    },
-    enabled: !!user,
-  });
-
-  const selectedTicket = selectedTicketId ? tickets.find((t: any) => t.id === selectedTicketId) : null;
+      }));
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -209,7 +207,6 @@ export default function Support() {
       });
     },
     onSuccess: async (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["support_tickets", user?.id] });
       const activeCompanyId = api.getCompanyId() || user?.company_id;
       toast.success("Chamado registrado com sucesso! Nossa equipe técnica retornará em breve.");
       
@@ -254,7 +251,6 @@ export default function Support() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["support_tickets", user?.id] });
       toast.success("Mensagem enviada com sucesso!");
       setReplyText("");
     },

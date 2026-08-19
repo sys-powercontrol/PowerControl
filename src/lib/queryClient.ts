@@ -6,18 +6,12 @@ import * as idb from "idb-keyval";
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache
-      staleTime: 1000 * 60 * 5, // 5 minutes fresh data
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      staleTime: 1000 * 60 * 5, // 5 minutes
       refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      refetchOnMount: false,
-      retry: (failureCount, error: any) => {
+      retry: (failureCount) => {
         if (!navigator.onLine) return false;
-        // Do not retry if quota limit was exceeded
-        if (error?.message?.includes('Quota limit') || error?.code === 'resource-exhausted') {
-          return false;
-        }
-        return failureCount < 1;
+        return failureCount < 2;
       }
     },
   },

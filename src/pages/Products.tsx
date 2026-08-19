@@ -105,19 +105,19 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   const currentCompanyId = api.getCompanyId();
   const canManage = hasPermission('products.manage');
 
-  const { data: productsData = [], isLoading: isLoadingProducts, refetch: refetchProducts } = useQuery({ 
+  const { data: productsData = [], isLoading: isLoadingProducts } = useQuery({ 
     queryKey: ["products", currentCompanyId], 
     queryFn: () => api.get("products"),
     enabled: !!user
   });
 
-  const { data: categoriesData = [], isLoading: isLoadingCategories, refetch: refetchCategories } = useQuery({ 
+  const { data: categoriesData = [], isLoading: isLoadingCategories } = useQuery({ 
     queryKey: ["categories", currentCompanyId], 
     queryFn: () => api.get("categories"),
     enabled: !!user
   });
 
-  const { data: brandsData = [], isLoading: isLoadingBrands, refetch: refetchBrands } = useQuery({ 
+  const { data: brandsData = [], isLoading: isLoadingBrands } = useQuery({ 
     queryKey: ["brands", currentCompanyId], 
     queryFn: () => api.get("brands"),
     enabled: !!user
@@ -185,14 +185,9 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       });
       return result;
     },
-    onSuccess: (newProduct) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      queryClient.setQueryData(["products", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return [newProduct];
-        return [newProduct, ...old.filter((p: any) => p.id !== newProduct.id)];
-      });
-      refetchProducts();
       toast.success("Produto criado com sucesso!");
       setIsModalOpen(false);
     }
@@ -234,14 +229,9 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       });
       return result;
     },
-    onSuccess: (updatedProduct, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      queryClient.setQueryData(["products", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map((p: any) => p.id === variables.id ? { ...p, ...variables.data } : p);
-      });
-      refetchProducts();
       toast.success("Produto atualizado!");
       setIsModalOpen(false);
       setEditingProduct(null);
@@ -264,17 +254,9 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       
       return result;
     },
-    onSuccess: (savedCat) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      queryClient.setQueryData(["categories", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return [savedCat];
-        if (editingCategory) {
-          return old.map((c: any) => c.id === savedCat.id ? { ...c, ...savedCat } : c);
-        }
-        return [savedCat, ...old];
-      });
-      refetchCategories();
       toast.success(editingCategory ? "Categoria atualizada!" : "Categoria criada!");
       setIsCategoryModalOpen(false);
       setEditingCategory(null);
@@ -297,17 +279,9 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       
       return result;
     },
-    onSuccess: (savedBrand) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      queryClient.setQueryData(["brands", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return [savedBrand];
-        if (editingBrand) {
-          return old.map((b: any) => b.id === savedBrand.id ? { ...b, ...savedBrand } : b);
-        }
-        return [savedBrand, ...old];
-      });
-      refetchBrands();
       toast.success(editingBrand ? "Marca atualizada!" : "Marca criada!");
       setIsBrandModalOpen(false);
       setEditingBrand(null);
@@ -328,25 +302,6 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [variables.entity] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      if (variables.entity === "products") {
-        queryClient.setQueryData(["products", currentCompanyId], (old: any) => {
-          if (!old || !Array.isArray(old)) return old;
-          return old.filter((p: any) => p.id !== variables.id);
-        });
-        refetchProducts();
-      } else if (variables.entity === "categories") {
-        queryClient.setQueryData(["categories", currentCompanyId], (old: any) => {
-          if (!old || !Array.isArray(old)) return old;
-          return old.filter((c: any) => c.id !== variables.id);
-        });
-        refetchCategories();
-      } else if (variables.entity === "brands") {
-        queryClient.setQueryData(["brands", currentCompanyId], (old: any) => {
-          if (!old || !Array.isArray(old)) return old;
-          return old.filter((b: any) => b.id !== variables.id);
-        });
-        refetchBrands();
-      }
       toast.success("Excluído com sucesso!");
     }
   });

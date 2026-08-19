@@ -56,7 +56,7 @@ export default function AccountsReceivable() {
 
   const currentCompanyId = api.getCompanyId();
 
-  const { data: accountsData = [], isLoading, refetch: refetchAccounts } = useQuery({ 
+  const { data: accountsData = [], isLoading } = useQuery({ 
     queryKey: ["accountsReceivable", currentCompanyId], 
     queryFn: () => api.get("accountsReceivable", { _orderBy: "due_date", _orderDir: "desc" }),
     enabled: !!user
@@ -202,22 +202,11 @@ export default function AccountsReceivable() {
 
       return { success: true };
     },
-    onSuccess: (_, variables) => {
-      queryClient.setQueryData(["accountsReceivable", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map((acc: any) => acc.id === variables.id ? { 
-          ...acc, 
-          status: "Recebido", 
-          receipt_date: getTodayBR(),
-          bank_account_id: variables.account.type === "bank" ? variables.account.id : null,
-          cashier_id: variables.account.type === "cashier" ? variables.account.id : null
-        } : acc);
-      });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
-      refetchAccounts();
       toast.success("Conta marcada como recebida!");
     }
   });
@@ -230,13 +219,8 @@ export default function AccountsReceivable() {
       status: "Pendente",
       is_recurring: data.is_recurring === "on"
     }),
-    onSuccess: (newAccount) => {
-      queryClient.setQueryData(["accountsReceivable", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return [newAccount];
-        return [newAccount, ...old];
-      });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
-      refetchAccounts();
       toast.success("Conta cadastrada!");
       setIsModalOpen(false);
     }
@@ -267,7 +251,7 @@ export default function AccountsReceivable() {
       ? api.put("accountsReceivable", editingAccount.id, accountData)
       : api.post("accountsReceivable", accountData);
 
-    mutationPromise.then(async (savedAccount: any) => {
+    mutationPromise.then(async () => {
       if (editingAccount && (editingAccount.recurrent_id || editingAccount.is_recurring)) {
         const { updateRecurrencesCascade } = await import("../lib/finance");
         const recId = editingAccount.recurrent_id || editingAccount.id;
@@ -286,18 +270,7 @@ export default function AccountsReceivable() {
         await reverseAccountReceipt(editingAccount);
         toast.info("A conta foi reaberta e o saldo estornado.");
       }
-
-      const recordWithId = { id: editingAccount ? editingAccount.id : savedAccount?.id, ...accountData };
-      queryClient.setQueryData(["accountsReceivable", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return [recordWithId];
-        if (editingAccount) {
-          return old.map((acc: any) => acc.id === editingAccount.id ? { ...acc, ...accountData } : acc);
-        }
-        return [recordWithId, ...old];
-      });
-
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
-      refetchAccounts();
       toast.success(editingAccount ? "Conta atualizada!" : "Conta cadastrada!");
       setIsModalOpen(false);
       setEditingAccount(null);
@@ -366,16 +339,10 @@ export default function AccountsReceivable() {
       }
     }
 
-    queryClient.setQueryData(["accountsReceivable", currentCompanyId], (old: any) => {
-      if (!old || !Array.isArray(old)) return old;
-      return old.map((acc: any) => selectedAccountIds.has(acc.id) ? { ...acc, status: "Recebido", receipt_date: getTodayBR() } : acc);
-    });
-
     queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
     queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
     queryClient.invalidateQueries({ queryKey: ["cashiers"] });
     queryClient.invalidateQueries({ queryKey: ["movements"] });
-    refetchAccounts();
 
     toast.success(`${successCount} contas recebidas com sucesso em lote!`);
     setIsBatchProcessing(false);
@@ -409,16 +376,11 @@ export default function AccountsReceivable() {
       }
       return api.delete("accountsReceivable", id);
     },
-    onSuccess: (_, id) => {
-      queryClient.setQueryData(["accountsReceivable", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.filter((acc: any) => acc.id !== id);
-      });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-      refetchAccounts();
       toast.success("Conta excluída com sucesso.");
     }
   });
@@ -438,23 +400,11 @@ export default function AccountsReceivable() {
         cashier_id: null
       });
     },
-    onSuccess: (_, id) => {
-      const dbAccount = accounts.find((a: any) => a.id === id);
-      queryClient.setQueryData(["accountsReceivable", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map((acc: any) => acc.id === id ? {
-          ...acc,
-          status: (dbAccount?.due_date || acc.due_date) >= getTodayBR() ? "Pendente" : "Atrasado",
-          receipt_date: null,
-          bank_account_id: null,
-          cashier_id: null
-        } : acc);
-      });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
-      refetchAccounts();
       toast.success("Estorno concluído! A fatura voltou a ficar pendente/atrasada.");
       setIsReverseModalOpen(false);
       setAccountToReverse(null);
@@ -484,17 +434,8 @@ export default function AccountsReceivable() {
         due_date_history: updatedHistory
       });
     },
-    onSuccess: (_, variables) => {
-      queryClient.setQueryData(["accountsReceivable", currentCompanyId], (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map((acc: any) => acc.id === variables.id ? {
-          ...acc,
-          due_date: variables.newDate,
-          status: variables.newDate >= getTodayBR() ? "Pendente" : "Atrasado"
-        } : acc);
-      });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
-      refetchAccounts();
       toast.success("Vencimento alterado com sucesso!");
       setIsEditDateModalOpen(false);
       setNewDueDate("");

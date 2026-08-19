@@ -80,16 +80,10 @@ export default function Fiscal() {
   const [recipientEmail, setRecipientEmail] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
   const [isExportingXmlZip, setIsExportingXmlZip] = useState(false);
   const [isSyncingPending, setIsSyncingPending] = useState(false);
-
-  const currentCompanyId = user?.company_id || api.getCompanyId();
-
-  const { data: invoices = [], isLoading: isLoadingInvoices } = useQuery({
-    queryKey: ["invoices", currentCompanyId],
-    queryFn: () => currentCompanyId ? api.get("invoices", { company_id: currentCompanyId }) : Promise.resolve([]),
-    enabled: !!currentCompanyId
-  });
 
   const handleSyncPendingInvoices = async () => {
     const pendingInvoices = invoices.filter(
@@ -186,6 +180,17 @@ export default function Fiscal() {
       setIsExportingXmlZip(false);
     }
   };
+
+  const currentCompanyId = user?.company_id || api.getCompanyId();
+
+  React.useEffect(() => {
+    if (!currentCompanyId) return;
+    const unsubscribe = api.subscribe("invoices", { company_id: currentCompanyId }, (data) => {
+      setInvoices(data);
+      setIsLoadingInvoices(false);
+    });
+    return () => unsubscribe();
+  }, [currentCompanyId]);
 
   const { data: sales = [] } = useQuery({
     queryKey: ["sales", currentCompanyId],
