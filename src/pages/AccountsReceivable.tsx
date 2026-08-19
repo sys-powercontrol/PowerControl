@@ -267,7 +267,7 @@ export default function AccountsReceivable() {
       ? api.put("accountsReceivable", editingAccount.id, accountData)
       : api.post("accountsReceivable", accountData);
 
-    mutationPromise.then(async (savedAccount) => {
+    mutationPromise.then(async (savedAccount: any) => {
       if (editingAccount && (editingAccount.recurrent_id || editingAccount.is_recurring)) {
         const { updateRecurrencesCascade } = await import("../lib/finance");
         const recId = editingAccount.recurrent_id || editingAccount.id;
