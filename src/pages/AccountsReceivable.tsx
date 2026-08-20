@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { formatBR, getTodayBR } from "../lib/dateUtils";
 import { formatCurrency } from "../lib/currencyUtils";
 import { 
@@ -56,10 +58,11 @@ export default function AccountsReceivable() {
 
   const currentCompanyId = api.getCompanyId();
 
-  const { data: accountsData = [], isLoading } = useQuery({ 
+  const { data: accountsData = [], isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({ 
     queryKey: ["accountsReceivable", currentCompanyId], 
     queryFn: () => api.get("accountsReceivable", { _orderBy: "due_date", _orderDir: "desc" }),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
 
   const accounts = React.useMemo(() => {
@@ -70,7 +73,8 @@ export default function AccountsReceivable() {
   const { data: bankAccountsData = [] } = useQuery({ 
     queryKey: ["bankAccounts", currentCompanyId], 
     queryFn: () => api.get("bankAccounts"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.MASTER
   });
 
   const bankAccounts = React.useMemo(() => {
@@ -91,7 +95,8 @@ export default function AccountsReceivable() {
   const { data: cashiersData = [] } = useQuery({ 
     queryKey: ["cashiers", currentCompanyId], 
     queryFn: () => api.get("cashiers"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
 
   const cashiers = React.useMemo(() => {
@@ -102,7 +107,8 @@ export default function AccountsReceivable() {
   const { data: clientsData = [] } = useQuery({ 
     queryKey: ["clients", currentCompanyId], 
     queryFn: () => api.get("clients"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.MASTER
   });
 
   const clients = React.useMemo(() => {
@@ -274,8 +280,19 @@ export default function AccountsReceivable() {
       toast.success(editingAccount ? "Conta atualizada!" : "Conta cadastrada!");
       setIsModalOpen(false);
       setEditingAccount(null);
-    }).catch((error) => {
-      toast.error("Erro ao salvar: " + error.message);
+    }).catch(async (error) => {
+      console.warn("Falha ao salvar CR, acionando offline fallback", error);
+      if (!navigator.onLine || error.message?.includes('offline') || error.message?.includes('Failed to fetch') || error.message?.includes('network')) {
+        const { offlineStore } = await import('../lib/offlineStore');
+        if (editingAccount) {
+          toast.error("Edição offline não disponível no momento.");
+        } else {
+          await offlineStore.saveAccountReceivable(accountData);
+          setIsModalOpen(false);
+        }
+      } else {
+        toast.error("Erro ao salvar: " + error.message);
+      }
     });
   };
 
@@ -527,7 +544,14 @@ if (!canView) {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contas a Receber</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Contas a Receber</h1>
+            <DataFreshnessBadge 
+              lastUpdated={dataUpdatedAt} 
+              onRefresh={() => refetch()} 
+              isFetching={isFetching} 
+            />
+          </div>
           <p className="text-gray-500">Gestão de recebimentos e faturamento.</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch">

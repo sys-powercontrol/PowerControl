@@ -172,11 +172,16 @@ export default function Purchases() {
         purchase_date: new Date().toISOString()
       };
 
+      if (!navigator.onLine) {
+        const { offlineStore } = await import('../lib/offlineStore');
+        await offlineStore.savePurchase(purchaseData, itemsWithTaxes, user);
+        return { isOffline: true, ...purchaseData };
+      }
+
       const purchase = await inventory.processPurchase(purchaseData, itemsWithTaxes);
-      
       return purchase;
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       setCart([]);
       setSelectedSupplier(null);
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
@@ -184,7 +189,11 @@ export default function Purchases() {
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
-      toast.success("Compra registrada com sucesso!");
+      if (res?.isOffline) {
+        toast.info("Compra gravada offline! Será sincronizada quando houver conexão.");
+      } else {
+        toast.success("Compra registrada com sucesso!");
+      }
     },
     onError: async (err: any) => {
       console.warn("Falha ao salvar compra online, acionando offline fallback", err);

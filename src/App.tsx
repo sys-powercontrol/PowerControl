@@ -8,7 +8,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
-import { toast, Toaster } from "sonner";
+import { Toaster } from "sonner";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import SellerDashboard from "./pages/SellerDashboard";
@@ -74,28 +74,28 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
   useEffect(() => {
+    // Check and trigger offline sync on app boot if online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      import('./lib/offlineStore').then(({ offlineStore }) => {
+        offlineStore.syncAll();
+      });
+    }
+
     if ('serviceWorker' in navigator) {
       const handleMessage = (event: MessageEvent) => {
-        if (event.data?.type === 'SYNC_COMPLETED') {
-          const { synced = 0, failed = 0, abandoned = 0 } = event.data.payload || {};
-          
-          if (synced > 0) {
-            toast.success(`${synced} ${synced === 1 ? 'venda offline sincronizada' : 'vendas offline sincronizadas'} com sucesso!`);
-          }
-          if (failed > 0) {
-            toast.warning(`${failed} ${failed === 1 ? 'venda contínua' : 'vendas continuam'} na fila de retentativa.`);
-          }
-          if (abandoned > 0) {
-            toast.error(`${abandoned} ${abandoned === 1 ? 'venda foi descartada' : 'vendas foram descartadas'} por excesso de falhas persistentes.`);
-          }
-        } else if (event.data?.type === 'SYNC_ERROR') {
-          toast.error(`Falha intermitente de rede no sincronismo: ${event.data.payload?.error}`);
+        if (event.data?.type === 'TRIGGER_SYNC' || event.data?.type === 'CHECK_SYNC') {
+          import('./lib/offlineStore').then(({ offlineStore }) => {
+            offlineStore.syncAll();
+          });
         }
       };
 
       navigator.serviceWorker.addEventListener('message', handleMessage);
 
       const handleOnline = () => {
+        import('./lib/offlineStore').then(({ offlineStore }) => {
+          offlineStore.syncAll();
+        });
         navigator.serviceWorker.ready.then(registration => {
           if (registration.active) {
             registration.active.postMessage({ type: 'CHECK_SYNC' });

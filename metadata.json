@@ -1,5 +1,6 @@
 {
   "name": "PowerControl",
-  "description": "Sistema de Gestão Empresarial completo com controle de vendas, financeiro, estoque e multi-tenant.",
-  "requestFramePermissions": []
+  "description": "Sistema de Gestão Empresarial completo com controle de vendas, financeiro, estoque, PWA offline e multi-tenant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

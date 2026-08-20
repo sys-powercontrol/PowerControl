@@ -1,6 +1,12 @@
-import { initializeApp, FirebaseApp } from "firebase/app";
+import { initializeApp, FirebaseApp, getApps, getApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { 
+  initializeFirestore, 
+  getFirestore, 
+  Firestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 import firebaseConfig from "../../firebase-applet-config.json";
 
@@ -16,9 +22,20 @@ try {
     (firebaseConfig as any).firestoreDatabaseId = "ai-studio-ebf7fabd-0d29-4956-b2cc-835a0409d727";
   }
 
-  app = initializeApp(firebaseConfig);
+  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    }, firebaseConfig.firestoreDatabaseId);
+  } catch {
+    // If already initialized (e.g. fast refresh or test), fallback to getFirestore
+    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  }
+
   storage = getStorage(app);
 } catch (error) {
   console.error("CRITICAL ERROR: Failed to initialize Firebase.", error);
@@ -26,3 +43,4 @@ try {
 }
 
 export { app, auth, db, storage };
+

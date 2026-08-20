@@ -141,6 +141,11 @@ export async function processAccountPayment(accountId: string, accountData: any,
       throw new Error("Transação negada. O Caixa selecionado já está Fechado.");
     }
 
+    const todayDateStr = new Date().toISOString().split("T")[0];
+    const summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
+    const summaryDoc = await transaction.get(summaryRef);
+    const prevSummary = summaryDoc.exists() ? summaryDoc.data() : {};
+
     // Update balance
     transaction.update(paymentAccountRef, {
       balance: (paymentAccountData.balance || 0) - amount
@@ -170,6 +175,14 @@ export async function processAccountPayment(accountId: string, accountData: any,
       created_at: serverTimestamp()
     });
 
+    // Update daily summary
+    transaction.set(summaryRef, {
+      date: todayDateStr,
+      company_id: accountData.company_id,
+      expenses_total: (prevSummary.expenses_total || 0) + amount,
+      updated_at: serverTimestamp()
+    }, { merge: true });
+
     return { success: true };
   });
 }
@@ -188,6 +201,11 @@ export async function processAccountReceipt(accountId: string, accountData: any,
     if (collectionName === "cashiers" && receiptAccountData.status === "Fechado") {
       throw new Error("Transação negada. O Caixa selecionado já está Fechado.");
     }
+
+    const todayDateStr = new Date().toISOString().split("T")[0];
+    const summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
+    const summaryDoc = await transaction.get(summaryRef);
+    const prevSummary = summaryDoc.exists() ? summaryDoc.data() : {};
 
     // Update balance
     transaction.update(receiptAccountRef, {
@@ -217,6 +235,14 @@ export async function processAccountReceipt(accountId: string, accountData: any,
       movement_date: new Date().toISOString(),
       created_at: serverTimestamp()
     });
+
+    // Update daily summary
+    transaction.set(summaryRef, {
+      date: todayDateStr,
+      company_id: accountData.company_id,
+      receipts_total: (prevSummary.receipts_total || 0) + amount,
+      updated_at: serverTimestamp()
+    }, { merge: true });
 
     return { success: true };
   });

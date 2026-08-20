@@ -46,13 +46,13 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Register Service Worker
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// Register Service Worker for PWA offline support
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(registration => {
-      console.log('SW registered: ', registration);
+      console.log('PowerControl SW registered successfully:', registration.scope);
     }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
+      console.warn('PowerControl SW registration notice:', registrationError);
     });
   });
 }

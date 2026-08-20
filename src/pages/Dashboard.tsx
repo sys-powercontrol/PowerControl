@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { formatCurrency } from "../lib/currencyUtils";
 import { formatBR, getNowBR } from "../lib/dateUtils";
 import SellerDashboard from "./SellerDashboard";
@@ -23,7 +25,6 @@ import {
   CheckCircle2,
   Package,
   ArrowRightLeft,
-  Calendar,
   Download
 } from "lucide-react";
 import { 
@@ -128,6 +129,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle, badge, trend }: a
 
 export default function Dashboard() {
   const { user, hasPermission } = useAuth();
+  const queryClient = useQueryClient();
   const currentCompanyId = api.getCompanyId();
 
   const [dateFilter, setDateFilter] = useState<"30d" | "7d" | "today" | "month">("30d");
@@ -136,46 +138,99 @@ export default function Dashboard() {
   const { data: companyData } = useQuery({
     queryKey: ["company", currentCompanyId],
     queryFn: () => currentCompanyId ? api.get("companies", currentCompanyId) : null,
-    enabled: !!currentCompanyId
+    enabled: !!currentCompanyId,
+    ...CACHE_TIERS.STATIC
   });
 
   const companyName = companyData?.name || (user as any)?.company_name || "Empresa Principal";
 
-  const { data: salesData = [] } = useQuery({ 
-    queryKey: ["sales", currentCompanyId], 
-    queryFn: () => api.get("sales"),
-    enabled: !!user
+  const { startDateStr, endDateStr } = useMemo(() => {
+    const now = getNowBR();
+    let start: Date;
+    let end: Date = now;
+
+    if (dateFilter === "today") {
+      start = startOfDay(now);
+      end = endOfDay(now);
+    } else if (dateFilter === "7d") {
+      start = subDays(now, 7);
+    } else if (dateFilter === "month") {
+      start = startOfMonth(now);
+      end = endOfMonth(now);
+    } else {
+      start = subDays(now, 30);
+    }
+    return {
+      startDateStr: formatBR(start, 'yyyy-MM-dd'),
+      endDateStr: formatBR(end, 'yyyy-MM-dd')
+    };
+  }, [dateFilter]);
+
+  // Optimized Daily Summaries for Dashboards (1 read per day instead of thousands of raw sales)
+  const { data: dailySummaries = [] } = useQuery({
+    queryKey: ["daily_summaries", currentCompanyId, startDateStr, endDateStr],
+    queryFn: () => api.getDailySummaries(startDateStr, endDateStr, currentCompanyId),
+    enabled: !!currentCompanyId,
+    ...CACHE_TIERS.REPORTS
   });
+
+  const { data: salesData = [], isFetching: isFetchingSales, dataUpdatedAt } = useQuery({ 
+    queryKey: ["sales", currentCompanyId, startDateStr], 
+    queryFn: () => api.getPage("sales", { pageSize: 100, startDate: startDateStr, dateField: "sale_date", orderByField: "sale_date", orderDir: "desc" }).then(res => res.items),
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
+  });
+
   const { data: productsData = [] } = useQuery({ 
     queryKey: ["products", currentCompanyId], 
     queryFn: () => api.get("products"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.MASTER
   });
+
   const { data: cashiersData = [] } = useQuery({ 
     queryKey: ["cashiers", currentCompanyId], 
     queryFn: () => api.get("cashiers"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.MASTER
   });
+
   const { data: accountsPayableData = [] } = useQuery({ 
     queryKey: ["accountsPayable", currentCompanyId], 
     queryFn: () => api.get("accountsPayable"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
+
   const { data: accountsReceivableData = [] } = useQuery({ 
     queryKey: ["accountsReceivable", currentCompanyId], 
     queryFn: () => api.get("accountsReceivable"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
+
   const { data: purchasesData = [] } = useQuery({ 
     queryKey: ["purchases", currentCompanyId], 
-    queryFn: () => api.get("purchases"),
-    enabled: !!user
+    queryFn: () => api.getPage("purchases", { pageSize: 50, startDate: startDateStr, dateField: "date", orderByField: "date", orderDir: "desc" }).then(res => res.items),
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
+
   const { data: clientsData = [] } = useQuery({
     queryKey: ["clients", currentCompanyId],
     queryFn: () => api.get("clients"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.MASTER
   });
+
+  const handleManualRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["daily_summaries"] });
+    queryClient.invalidateQueries({ queryKey: ["sales"] });
+    queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+    queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
+    queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+    toast.success("Dados do painel atualizados!");
+  };
 
   const sales = useMemo(() => {
     if (!currentCompanyId) return salesData;
@@ -232,8 +287,13 @@ export default function Dashboard() {
       return d >= startDate && d <= endDate && s.status !== "Cancelada";
     });
 
-    const periodRevenue = periodSales.reduce((acc: number, s: any) => acc + (parseFloat(s.total) || 0), 0);
-    const salesCount = periodSales.length;
+    const hasSummaries = dailySummaries && dailySummaries.length > 0;
+    const summaryRevenue = dailySummaries.reduce((acc: number, d: any) => acc + (Number(d.sales_total) || 0), 0);
+    const summarySalesCount = dailySummaries.reduce((acc: number, d: any) => acc + (Number(d.sales_count) || 0), 0);
+    const summaryPurchasesTotal = dailySummaries.reduce((acc: number, d: any) => acc + (Number(d.purchases_total) || 0), 0);
+
+    const periodRevenue = hasSummaries ? summaryRevenue : periodSales.reduce((acc: number, s: any) => acc + (parseFloat(s.total) || 0), 0);
+    const salesCount = hasSummaries ? summarySalesCount : periodSales.length;
     const averageTicket = salesCount > 0 ? periodRevenue / salesCount : 0;
 
     // Filtered purchases in selected period
@@ -242,7 +302,7 @@ export default function Dashboard() {
       const d = new Date(p.created_at);
       return d >= startDate && d <= endDate;
     });
-    const periodPurchasesTotal = periodPurchases.reduce((acc: number, p: any) => acc + (parseFloat(p.total) || 0), 0);
+    const periodPurchasesTotal = (hasSummaries && summaryPurchasesTotal > 0) ? summaryPurchasesTotal : periodPurchases.reduce((acc: number, p: any) => acc + (parseFloat(p.total) || 0), 0);
 
     // Receivables & Payables Summary
     const pendingReceivableList = accountsReceivable.filter((a: any) => a.status === "Pendente");
@@ -269,6 +329,14 @@ export default function Dashboard() {
     });
 
     const dailyChartData = chartDays.map(dateStr => {
+      const summary = dailySummaries.find((d: any) => d.date === dateStr);
+      if (summary) {
+        return {
+          date: formatBR(dateStr, 'dd/MM'),
+          total: Number(summary.sales_total) || 0,
+          count: Number(summary.sales_count) || 0
+        };
+      }
       const daySales = periodSales.filter((s: any) => s.sale_date && formatBR(s.sale_date, 'yyyy-MM-dd') === dateStr);
       const total = daySales.reduce((acc: number, s: any) => acc + (parseFloat(s.total) || 0), 0);
       return {
@@ -345,7 +413,7 @@ export default function Dashboard() {
       topSellingProducts,
       topSellers
     };
-  }, [sales, purchases, accountsReceivable, accountsPayable, cashiers, products, dateFilter]);
+  }, [sales, purchases, accountsReceivable, accountsPayable, cashiers, products, dateFilter, dailySummaries]);
 
   const handleExportCSV = () => {
     try {
@@ -437,11 +505,12 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="flex items-center gap-4 text-xs font-bold text-gray-500">
-          <span className="flex items-center gap-1.5">
-            <Calendar size={14} className="text-blue-600" />
-            Atualizado em tempo real
-          </span>
+        <div className="flex items-center gap-3 text-xs font-bold text-gray-500">
+          <DataFreshnessBadge 
+            lastUpdated={dataUpdatedAt} 
+            onRefresh={handleManualRefresh} 
+            isFetching={isFetchingSales} 
+          />
           <span className="text-gray-300">|</span>
           <span className="text-gray-600">
             {clientsData.length} Clientes Cadastrados

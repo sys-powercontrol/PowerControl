@@ -2,6 +2,8 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { formatBR, getNowBR } from "../lib/dateUtils";
 import { formatCurrency } from "../lib/currencyUtils";
 import { toast } from "sonner";
@@ -22,7 +24,6 @@ import {
   CreditCard,
   Download,
   ShieldAlert,
-  RefreshCw,
   Activity,
   Sparkles,
   Wallet,
@@ -136,37 +137,45 @@ export default function GlobalDashboard() {
   const [activeTab, setActiveTab] = useState<"overview" | "financial" | "cashiers" | "companies" | "audit">("overview");
 
   // Multi-tenant dataset queries
-  const { data: companies, isLoading: loadingCompanies } = useQuery({ 
+  const { data: companies, dataUpdatedAt } = useQuery({ 
     queryKey: ["companies", "all"], 
-    queryFn: () => api.get("companies", { _all: true }) 
+    queryFn: () => api.get("companies", { _all: true }),
+    ...CACHE_TIERS.STATIC
   });
-  const { data: sales = [], isLoading: loadingSales } = useQuery({ 
+  const { data: sales = [], isLoading: loadingSales, isFetching: isFetchingSales } = useQuery({ 
     queryKey: ["sales", "all"], 
-    queryFn: () => api.get("sales", { _all: true }) 
+    queryFn: () => api.get("sales", { _all: true }),
+    ...CACHE_TIERS.REPORTS
   });
   const { data: users = [] } = useQuery({ 
     queryKey: ["users", "all"], 
-    queryFn: () => api.get("users", { _all: true }) 
+    queryFn: () => api.get("users", { _all: true }),
+    ...CACHE_TIERS.STATIC
   });
   const { data: payables = [] } = useQuery({
     queryKey: ["accountsPayable", "all"],
-    queryFn: () => api.get("accountsPayable", { _all: true })
+    queryFn: () => api.get("accountsPayable", { _all: true }),
+    ...CACHE_TIERS.REPORTS
   });
   const { data: receivables = [] } = useQuery({
     queryKey: ["accountsReceivable", "all"],
-    queryFn: () => api.get("accountsReceivable", { _all: true })
+    queryFn: () => api.get("accountsReceivable", { _all: true }),
+    ...CACHE_TIERS.REPORTS
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products", "all"],
-    queryFn: () => api.get("products", { _all: true })
+    queryFn: () => api.get("products", { _all: true }),
+    ...CACHE_TIERS.MASTER
   });
   const { data: cashiers = [] } = useQuery({
     queryKey: ["cashiers", "all"],
-    queryFn: () => api.get("cashiers", { _all: true })
+    queryFn: () => api.get("cashiers", { _all: true }),
+    ...CACHE_TIERS.MASTER
   });
   const { data: auditLogs = [] } = useQuery({
     queryKey: ["audit_logs", "all"],
-    queryFn: () => api.get("audit_logs", { _all: true, _limit: 25 })
+    queryFn: () => api.get("audit_logs", { _all: true, _limit: 25 }),
+    ...CACHE_TIERS.REPORTS
   });
 
   const handleRefresh = () => {
@@ -400,12 +409,12 @@ export default function GlobalDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button 
-              onClick={handleRefresh}
-              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-2 backdrop-blur-md transition-all border border-white/10"
-            >
-              <RefreshCw size={15} className={(loadingCompanies || loadingSales) ? "animate-spin" : ""} /> Atualizar
-            </button>
+            <DataFreshnessBadge 
+              className="bg-white/10 text-white border-white/20" 
+              lastUpdated={dataUpdatedAt} 
+              onRefresh={handleRefresh} 
+              isFetching={loadingSales || isFetchingSales} 
+            />
             <button 
               onClick={handleExportSummaryCSV}
               className="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-500/30 transition-all"

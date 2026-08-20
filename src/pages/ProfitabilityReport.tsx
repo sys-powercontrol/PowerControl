@@ -2,6 +2,8 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { formatBR, getNowBR } from "../lib/dateUtils";
 import { formatCurrency } from "../lib/currencyUtils";
 import { 
@@ -47,22 +49,25 @@ export default function ProfitabilityReport() {
 
   const currentCompanyId = api.getCompanyId();
 
-  const { data: sales = [], isLoading: isLoadingSales } = useQuery({ 
+  const { data: sales = [], isLoading: isLoadingSales, isFetching: isFetchingSales, dataUpdatedAt, refetch } = useQuery({ 
     queryKey: ["sales", currentCompanyId], 
     queryFn: () => api.get("sales"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.REPORTS
   });
 
   const { data: accountsPayable = [], isLoading: isLoadingExpenses } = useQuery({ 
     queryKey: ["accountsPayable", currentCompanyId], 
     queryFn: () => api.get("accountsPayable"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.REPORTS
   });
 
   const { data: categories = [] } = useQuery({ 
     queryKey: ["categories", currentCompanyId], 
     queryFn: () => api.get("categories"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.STATIC
   });
 
   const reportData = useMemo(() => {
@@ -190,7 +195,14 @@ if (!canView) {
     <div className="space-y-8" id="profitability-report-content">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relatório de Lucratividade</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Relatório de Lucratividade</h1>
+            <DataFreshnessBadge 
+              lastUpdated={dataUpdatedAt} 
+              onRefresh={() => refetch()} 
+              isFetching={isFetchingSales} 
+            />
+          </div>
           <p className="text-gray-500">Análise detalhada de margens, lucros e desempenho financeiro.</p>
         </div>
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">

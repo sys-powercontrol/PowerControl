@@ -565,7 +565,18 @@ export default function Sales() {
         return { id: getOfflineId(), ...saleData, isOffline: true };
       }
 
-      const sale = await inventory.processSale(saleData, itemsWithTaxes, user);
+      let sale;
+      try {
+        sale = await inventory.processSale(saleData, itemsWithTaxes, user);
+      } catch (err: any) {
+        const msg = err?.message || "";
+        if (!navigator.onLine || msg.includes('network') || msg.includes('Failed to fetch') || msg.includes('offline') || msg.includes('unavailable')) {
+          console.warn("Falha de rede ao processar venda online, salvando offline:", err);
+          await offlineStore.saveSale(saleData, itemsWithTaxes, user);
+          return { id: getOfflineId(), ...saleData, isOffline: true };
+        }
+        throw err;
+      }
       
       await api.log({
         action: 'CREATE',

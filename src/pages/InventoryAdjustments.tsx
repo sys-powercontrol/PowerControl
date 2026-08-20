@@ -52,11 +52,22 @@ export default function InventoryAdjustments() {
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => inventory.recordMovement(data),
-    onSuccess: () => {
+    mutationFn: async (data: any) => {
+      if (!navigator.onLine) {
+        const { offlineStore } = await import("../lib/offlineStore");
+        await offlineStore.saveInventoryMovement(data, user);
+        return { isOffline: true };
+      }
+      return inventory.recordMovement(data);
+    },
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inventory_movements"] });
-      toast.success("Ajuste de estoque realizado com sucesso!");
+      if (res?.isOffline) {
+        toast.info("Ajuste de estoque salvo offline! Será sincronizado ao reconectar.");
+      } else {
+        toast.success("Ajuste de estoque realizado com sucesso!");
+      }
       // Reset form
       setSelectedProductId("");
       setQuantity(0);
@@ -64,8 +75,19 @@ export default function InventoryAdjustments() {
       setObservation("");
       setSearchTerm("");
     },
-    onError: (error: any) => {
-      toast.error(`Erro ao realizar ajuste: ${error.message}`);
+    onError: async (error: any, data: any) => {
+      console.warn("Falha no ajuste online, acionando offline fallback", error);
+      if (!navigator.onLine || error.message?.includes('offline') || error.message?.includes('network') || error.message?.includes('Failed to fetch')) {
+        const { offlineStore } = await import("../lib/offlineStore");
+        await offlineStore.saveInventoryMovement(data, user);
+        setSelectedProductId("");
+        setQuantity(0);
+        setReason("MANUAL");
+        setObservation("");
+        setSearchTerm("");
+      } else {
+        toast.error(`Erro ao realizar ajuste: ${error.message}`);
+      }
     }
   });
 

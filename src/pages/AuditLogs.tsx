@@ -2,6 +2,9 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { CursorPagination } from "../components/Common/CursorPagination";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
 import { 
   History, 
@@ -38,25 +41,71 @@ export default function AuditLogs() {
   });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  
+  const [page, setPage] = useState(1);
+  const [cursorDocs, setCursorDocs] = useState<(any | null)[]>([null]);
+  const pageSize = 50;
 
   const isAdminMaster = currentUser?.role === 'master';
 
-  
+  const filterKey = `${searchTerm}_${selectedCompanyId}_${selectedUserId}_${selectedAction}_${dateRange.start}_${dateRange.end}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+    setCursorDocs([null]);
+  }
 
-  const { data: logs = [], isLoading } = useQuery({ 
-    queryKey: ["audit_logs", "all"], 
-    queryFn: () => api.get("audit_logs", { _all: true, _orderBy: "timestamp", _orderDir: "desc" }) 
+  const currentCursor = cursorDocs[page - 1] || null;
+
+  const { data: pageResult, isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({ 
+    queryKey: ["audit_logs_page", page, currentCursor?.id, selectedCompanyId, selectedUserId, selectedAction], 
+    queryFn: () => api.getPage<AuditLog>("audit_logs", { 
+      pageSize,
+      cursorDoc: currentCursor,
+      params: { 
+        _all: true,
+        ...(selectedCompanyId ? { company_id: selectedCompanyId } : {}),
+        ...(selectedUserId ? { user_id: selectedUserId } : {}),
+        ...(selectedAction ? { action: selectedAction } : {})
+      },
+      orderByField: "timestamp", 
+      orderDir: "desc" 
+    }),
+    ...CACHE_TIERS.REPORTS
   });
+
+  const logs = useMemo(() => {
+    return pageResult?.items || [];
+  }, [pageResult?.items]);
+  const hasMore = pageResult?.hasMore || false;
+
+  const handleNextPage = () => {
+    if (pageResult?.lastDoc && hasMore) {
+      setCursorDocs(prev => {
+        const next = [...prev];
+        next[page] = pageResult.lastDoc;
+        return next;
+      });
+      setPage(p => p + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (page > 1) {
+      setPage(p => p - 1);
+    }
+  };
 
   const { data: companies = [] } = useQuery({ 
     queryKey: ["companies", "all"], 
-    queryFn: () => api.get("companies", { _all: true }) 
+    queryFn: () => api.get("companies", { _all: true }),
+    ...CACHE_TIERS.STATIC
   });
 
   const { data: users = [] } = useQuery({ 
     queryKey: ["users", "all"], 
-    queryFn: () => api.get("users", { _all: true }) 
+    queryFn: () => api.get("users", { _all: true }),
+    ...CACHE_TIERS.STATIC
   });
 
   const filteredLogs = useMemo(() => {
@@ -170,8 +219,15 @@ if (!isAdminMaster) {
             <History size={32} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Auditoria Global</h1>
-            <p className="text-gray-500">Monitore todas as ações críticas do sistema.</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">Auditoria Global</h1>
+              <DataFreshnessBadge 
+                lastUpdated={dataUpdatedAt} 
+                onRefresh={() => refetch()} 
+                isFetching={isFetching} 
+              />
+            </div>
+            <p className="text-gray-500">Monitore todas as ações críticas do sistema com paginação otimizada.</p>
           </div>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm">
@@ -352,6 +408,21 @@ if (!isAdminMaster) {
             </tbody>
           </table>
         </div>
+
+        {/* Cursor Pagination Control */}
+        {logs.length > 0 && (
+          <div className="border-t border-gray-100">
+            <CursorPagination
+              page={page}
+              hasMore={hasMore}
+              isLoading={isLoading || isFetching}
+              onPrevPage={handlePrevPage}
+              onNextPage={handleNextPage}
+              pageSize={pageSize}
+              totalLoaded={filteredLogs.length}
+            />
+          </div>
+        )}
       </div>
 
       {/* Details Modal */}

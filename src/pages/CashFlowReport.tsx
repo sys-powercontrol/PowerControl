@@ -2,6 +2,8 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { formatBR, getNowBR } from "../lib/dateUtils";
 import { formatCurrency } from "../lib/currencyUtils";
 import { 
@@ -62,28 +64,32 @@ export default function CashFlowReport() {
   });
   const [filterType, setFilterType] = useState("current_month");
 
-  const { data: sales = [] } = useQuery({ 
+  const { data: sales = [], isFetching: isFetchingSales, dataUpdatedAt: salesUpdatedAt, refetch: refetchSales } = useQuery({ 
     queryKey: ["sales", currentCompanyId], 
     queryFn: () => api.get("sales"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.REPORTS
   });
 
   const { data: purchases = [] } = useQuery({ 
     queryKey: ["purchases", currentCompanyId], 
     queryFn: () => api.get("purchases"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.REPORTS
   });
 
   const { data: accountsPayable = [] } = useQuery({ 
     queryKey: ["accountsPayable", currentCompanyId], 
     queryFn: () => api.get("accountsPayable"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.REPORTS
   });
 
   const { data: accountsReceivable = [] } = useQuery({ 
     queryKey: ["accountsReceivable", currentCompanyId], 
     queryFn: () => api.get("accountsReceivable"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.REPORTS
   });
 
   const handleFilterChange = (type: string) => {
@@ -217,7 +223,14 @@ if (!canView) {
     <div className="space-y-8" id="dre-report-content">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">DRE Simplificado</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">DRE Simplificado</h1>
+            <DataFreshnessBadge 
+              lastUpdated={salesUpdatedAt} 
+              onRefresh={() => refetchSales()} 
+              isFetching={isFetchingSales} 
+            />
+          </div>
           <p className="text-gray-500">Demonstrativo de Resultados do Exercício e Lucratividade.</p>
         </div>
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">

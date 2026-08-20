@@ -119,6 +119,18 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (isMaster() || (isAdmin() && (getUserCompanyId() == companyId || getUserCompanyId() == '')));
       allow delete: if isAuthenticated() && isMaster();
+
+      match /daily_summaries/{summaryId} {
+        allow read: if belongsToCompany(companyId);
+        allow create, update: if belongsToCompany(companyId) && (hasPermission('sales.create') || hasPermission('finance.manage') || hasPermission('inventory.manage') || isAdmin() || isMaster());
+        allow delete: if isMaster();
+      }
+    }
+
+    match /daily_summaries/{id} {
+      allow read: if belongsToCompany(resource.data.get('company_id', ''));
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('sales.create') || hasPermission('finance.manage') || hasPermission('inventory.manage') || isAdmin() || isMaster());
+      allow delete: if isMaster();
     }
 
     match /products/{id} {

@@ -1,9 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { CursorPagination } from "../components/Common/CursorPagination";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { useNavigate } from "react-router-dom";
 import { offlineStore } from "../lib/offlineStore";
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO, format } from "date-fns";
 import { formatCurrency } from "../lib/currencyUtils";
 import { 
   Search, 
@@ -98,15 +101,84 @@ export default function SalesHistory() {
 
   const currentCompanyId = api.getCompanyId() || user?.company_id;
 
-  const { data: salesData = [], isLoading } = useQuery({ 
-    queryKey: ["sales", currentCompanyId], 
-    queryFn: () => api.get("sales", { _orderBy: "sale_date", _orderDir: "desc" }),
-    enabled: !!user
+  const [page, setPage] = useState(1);
+  const [cursorDocs, setCursorDocs] = useState<(any | null)[]>([null]);
+  const pageSize = 25;
+
+  const dateConstraints = React.useMemo(() => {
+    const now = new Date();
+    if (dateFilter === "day") {
+      return {
+        startDate: format(startOfDay(now), "yyyy-MM-dd'T'00:00:00"),
+        endDate: format(endOfDay(now), "yyyy-MM-dd'T'23:59:59")
+      };
+    } else if (dateFilter === "week") {
+      return {
+        startDate: format(startOfWeek(now, { weekStartsOn: 0 }), "yyyy-MM-dd'T'00:00:00"),
+        endDate: format(endOfWeek(now, { weekStartsOn: 0 }), "yyyy-MM-dd'T'23:59:59")
+      };
+    } else if (dateFilter === "month") {
+      return {
+        startDate: format(startOfMonth(now), "yyyy-MM-dd'T'00:00:00"),
+        endDate: format(endOfMonth(now), "yyyy-MM-dd'T'23:59:59")
+      };
+    } else if (dateFilter === "custom" && customStartDate) {
+      return {
+        startDate: format(startOfDay(parseISO(customStartDate)), "yyyy-MM-dd'T'00:00:00"),
+        endDate: customEndDate ? format(endOfDay(parseISO(customEndDate)), "yyyy-MM-dd'T'23:59:59") : undefined
+      };
+    }
+    return { startDate: undefined, endDate: undefined };
+  }, [dateFilter, customStartDate, customEndDate]);
+
+  const filterKey = `${dateFilter}_${customStartDate}_${customEndDate}_${searchTerm}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+    setCursorDocs([null]);
+  }
+
+  const currentCursor = cursorDocs[page - 1] || null;
+
+  const { data: pageResult, isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({ 
+    queryKey: ["sales_page", currentCompanyId, dateFilter, customStartDate, customEndDate, page, currentCursor?.id], 
+    queryFn: async () => {
+      return api.getPage("sales", {
+        pageSize,
+        cursorDoc: currentCursor,
+        dateField: "sale_date",
+        startDate: dateConstraints.startDate,
+        endDate: dateConstraints.endDate,
+        orderByField: "sale_date",
+        orderDir: "desc"
+      });
+    },
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
 
   const sales = React.useMemo(() => {
-    return salesData;
-  }, [salesData]);
+    return pageResult?.items || [];
+  }, [pageResult?.items]);
+  const hasMore = pageResult?.hasMore || false;
+
+  const handleNextPage = () => {
+    if (pageResult?.lastDoc && hasMore) {
+      setCursorDocs(prev => {
+        const next = [...prev];
+        next[page] = pageResult.lastDoc;
+        return next;
+      });
+      setPage(p => p + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (page > 1) {
+      setPage(p => p - 1);
+    }
+  };
 
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -377,8 +449,15 @@ if (!canView) {
 
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Histórico de Vendas</h1>
-          <p className="text-gray-500">Consulte e gerencie todas as movimentações de venda.</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Histórico de Vendas</h1>
+            <DataFreshnessBadge 
+              lastUpdated={dataUpdatedAt} 
+              onRefresh={() => refetch()} 
+              isFetching={isFetching} 
+            />
+          </div>
+          <p className="text-gray-500">Consulte e gerencie todas as movimentações de venda de forma paginada e otimizada.</p>
         </div>
         
         <div className="flex flex-wrap justify-end gap-3 lg:max-w-[600px]">
@@ -625,6 +704,21 @@ if (!canView) {
             </div>
           </div>
         ))}
+
+        {/* Cursor Pagination Control */}
+        {sales.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <CursorPagination
+              page={page}
+              hasMore={hasMore}
+              isLoading={isLoading || isFetching}
+              onPrevPage={handlePrevPage}
+              onNextPage={handleNextPage}
+              pageSize={pageSize}
+              totalLoaded={filteredSales.length}
+            />
+          </div>
+        )}
       </div>
 
       {/* Details Modal */}

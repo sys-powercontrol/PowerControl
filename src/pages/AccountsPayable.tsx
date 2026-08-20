@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CACHE_TIERS } from "../lib/queryClient";
+import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
 import { formatBR, getTodayBR } from "../lib/dateUtils";
 import { formatCurrency } from "../lib/currencyUtils";
 import { 
@@ -63,10 +65,11 @@ export default function AccountsPayable() {
 
   const currentCompanyId = api.getCompanyId();
 
-  const { data: accountsData = [], isLoading } = useQuery({ 
+  const { data: accountsData = [], isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({ 
     queryKey: ["accountsPayable", currentCompanyId], 
     queryFn: () => api.get("accountsPayable", { _orderBy: "due_date", _orderDir: "desc" }),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
 
   const accounts = React.useMemo(() => {
@@ -77,7 +80,8 @@ export default function AccountsPayable() {
   const { data: bankAccountsData = [] } = useQuery({ 
     queryKey: ["bankAccounts", currentCompanyId], 
     queryFn: () => api.get("bankAccounts"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.MASTER
   });
 
   const bankAccounts = React.useMemo(() => {
@@ -98,7 +102,8 @@ export default function AccountsPayable() {
   const { data: cashiersData = [] } = useQuery({ 
     queryKey: ["cashiers", currentCompanyId], 
     queryFn: () => api.get("cashiers"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.TRANSACTIONAL
   });
 
   const cashiers = React.useMemo(() => {
@@ -109,7 +114,8 @@ export default function AccountsPayable() {
   const { data: suppliersData = [] } = useQuery({ 
     queryKey: ["suppliers", currentCompanyId], 
     queryFn: () => api.get("suppliers"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.MASTER
   });
 
   const suppliers = React.useMemo(() => {
@@ -120,7 +126,8 @@ export default function AccountsPayable() {
   const { data: categoriesData = [] } = useQuery({ 
     queryKey: ["categories", currentCompanyId], 
     queryFn: () => api.get("categories"),
-    enabled: !!user
+    enabled: !!user,
+    ...CACHE_TIERS.STATIC
   });
 
   const categories = React.useMemo(() => {
@@ -580,7 +587,14 @@ if (!canView) {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contas a Pagar</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Contas a Pagar</h1>
+            <DataFreshnessBadge 
+              lastUpdated={dataUpdatedAt} 
+              onRefresh={() => refetch()} 
+              isFetching={isFetching} 
+            />
+          </div>
           <p className="text-gray-500">Gestão de despesas e compromissos.</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto min-w-0 items-stretch">

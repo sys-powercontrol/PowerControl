@@ -238,11 +238,16 @@ export const inventory = {
       const saleRef = doc(collection(db, "sales"));
       const reconciliationId = saleRef.id;
 
-      // 3. Read all products, components, and accounts FIRST
+      // 3. Read all products, components, accounts, and daily summary FIRST
       const productDocs = new Map();
       const componentDocs = new Map();
       let accountDoc = null;
       let accountRef = null;
+
+      const todayDateStr = ((saleData.sale_date as string) || new Date().toISOString()).split("T")[0];
+      const summaryRef = doc(db, "companies", user.company_id, "daily_summaries", todayDateStr);
+      const summaryDoc = await transaction.get(summaryRef);
+      const prevSummary = summaryDoc.exists() ? summaryDoc.data() : {};
 
       if (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado") {
         if (!saleData.cashier_id && !saleData.bank_account_id) {
@@ -427,6 +432,24 @@ export const inventory = {
         throw new Error("Transação imediata sem conta de destino processada, impossível registrar financeiro.");
       }
 
+      // 7. Update Daily Summary Rollup
+      const totalCostOfSale = items.reduce((acc, it) => {
+        const prodDoc = productDocs.get(it.id);
+        const pData = prodDoc?.data() || {};
+        const unitCost = Number(pData.cost_price) || Number(pData.cost) || 0;
+        return acc + (unitCost * it.quantity);
+      }, 0);
+
+      transaction.set(summaryRef, {
+        date: todayDateStr,
+        company_id: user.company_id,
+        sales_count: (prevSummary.sales_count || 0) + 1,
+        sales_total: (prevSummary.sales_total || 0) + (Number(saleData.total) || 0),
+        sales_cost_total: (prevSummary.sales_cost_total || 0) + totalCostOfSale,
+        receipts_total: (prevSummary.receipts_total || 0) + (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado" ? (Number(saleData.total) || 0) : 0),
+        updated_at: serverTimestamp()
+      }, { merge: true });
+
       return { id: saleRef.id, ...finalSaleData };
     });
   },
@@ -442,10 +465,15 @@ export const inventory = {
       const purchaseRef = doc(collection(db, "purchases"));
       const reconciliationId = purchaseRef.id;
 
-      // 2. Read all products and accounts FIRST
+      // 2. Read all products, accounts, and daily summary FIRST
       const productDocs = new Map();
       let accountDoc = null;
       let accountRef = null;
+
+      const purchaseDateStr = ((purchaseData.purchase_date as string) || new Date().toISOString()).split("T")[0];
+      const summaryRef = doc(db, "companies", user.company_id, "daily_summaries", purchaseDateStr);
+      const summaryDoc = await transaction.get(summaryRef);
+      const prevSummary = summaryDoc.exists() ? summaryDoc.data() : {};
 
       if (purchaseData.payment_status !== "Pendente") {
         if (!purchaseData.bank_account_id && !purchaseData.cashier_id) {
@@ -607,6 +635,15 @@ export const inventory = {
       } else {
         throw new Error("Transação imediata sem conta de origem processada, impossível registrar financeiro.");
       }
+
+      // 6. Update Daily Summary Rollup
+      transaction.set(summaryRef, {
+        date: purchaseDateStr,
+        company_id: user.company_id,
+        purchases_total: (prevSummary.purchases_total || 0) + (Number(purchaseData.total) || 0),
+        expenses_total: (prevSummary.expenses_total || 0) + (purchaseData.payment_status !== "Pendente" ? (Number(purchaseData.total) || 0) : 0),
+        updated_at: serverTimestamp()
+      }, { merge: true });
 
       return { id: purchaseRef.id, ...finalPurchaseData };
     });

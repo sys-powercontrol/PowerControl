@@ -1,5 +1,32 @@
 import { auth, db } from "./firebase";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, orderBy, limit, OrderByDirection, onSnapshot, QueryConstraint, Query, DocumentData, QuerySnapshot, QueryDocumentSnapshot } from "firebase/firestore";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  serverTimestamp, 
+  orderBy, 
+  limit, 
+  startAfter,
+  OrderByDirection, 
+  onSnapshot, 
+  QueryConstraint, 
+  Query, 
+  DocumentData, 
+  QuerySnapshot, 
+  QueryDocumentSnapshot,
+  getCountFromServer,
+  getAggregateFromServer,
+  sum,
+  average,
+  count,
+  increment
+} from "firebase/firestore";
 import { User, AuditLog } from "../types";
 
 let currentCompanyId: string | null = null;
@@ -38,6 +65,14 @@ const saveToLocalCache = (key: string, data: any) => {
     console.warn("Could not save to localStorage cache:", e);
   }
 };
+
+export interface PageResult<T = any> {
+  items: T[];
+  lastDoc: any | null;
+  hasMore: boolean;
+  totalCount?: number;
+}
+
 
 export const api = {
   updateCurrentUserData: (userData: User | null) => {
@@ -310,8 +345,19 @@ export const api = {
         const queryConstraints: QueryConstraint[] = [...conditions];
         
         if (paramsOrId && typeof paramsOrId === "object") {
+          // Server-side date range constraints
+          if (paramsOrId._dateField && paramsOrId._startDate) {
+            queryConstraints.push(where(paramsOrId._dateField, ">=", paramsOrId._startDate));
+          }
+          if (paramsOrId._dateField && paramsOrId._endDate) {
+            queryConstraints.push(where(paramsOrId._dateField, "<=", paramsOrId._endDate));
+          }
+
           if (paramsOrId._orderBy) {
             queryConstraints.push(orderBy(paramsOrId._orderBy as string, (paramsOrId._orderDir as OrderByDirection) || "asc"));
+          }
+          if (paramsOrId._startAfter) {
+            queryConstraints.push(startAfter(paramsOrId._startAfter));
           }
           if (paramsOrId._limit) {
             queryConstraints.push(limit(paramsOrId._limit as number));
@@ -568,4 +614,298 @@ export const api = {
       }
     }
   },
+
+  // Server-side Count aggregation (Only 1 document read charged by Firestore)
+  count: async (entityPath: string, params?: Record<string, any>): Promise<number> => {
+    try {
+      let q: Query<DocumentData> = collection(db, entityPath);
+      const conditions: QueryConstraint[] = [];
+
+      const isCompanyEntity = entityPath === "companies";
+      const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
+
+      const companyId = requiresIsolation 
+        ? (currentCompanyId || await api.waitForCompany(2000))
+        : (isSystemAdminStatus && !params?._all && !isCompanyEntity ? (currentCompanyId || await api.waitForCompany(500)) : null);
+
+      if (requiresIsolation && !companyId) return 0;
+      if (companyId) {
+        conditions.push(where("company_id", "==", companyId));
+      }
+
+      if (params && typeof params === "object") {
+        Object.keys(params).forEach(key => {
+          if (params[key] !== undefined && !key.startsWith("_")) {
+            conditions.push(where(key, "==", params[key]));
+          }
+        });
+        if (params._dateField && params._startDate) {
+          conditions.push(where(params._dateField, ">=", params._startDate));
+        }
+        if (params._dateField && params._endDate) {
+          conditions.push(where(params._dateField, "<=", params._endDate));
+        }
+      }
+
+      if (conditions.length > 0) {
+        q = query(q, ...conditions);
+      }
+
+      const snapshot = await getCountFromServer(q);
+      return snapshot.data().count;
+    } catch (err) {
+      console.warn(`api.count fallback for ${entityPath}:`, err);
+      // Fallback: estimate from local cache if possible
+      const cached = getFromLocalCache<any[]>(getCacheKey(entityPath, params));
+      return cached ? cached.length : 0;
+    }
+  },
+
+  // Server-side Aggregations (sum, average, count) - (Only 1 document read charged by Firestore)
+  aggregate: async (
+    entityPath: string, 
+    specs: { sum?: string[]; average?: string[]; count?: boolean },
+    params?: Record<string, any>
+  ): Promise<{ sums: Record<string, number>; averages: Record<string, number>; count: number }> => {
+    try {
+      let q: Query<DocumentData> = collection(db, entityPath);
+      const conditions: QueryConstraint[] = [];
+
+      const isCompanyEntity = entityPath === "companies";
+      const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
+
+      const companyId = requiresIsolation 
+        ? (currentCompanyId || await api.waitForCompany(2000))
+        : (isSystemAdminStatus && !params?._all && !isCompanyEntity ? (currentCompanyId || await api.waitForCompany(500)) : null);
+
+      if (requiresIsolation && !companyId) {
+        return { sums: {}, averages: {}, count: 0 };
+      }
+      if (companyId) {
+        conditions.push(where("company_id", "==", companyId));
+      }
+
+      if (params && typeof params === "object") {
+        Object.keys(params).forEach(key => {
+          if (params[key] !== undefined && !key.startsWith("_")) {
+            conditions.push(where(key, "==", params[key]));
+          }
+        });
+        if (params._dateField && params._startDate) {
+          conditions.push(where(params._dateField, ">=", params._startDate));
+        }
+        if (params._dateField && params._endDate) {
+          conditions.push(where(params._dateField, "<=", params._endDate));
+        }
+      }
+
+      if (conditions.length > 0) {
+        q = query(q, ...conditions);
+      }
+
+      const aggMap: Record<string, any> = {};
+      if (specs.count !== false) {
+        aggMap.totalCount = count();
+      }
+      if (specs.sum) {
+        specs.sum.forEach(field => {
+          aggMap[`sum_${field}`] = sum(field);
+        });
+      }
+      if (specs.average) {
+        specs.average.forEach(field => {
+          aggMap[`avg_${field}`] = average(field);
+        });
+      }
+
+      const snapshot = await getAggregateFromServer(q, aggMap);
+      const data = snapshot.data();
+
+      const sums: Record<string, number> = {};
+      if (specs.sum) {
+        specs.sum.forEach(field => {
+          sums[field] = Number(data[`sum_${field}`]) || 0;
+        });
+      }
+
+      const averages: Record<string, number> = {};
+      if (specs.average) {
+        specs.average.forEach(field => {
+          averages[field] = Number(data[`avg_${field}`]) || 0;
+        });
+      }
+
+      return {
+        sums,
+        averages,
+        count: Number(data.totalCount) || 0
+      };
+    } catch (err) {
+      console.warn(`api.aggregate fallback for ${entityPath}:`, err);
+      return { sums: {}, averages: {}, count: 0 };
+    }
+  },
+
+  // Resilient Cursor-based Pagination
+  getPage: async <T = any>(
+    entityPath: string, 
+    options: {
+      pageSize?: number;
+      cursorDoc?: QueryDocumentSnapshot<DocumentData> | null;
+      params?: Record<string, any>;
+      orderByField?: string;
+      orderDir?: OrderByDirection;
+      dateField?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ): Promise<PageResult<T>> => {
+    const pageSize = options.pageSize || 25;
+    try {
+      let q: Query<DocumentData> = collection(db, entityPath);
+      const conditions: QueryConstraint[] = [];
+
+      const isCompanyEntity = entityPath === "companies";
+      const requiresIsolation = !isSystemAdminStatus && !isCompanyEntity;
+
+      const companyId = requiresIsolation 
+        ? (currentCompanyId || await api.waitForCompany(2000))
+        : (isSystemAdminStatus && !options.params?._all && !isCompanyEntity ? (currentCompanyId || await api.waitForCompany(500)) : null);
+
+      if (requiresIsolation && !companyId) {
+        return { items: [], lastDoc: null, hasMore: false, totalCount: 0 };
+      }
+      if (companyId) {
+        conditions.push(where("company_id", "==", companyId));
+      }
+
+      if (options.params && typeof options.params === "object") {
+        Object.keys(options.params).forEach(key => {
+          if (options.params![key] !== undefined && !key.startsWith("_")) {
+            conditions.push(where(key, "==", options.params![key]));
+          }
+        });
+      }
+
+      if (options.dateField && options.startDate) {
+        conditions.push(where(options.dateField, ">=", options.startDate));
+      }
+      if (options.dateField && options.endDate) {
+        conditions.push(where(options.dateField, "<=", options.endDate));
+      }
+
+      const queryConstraints: QueryConstraint[] = [...conditions];
+
+      const sortField = options.orderByField || options.dateField || "created_at";
+      const sortDir = options.orderDir || "desc";
+      queryConstraints.push(orderBy(sortField, sortDir));
+
+      if (options.cursorDoc) {
+        queryConstraints.push(startAfter(options.cursorDoc));
+      }
+
+      // Fetch +1 to detect if there is a next page
+      queryConstraints.push(limit(pageSize + 1));
+
+      q = query(q, ...queryConstraints);
+      const snapshot = await getDocs(q);
+
+      const hasMore = snapshot.docs.length > pageSize;
+      const docsToReturn = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs;
+      const lastDoc = docsToReturn.length > 0 ? docsToReturn[docsToReturn.length - 1] : null;
+
+      const items = docsToReturn.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      })) as T[];
+
+      return {
+        items,
+        lastDoc,
+        hasMore
+      };
+    } catch (err: any) {
+      console.warn(`api.getPage fallback for ${entityPath}:`, err?.message || err);
+      return { items: [], lastDoc: null, hasMore: false };
+    }
+  },
+
+  // Daily Summary Rollups (reads 30 documents instead of thousands of raw sales/expenses)
+  getDailySummaries: async (
+    companyId: string, 
+    startDate: string, 
+    endDate: string
+  ): Promise<Array<{
+    id: string;
+    date: string;
+    company_id: string;
+    sales_count: number;
+    sales_total: number;
+    sales_cost_total: number;
+    purchases_total: number;
+    expenses_total: number;
+    receipts_total: number;
+  }>> => {
+    try {
+      const q = query(
+        collection(db, "companies", companyId, "daily_summaries"),
+        where("date", ">=", startDate),
+        where("date", "<=", endDate),
+        orderBy("date", "asc")
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    } catch (e) {
+      console.warn("api.getDailySummaries error (trying root fallback):", e);
+      try {
+        const qRoot = query(
+          collection(db, "daily_summaries"),
+          where("company_id", "==", companyId),
+          where("date", ">=", startDate),
+          where("date", "<=", endDate),
+          orderBy("date", "asc")
+        );
+        const snapshot = await getDocs(qRoot);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+      } catch (e2) {
+        console.warn("Root daily_summaries fallback error:", e2);
+        return [];
+      }
+    }
+  },
+
+  // Increments / updates a daily rollup doc
+  updateDailySummary: async (
+    companyId: string,
+    date: string,
+    deltas: {
+      sales_count?: number;
+      sales_total?: number;
+      sales_cost_total?: number;
+      purchases_total?: number;
+      expenses_total?: number;
+      receipts_total?: number;
+    }
+  ): Promise<void> => {
+    if (!companyId || !date) return;
+    const summaryRef = doc(db, "companies", companyId, "daily_summaries", date);
+    const updatePayload: Record<string, any> = {
+      date,
+      company_id: companyId,
+      updated_at: serverTimestamp()
+    };
+
+    if (deltas.sales_count !== undefined) updatePayload.sales_count = increment(deltas.sales_count);
+    if (deltas.sales_total !== undefined) updatePayload.sales_total = increment(deltas.sales_total);
+    if (deltas.sales_cost_total !== undefined) updatePayload.sales_cost_total = increment(deltas.sales_cost_total);
+    if (deltas.purchases_total !== undefined) updatePayload.purchases_total = increment(deltas.purchases_total);
+    if (deltas.expenses_total !== undefined) updatePayload.expenses_total = increment(deltas.expenses_total);
+    if (deltas.receipts_total !== undefined) updatePayload.receipts_total = increment(deltas.receipts_total);
+
+    try {
+      await setDoc(summaryRef, updatePayload, { merge: true });
+    } catch (err) {
+      console.warn("Could not update daily summary:", err);
+    }
+  }
 };

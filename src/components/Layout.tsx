@@ -40,6 +40,7 @@ import * as idb from "idb-keyval";
 import GlobalSearch from "./GlobalSearch";
 import NotificationCenter from "./NotificationCenter";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
+import OfflineSyncStatusBar from "./OfflineSyncStatusBar";
 import { useGlobalKeyboardShortcuts } from "../hooks/useGlobalKeyboardShortcuts";
 import Footer from "./Footer";
 
@@ -544,6 +545,8 @@ export default function Layout() {
             </Link>
           </div>
         </header>
+
+        <OfflineSyncStatusBar />
 
         <KeyboardShortcutsModal isOpen={isModalOpen} onClose={closeModal} />
 
