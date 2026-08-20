@@ -28,6 +28,8 @@ import {
   increment
 } from "firebase/firestore";
 import { User, AuditLog } from "../types";
+import { offlineStore } from "./offlineStore";
+import { queryClient } from "./queryClient";
 
 let currentCompanyId: string | null = null;
 let isSystemAdminStatus = false;
@@ -63,6 +65,43 @@ const saveToLocalCache = (key: string, data: any) => {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
     console.warn("Could not save to localStorage cache:", e);
+  }
+};
+
+// Purge any occurrence of a deleted item across all localStorage cached collections
+const removeFromLocalCacheAcrossKeys = (entity: string, id: string) => {
+  try {
+    const prefix = `api_cache_${entity}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith(prefix) || key === `api_cache_${entity}`)) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const filtered = parsed.filter((item: any) => item?.id !== id);
+              if (filtered.length !== parsed.length) {
+                localStorage.setItem(key, JSON.stringify(filtered));
+              }
+            } else if (parsed && typeof parsed === "object" && (parsed.id === id || (parsed as any).items)) {
+              if (parsed.id === id) {
+                localStorage.removeItem(key);
+              } else if (Array.isArray((parsed as any).items)) {
+                const filtered = (parsed as any).items.filter((item: any) => item?.id !== id);
+                if (filtered.length !== (parsed as any).items.length) {
+                  localStorage.setItem(key, JSON.stringify({ ...parsed, items: filtered }));
+                }
+              }
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not purge deleted item from all localStorage keys:", e);
   }
 };
 
@@ -503,14 +542,41 @@ export const api = {
       console.warn(`Firestore delete on ${entity}/${id} error:`, e?.message || e);
     }
 
-    // Update local cache
+    // 1. Purge from all localStorage cache keys
+    removeFromLocalCacheAcrossKeys(entity, id);
+
+    // 2. Purge from IndexedDB offline storage queues if present
     try {
-      const listCacheKey = getCacheKey(entity, undefined);
-      const cachedList = getFromLocalCache<any[]>(listCacheKey) || [];
-      const updatedList = cachedList.filter(item => item.id !== id);
-      saveToLocalCache(listCacheKey, updatedList);
+      await offlineStore.removeRecordFromAllStores(id);
     } catch (e) {
-      console.warn("Could not update local cache after delete:", e);
+      console.warn(`Could not remove ${id} from offlineStore:`, e);
+    }
+
+    // 3. Purge from TanStack Query in-memory and persistent cache
+    try {
+      // Invalidate queries for this entity
+      queryClient.invalidateQueries({ queryKey: [entity] });
+      // Optimistically remove/filter out the deleted record from active query caches
+      queryClient.setQueriesData({ queryKey: [entity] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        if (Array.isArray(oldData)) {
+          return oldData.filter((item: any) => item?.id !== id);
+        }
+        if (typeof oldData === "object" && Array.isArray(oldData.items)) {
+          return {
+            ...oldData,
+            items: oldData.items.filter((item: any) => item?.id !== id)
+          };
+        }
+        if (typeof oldData === "object" && oldData.id === id) {
+          return null;
+        }
+        return oldData;
+      });
+      // Remove individual query entry if cached by specific ID
+      queryClient.removeQueries({ queryKey: [entity, id] });
+    } catch (e) {
+      console.warn(`Could not purge ${entity}/${id} from queryClient:`, e);
     }
 
     return true;

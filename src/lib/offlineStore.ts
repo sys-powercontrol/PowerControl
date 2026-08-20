@@ -292,10 +292,45 @@ export const offlineStore = {
     return newEntity;
   },
 
-  // --- GENERIC ENTITY GETTERS ---
+  // --- GENERIC ENTITY GETTERS & DELETERS ---
   async getPendingEntities(storeName: string): Promise<OfflineEntity[]> {
     const db = await getDB();
     return db.getAll(storeName);
+  },
+
+  async deletePendingEntity(storeName: string, id: string): Promise<void> {
+    const db = await getDB();
+    if (db.objectStoreNames.contains(storeName as any)) {
+      await db.delete(storeName as any, id);
+      await notifyQueueChange();
+    }
+  },
+
+  async removeRecordFromAllStores(id: string): Promise<void> {
+    const db = await getDB();
+    const stores = [
+      STORES.SALES,
+      STORES.SALES_FAILED,
+      STORES.PURCHASES,
+      STORES.ACCOUNTS_PAYABLE,
+      STORES.ACCOUNTS_RECEIVABLE,
+      STORES.INVENTORY_MOVEMENTS,
+      STORES.CLIENTS
+    ];
+
+    for (const storeName of stores) {
+      try {
+        if (db.objectStoreNames.contains(storeName)) {
+          const item = await db.get(storeName, id);
+          if (item) {
+            await db.delete(storeName, id);
+          }
+        }
+      } catch (err) {
+        console.warn(`Could not check/delete ${id} from store ${storeName}:`, err);
+      }
+    }
+    await notifyQueueChange();
   },
 
   // --- SYNC INDIVIDUAL STORES ---

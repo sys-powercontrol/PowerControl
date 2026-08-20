@@ -4,23 +4,27 @@ import { useAuth } from "../lib/auth";
 import { CACHE_TIERS } from "../lib/queryClient";
 import { CursorPagination } from "../components/Common/CursorPagination";
 import { DataFreshnessBadge } from "../components/Common/DataFreshnessBadge";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { offlineStore } from "../lib/offlineStore";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO, format } from "date-fns";
 import { formatCurrency } from "../lib/currencyUtils";
+import { formatBR } from "../lib/dateUtils";
+import { fiscalApi } from "../services/fiscalApi";
 import { 
   Search, 
   Eye, 
   Printer, 
-  XCircle,
-  ChevronDown,
-  Shield,
-  Trash2,
-  FileText,
-  AlertTriangle,
-  RotateCcw,
-  ChevronRight,
-  FileSpreadsheet
+  XCircle, 
+  ChevronDown, 
+  Shield, 
+  Trash2, 
+  FileText, 
+  AlertTriangle, 
+  RotateCcw, 
+  ChevronRight, 
+  FileSpreadsheet,
+  CheckCircle2,
+  ReceiptText
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -34,12 +38,28 @@ type DateFilterType = "day" | "week" | "month" | "custom" | "all";
 export default function SalesHistory() {
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilterType>("day");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [failedSales, setFailedSales] = useState<any[]>([]);
+
+  const [receiptSale, setReceiptSale] = useState<any>(location.state?.lastSale || null);
+  const [showReceipt, setShowReceipt] = useState<boolean>(!!location.state?.showReceipt);
+  const [nfceUrl, setNfceUrl] = useState<string | null>(null);
+  const [nfceErrorMsg, setNfceErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location.state?.lastSale && location.state?.showReceipt) {
+      const timer = setTimeout(() => {
+        setReceiptSale(location.state.lastSale);
+        setShowReceipt(true);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     const loadFailedSales = async () => {
@@ -189,6 +209,85 @@ export default function SalesHistory() {
     queryKey: ["company", currentCompanyId], 
     queryFn: () => api.get(`companies/${currentCompanyId}`),
     enabled: !!currentCompanyId
+  });
+
+  const emitNfceMutation = useMutation({
+    mutationFn: async () => {
+      if (!receiptSale) throw new Error("Nenhuma venda concluída para emitir");
+      
+      const client = { name: receiptSale.client_name, document: receiptSale.client_document || "Consumidor Final" };
+      
+      if (!company?.fiscal_token) {
+        const simulatedReference = `sim_${receiptSale.id}_${Date.now()}`;
+        const accessKey = Array.from({length: 44}, () => Math.floor(Math.random() * 10)).join("");
+        const simulatedInvoice = {
+          sale_id: receiptSale.id,
+          type: "NFCe",
+          client_name: receiptSale.client_name,
+          client_document: receiptSale.client_document || "Consumidor Final",
+          company_id: currentCompanyId,
+          number: Math.floor(Math.random() * 90000) + 10000,
+          series: "001",
+          total: receiptSale.total,
+          status: "Emitida",
+          emission_date: new Date().toISOString(),
+          reference: simulatedReference,
+          protocol: "135150000000000",
+          access_key: accessKey,
+          pdf_url: `https://www.nfe.fazenda.gov.br/portal/consultaRecipiente.aspx?chave=${accessKey}`,
+          xml_url: ""
+        };
+        const docRef = await api.post("invoices", simulatedInvoice) as any;
+        return { ...simulatedInvoice, id: docRef.id };
+      }
+
+      const fiscalConfig = {
+        token: company.fiscal_token,
+        environment: company.fiscal_environment || "sandbox",
+        provider: company.fiscal_provider || "FocusNFe"
+      };
+
+      const result = await fiscalApi.emit(fiscalConfig as any, {
+        sale_id: receiptSale.id,
+        type: "NFCe",
+        client,
+        items: receiptSale.items,
+        total: receiptSale.total,
+        company
+      });
+
+      const invoiceData = {
+        sale_id: receiptSale.id,
+        type: "NFCe",
+        company_id: currentCompanyId,
+        number: result.protocol ? parseInt(result.protocol.slice(-6)) : Math.floor(Math.random() * 90000) + 10000,
+        series: "001",
+        client_name: receiptSale.client_name,
+        client_document: receiptSale.client_document || "Consumidor Final",
+        total: receiptSale.total,
+        status: result.status === "processando" ? "Pendente" : "Emitida",
+        emission_date: new Date().toISOString(),
+        reference: result.reference,
+        protocol: result.protocol,
+        access_key: result.access_key,
+        pdf_url: (result as any).pdf_url || `https://www.nfe.fazenda.gov.br/portal/consultaRecipiente.aspx?chave=${result.access_key}`,
+        xml_url: (result as any).xml_url
+      };
+
+      const docRef = await api.post("invoices", invoiceData) as any;
+      return { ...invoiceData, id: docRef.id };
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      if (data.pdf_url) {
+        setNfceUrl(data.pdf_url);
+      }
+      toast.success("NFC-e emitida com sucesso!");
+    },
+    onError: (err: any) => {
+      setNfceErrorMsg(err.message || "Erro ao emitir NFC-e");
+      toast.error(err.message || "Falha na emissão da NFC-e");
+    }
   });
 
   const filteredSales = sales.filter((s: any) => {
@@ -840,6 +939,98 @@ if (!canView) {
         confirmText="Sim, Excluir"
         isLoading={deleteSaleMutation.isPending}
       />
+
+      {/* Floating Modal "Venda Concluída!" when redirected from POS */}
+      {showReceipt && receiptSale && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
+            onClick={() => {
+              setShowReceipt(false);
+              setReceiptSale(null);
+              setNfceUrl(null);
+              setNfceErrorMsg(null);
+              window.history.replaceState({}, document.title);
+            }} 
+          />
+          <div className="relative bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 size={48} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Venda Concluída!</h2>
+              <p className="text-gray-500">Venda #{receiptSale?.id?.substr(0, 8).toUpperCase()}</p>
+            </div>
+            <div className="text-4xl font-bold text-green-600 py-4">{formatCurrency(receiptSale?.total || 0)}</div>
+            
+            <div className="bg-gray-50 p-4 rounded-2xl text-left space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Cliente</span>
+                <span className="font-bold text-gray-900">{receiptSale?.client_name || "Consumidor Final"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Pagamento</span>
+                <span className="font-bold text-gray-900">{receiptSale?.payment_method}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Data</span>
+                <span className="font-bold text-gray-900">{formatBR(receiptSale?.sale_date, "dd/MM/yyyy HH:mm")}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-4">
+              {nfceUrl ? (
+                <button 
+                  onClick={() => window.open(nfceUrl, '_blank')}
+                  className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors cursor-pointer"
+                >
+                  <FileText size={20} /> Ver DANFE (NFC-e)
+                </button>
+              ) : (
+                <button 
+                  onClick={() => emitNfceMutation.mutate()}
+                  disabled={emitNfceMutation.isPending}
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <ReceiptText size={20} /> {emitNfceMutation.isPending ? "Emitindo NFC-e..." : "Emitir NFC-e Rápida"}
+                </button>
+              )}
+
+              {nfceErrorMsg && (
+                <p className="text-xs text-red-500 bg-red-50 p-2 rounded-xl text-center">{nfceErrorMsg}</p>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => printReceipt(receiptSale, company)}
+                  className="py-3 bg-gray-100 text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  <Printer size={20} /> Recibo 80mm
+                </button>
+                <button 
+                  onClick={() => printA4Quote(receiptSale, company)}
+                  className="py-3 bg-blue-50 text-blue-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  <FileText size={20} /> Orçamento A4
+                </button>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setShowReceipt(false);
+                  setReceiptSale(null);
+                  setNfceUrl(null);
+                  setNfceErrorMsg(null);
+                  window.history.replaceState({}, document.title);
+                }}
+                className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

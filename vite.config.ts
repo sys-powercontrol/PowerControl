@@ -62,6 +62,22 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        onwarn(warning, defaultHandler) {
+          const msg = warning.message || (warning as any).text || '';
+          if (
+            warning.code === 'MODULE_LEVEL_DIRECTIVE' ||
+            msg.includes('Module level directives cause errors') ||
+            msg.includes('"use client"') ||
+            msg.includes('use client')
+          ) {
+            return;
+          }
+          defaultHandler(warning);
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

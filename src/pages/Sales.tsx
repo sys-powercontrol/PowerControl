@@ -609,15 +609,6 @@ export default function Sales() {
       return sale;
     },
     onSuccess: (sale: any) => {
-      if (sale.isOffline) {
-        setCart([]);
-        setSelectedClient(null);
-        setDiscount(0);
-        setHasPending(true);
-        return;
-      }
-      setLastSale(sale);
-      setShowReceipt(true);
       setCart([]);
       setSelectedClient(null);
       setDiscount(0);
@@ -625,7 +616,16 @@ export default function Sales() {
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
+
+      if (sale.isOffline) {
+        setHasPending(true);
+        navigate("/HistoricoVendas", { state: { lastSale: sale, showReceipt: true, isOffline: true } });
+        return;
+      }
+
+      setLastSale(sale);
       toast.success("Venda finalizada com sucesso!");
+      navigate("/HistoricoVendas", { state: { lastSale: sale, showReceipt: true } });
     },
     onError: (err: any) => {
       toast.error(err.message);
