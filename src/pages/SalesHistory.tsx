@@ -24,7 +24,9 @@ import {
   ChevronRight, 
   FileSpreadsheet,
   CheckCircle2,
-  ReceiptText
+  ReceiptText,
+  Calendar,
+  CalendarClock
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -210,6 +212,50 @@ export default function SalesHistory() {
     queryFn: () => api.get(`companies/${currentCompanyId}`),
     enabled: !!currentCompanyId
   });
+
+  const { data: accountsReceivable = [] } = useQuery({
+    queryKey: ["accountsReceivable"],
+    queryFn: () => api.get<any[]>("accountsReceivable"),
+    staleTime: CACHE_TIERS.TRANSACTIONAL.staleTime,
+    gcTime: CACHE_TIERS.TRANSACTIONAL.gcTime,
+  });
+
+  const getSaleDueDate = (sale: any) => {
+    if (!sale) return null;
+    if (sale.due_date) return sale.due_date;
+    const linked = accountsReceivable.find((r: any) => r.sale_id === sale.id || r.reconciliation_id === sale.id);
+    if (linked?.due_date) return linked.due_date;
+    if (["A Prazo", "Boleto", "Fiado"].includes(sale.payment_method) && sale.sale_date) {
+      try {
+        const saleD = new Date(sale.sale_date);
+        saleD.setDate(saleD.getDate() + 30);
+        return saleD.toISOString().split("T")[0];
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const formatDueDateDisplay = (dueDateRaw: string | null | undefined) => {
+    if (!dueDateRaw) return "Não informada";
+    try {
+      if (typeof dueDateRaw === "string" && dueDateRaw.includes("T")) {
+        const d = new Date(dueDateRaw);
+        return d.toLocaleDateString("pt-BR", { timeZone: "UTC" }) || d.toLocaleDateString("pt-BR");
+      }
+      if (typeof dueDateRaw === "string" && dueDateRaw.includes("-")) {
+        const parts = dueDateRaw.split("-");
+        if (parts.length === 3) {
+          return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+        }
+      }
+      const d = new Date(dueDateRaw);
+      return isNaN(d.getTime()) ? String(dueDateRaw) : d.toLocaleDateString("pt-BR");
+    } catch {
+      return String(dueDateRaw);
+    }
+  };
 
   const emitNfceMutation = useMutation({
     mutationFn: async () => {
@@ -719,7 +765,7 @@ if (!canView) {
                   {sale.id.substr(0, 3).toUpperCase()}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-bold text-gray-900">Venda #{sale.id.substr(0, 8).toUpperCase()}</h3>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                       sale.status === "Cancelada" ? "bg-red-100 text-red-700" :
@@ -732,36 +778,50 @@ if (!canView) {
                        sale.status || "Concluída"}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {sale.client_name} • {new Date(sale.sale_date).toLocaleString()}
-                  </p>
+                  <div className="text-xs text-gray-500 mt-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
+                    <span className="font-medium text-gray-700">{sale.client_name}</span>
+                    <span className="hidden sm:inline text-gray-300">•</span>
+                    <span className="text-gray-400">{new Date(sale.sale_date).toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between md:justify-end gap-8">
-                <div className="text-right">
-                  <p className="text-xl font-bold text-gray-900">{formatCurrency(sale.total || 0)}</p>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">{sale.payment_method}</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between md:justify-end gap-3 sm:gap-8 w-full md:w-auto pt-3 sm:pt-0 border-t border-gray-100/80 sm:border-t-0">
+                <div className="text-left sm:text-right flex flex-col items-start sm:items-end gap-1 w-full sm:w-auto">
+                  <span className="text-lg sm:text-xl font-bold text-gray-900 block leading-tight">
+                    {formatCurrency(sale.total || 0)}
+                  </span>
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider block">
+                    {sale.payment_method}
+                  </span>
+                  {(["A Prazo", "Boleto", "Fiado"].includes(sale.payment_method) || sale.due_date) && (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg mt-0.5 self-start sm:self-end">
+                      <Calendar size={12} className="text-amber-600 shrink-0" />
+                      <span>Vencimento: {formatDueDateDisplay(getSaleDueDate(sale))}</span>
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end">
                   <button 
                     onClick={() => { setSelectedSale(sale); setIsDetailsModalOpen(true); }}
-                    className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
+                    className="flex-1 sm:flex-none p-2 sm:p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100/80 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-1"
                     title="Visualizar Detalhes"
                   >
                     <Eye size={18} />
+                    <span className="sm:hidden text-xs font-bold">Ver</span>
                   </button>
                   <button 
                     onClick={() => { setSelectedSale(sale); setIsDetailsModalOpen(true); }}
-                    className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
+                    className="flex-1 sm:flex-none p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100/80 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-1"
                     title="Imprimir Recibo"
                   >
                     <Printer size={18} />
+                    <span className="sm:hidden text-xs font-bold">Recibo</span>
                   </button>
                   {sale.status !== "Cancelada" && canDelete && (
                     <button 
                       onClick={() => handleCancelClick(sale.id)}
-                      className="p-2 sm:p-2.5 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white border border-amber-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
+                      className="p-2 sm:p-2.5 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white border border-amber-100/80 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center justify-center"
                       title="Cancelar Venda"
                     >
                       <XCircle size={18} />
@@ -770,7 +830,7 @@ if (!canView) {
                   {canDelete && (
                     <button 
                       onClick={() => handleDeleteClick(sale.id)}
-                      className="p-2 sm:p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-100/80 rounded-xl transition-all shadow-2xs cursor-pointer"
+                      className="p-2 sm:p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-100/80 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center justify-center"
                       title="Excluir Venda"
                     >
                       <Trash2 size={18} />
@@ -833,25 +893,79 @@ if (!canView) {
               <button onClick={() => setIsDetailsModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             
-            <div className="p-6 overflow-y-auto space-y-8">
-              <div className="grid grid-cols-2 gap-6">
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Cliente</p>
                   <p className="font-bold text-gray-900">{selectedSale.client_name}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Data/Hora</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Data/Hora Emissão</p>
                   <p className="font-bold text-gray-900">{new Date(selectedSale.sale_date).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Pagamento</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Forma de Pagamento</p>
                   <p className="font-bold text-gray-900">{selectedSale.payment_method}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Vendedor</p>
                   <p className="font-bold text-gray-900">{selectedSale.seller_name || "Balcão"}</p>
                 </div>
+                {(["A Prazo", "Boleto", "Fiado"].includes(selectedSale.payment_method) || selectedSale.due_date) && (
+                  <div className="bg-amber-50/80 p-3 rounded-2xl border border-amber-200/80">
+                    <p className="text-[10px] font-bold text-amber-700 uppercase mb-1 flex items-center gap-1">
+                      <Calendar size={13} className="text-amber-600" /> Data de Vencimento
+                    </p>
+                    <p className="font-extrabold text-amber-900 text-sm">
+                      {formatDueDateDisplay(getSaleDueDate(selectedSale))}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Status da Venda</p>
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    selectedSale.status === 'Cancelada' ? 'bg-red-100 text-red-700' :
+                    selectedSale.status === 'Pendente de Estoque' ? 'bg-amber-100 text-amber-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {selectedSale.status || 'Concluída'}
+                  </span>
+                </div>
               </div>
+
+              {(["A Prazo", "Boleto", "Fiado"].includes(selectedSale.payment_method) || selectedSale.due_date) && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/80 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold shrink-0">
+                      <CalendarClock size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                        Venda a Prazo / Faturada ({selectedSale.payment_method})
+                      </p>
+                      <p className="text-sm text-amber-950 font-medium mt-0.5">
+                        Data de Vencimento: <strong className="font-extrabold text-amber-900">{formatDueDateDisplay(getSaleDueDate(selectedSale))}</strong>
+                      </p>
+                    </div>
+                  </div>
+                  {(() => {
+                    const linkedReceivable = accountsReceivable.find((r: any) => r.sale_id === selectedSale.id || r.reconciliation_id === selectedSale.id);
+                    if (!linkedReceivable) return null;
+                    return (
+                      <div className="flex items-center gap-2 self-start sm:self-center">
+                        <span className="text-xs text-amber-800 font-medium">Contas a Receber:</span>
+                        <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
+                          linkedReceivable.status === 'Pago' ? 'bg-emerald-100 text-emerald-800' :
+                          linkedReceivable.status === 'Atrasado' ? 'bg-rose-100 text-rose-800' :
+                          'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}>
+                          {linkedReceivable.status}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
               <div className="space-y-4">
                 <h3 className="font-bold text-gray-900 border-b border-gray-50 pb-2">Itens do Pedido</h3>
@@ -972,6 +1086,12 @@ if (!canView) {
                 <span className="text-gray-500">Pagamento</span>
                 <span className="font-bold text-gray-900">{receiptSale?.payment_method}</span>
               </div>
+              {(["A Prazo", "Boleto", "Fiado"].includes(receiptSale?.payment_method) || receiptSale?.due_date) && (
+                <div className="flex justify-between text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200/60 font-medium">
+                  <span className="flex items-center gap-1 text-amber-700 font-bold"><Calendar size={13} /> Vencimento</span>
+                  <span className="font-extrabold text-amber-900">{formatDueDateDisplay(getSaleDueDate(receiptSale))}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-500">Data</span>
                 <span className="font-bold text-gray-900">{formatBR(receiptSale?.sale_date, "dd/MM/yyyy HH:mm")}</span>

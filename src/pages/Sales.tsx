@@ -98,7 +98,7 @@ export default function Sales() {
       errors.bankAccount = "Selecione a conta bancária destino.";
     }
     
-    if (["A Prazo", "Fiado"].includes(paymentMethod)) {
+    if (["A Prazo", "Fiado", "Boleto"].includes(paymentMethod)) {
       if (!dueDate) {
         errors.dueDate = "Selecione a data de vencimento.";
       } else {
@@ -555,7 +555,7 @@ export default function Sales() {
         discount,
         total_taxes: totalTaxes,
         payment_method: paymentMethod,
-        ...(paymentMethod === "A Prazo" || paymentMethod === "Fiado" ? { due_date: dueDate } : {}),
+        ...(paymentMethod === "A Prazo" || paymentMethod === "Fiado" || paymentMethod === "Boleto" ? { due_date: dueDate } : {}),
         status: "Concluída",
         sale_date: new Date().toISOString()
       };
@@ -951,7 +951,7 @@ if (!canCreate) {
               </div>
             ) : null}
 
-            {(paymentMethod === "A Prazo" || paymentMethod === "Fiado") && (
+            {(paymentMethod === "A Prazo" || paymentMethod === "Fiado" || paymentMethod === "Boleto") && (
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Data de Vencimento *</label>
                 <input 

@@ -11,6 +11,30 @@ const escapeHtml = (unsafe: any): string => {
     .replace(/'/g, "&#039;");
 };
 
+const formatDueDate = (dueDate: any, saleDate?: any): string => {
+  if (dueDate) {
+    try {
+      if (typeof dueDate === 'string' && dueDate.includes('-') && !dueDate.includes('T')) {
+        const [y, m, d] = dueDate.split('-');
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      }
+      return new Date(dueDate).toLocaleDateString('pt-BR');
+    } catch {
+      return String(dueDate);
+    }
+  }
+  if (saleDate) {
+    try {
+      const d = new Date(saleDate);
+      d.setDate(d.getDate() + 30);
+      return d.toLocaleDateString('pt-BR');
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
 export const printReceipt = (sale: any, company: any) => {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -69,6 +93,9 @@ export const printReceipt = (sale: any, company: any) => {
           <div><strong>DATA:</strong> ${escapeHtml(new Date(sale.sale_date).toLocaleString())}</div>
           <div><strong>CLIENTE:</strong> ${escapeHtml(sale.client_name)}</div>
           <div><strong>VENDEDOR:</strong> ${escapeHtml(sale.seller_name || 'Balcão')}</div>
+          ${(["A Prazo", "Boleto", "Fiado"].includes(sale.payment_method) || sale.due_date) ? `
+          <div><strong>VENCIMENTO:</strong> ${escapeHtml(formatDueDate(sale.due_date, sale.sale_date))}</div>
+          ` : ''}
         </div>
         <table>
           <thead>
@@ -187,6 +214,9 @@ export const printA4Quote = (sale: any, company: any) => {
               <h3>DADOS DA VENDA</h3>
               <div><strong>Vendedor:</strong> ${escapeHtml(sale.seller_name || 'Balcão')}</div>
               <div><strong>Condição de Pagamento:</strong> ${escapeHtml(sale.payment_method)}</div>
+              ${(["A Prazo", "Boleto", "Fiado"].includes(sale.payment_method) || sale.due_date) ? `
+              <div><strong>Data de Vencimento:</strong> ${escapeHtml(formatDueDate(sale.due_date, sale.sale_date))}</div>
+              ` : ''}
               <div><strong>Status:</strong> ${escapeHtml(sale.status)}</div>
             </div>
           </div>

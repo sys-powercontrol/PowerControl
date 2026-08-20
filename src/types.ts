@@ -122,6 +122,7 @@ export interface Sale {
   subtotal: number;
   discount: number;
   payment_method: string;
+  due_date?: string;
   seller_id: string;
   seller_name: string;
   commission_amount: number;
