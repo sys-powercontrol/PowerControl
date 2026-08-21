@@ -136,40 +136,61 @@ export default function GlobalDashboard() {
   const [companySearch, setCompanySearch] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"overview" | "financial" | "cashiers" | "companies" | "audit">("overview");
 
-  // Multi-tenant dataset queries
+  // Multi-tenant dataset queries with optimized batch limits and date bounds
   const { data: companies, dataUpdatedAt } = useQuery({ 
     queryKey: ["companies", "all"], 
     queryFn: () => api.get("companies", { _all: true }),
     ...CACHE_TIERS.STATIC
   });
   const { data: sales = [], isLoading: loadingSales, isFetching: isFetchingSales } = useQuery({ 
-    queryKey: ["sales", "all"], 
-    queryFn: () => api.get("sales", { _all: true }),
+    queryKey: ["sales", "all", selectedCompanyId], 
+    queryFn: () => api.getPage("sales", { 
+      pageSize: 150, 
+      params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) },
+      orderByField: "sale_date",
+      orderDir: "desc"
+    }).then(r => r.items),
     ...CACHE_TIERS.REPORTS
   });
   const { data: users = [] } = useQuery({ 
     queryKey: ["users", "all"], 
-    queryFn: () => api.get("users", { _all: true }),
+    queryFn: () => api.get("users", { _all: true, _limit: 100 }),
     ...CACHE_TIERS.STATIC
   });
   const { data: payables = [] } = useQuery({
-    queryKey: ["accountsPayable", "all"],
-    queryFn: () => api.get("accountsPayable", { _all: true }),
+    queryKey: ["accountsPayable", "all", selectedCompanyId],
+    queryFn: () => api.getPage("accountsPayable", { 
+      pageSize: 100, 
+      params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) },
+      orderByField: "due_date",
+      orderDir: "desc"
+    }).then(r => r.items),
     ...CACHE_TIERS.REPORTS
   });
   const { data: receivables = [] } = useQuery({
-    queryKey: ["accountsReceivable", "all"],
-    queryFn: () => api.get("accountsReceivable", { _all: true }),
+    queryKey: ["accountsReceivable", "all", selectedCompanyId],
+    queryFn: () => api.getPage("accountsReceivable", { 
+      pageSize: 100, 
+      params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) },
+      orderByField: "due_date",
+      orderDir: "desc"
+    }).then(r => r.items),
     ...CACHE_TIERS.REPORTS
   });
   const { data: products = [] } = useQuery({
-    queryKey: ["products", "all"],
-    queryFn: () => api.get("products", { _all: true }),
+    queryKey: ["products", "all", selectedCompanyId],
+    queryFn: () => api.getPage("products", { 
+      pageSize: 100, 
+      params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) }
+    }).then(r => r.items),
     ...CACHE_TIERS.MASTER
   });
   const { data: cashiers = [] } = useQuery({
-    queryKey: ["cashiers", "all"],
-    queryFn: () => api.get("cashiers", { _all: true }),
+    queryKey: ["cashiers", "all", selectedCompanyId],
+    queryFn: () => api.getPage("cashiers", { 
+      pageSize: 50, 
+      params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) }
+    }).then(r => r.items),
     ...CACHE_TIERS.MASTER
   });
   const { data: auditLogs = [] } = useQuery({

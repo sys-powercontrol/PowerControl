@@ -60,7 +60,7 @@ export default function AccountsReceivable() {
 
   const { data: accountsData = [], isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({ 
     queryKey: ["accountsReceivable", currentCompanyId], 
-    queryFn: () => api.get("accountsReceivable", { _orderBy: "due_date", _orderDir: "desc" }),
+    queryFn: () => api.getPage("accountsReceivable", { pageSize: 150, orderByField: "due_date", orderDir: "desc" }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.TRANSACTIONAL
   });

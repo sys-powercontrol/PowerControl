@@ -49,16 +49,34 @@ export default function ProfitabilityReport() {
 
   const currentCompanyId = api.getCompanyId();
 
+  const startDateStr = useMemo(() => {
+    const now = getNowBR();
+    const startDate = subDays(now, parseInt(dateRange) || 30);
+    return formatBR(startDate, 'yyyy-MM-dd');
+  }, [dateRange]);
+
   const { data: sales = [], isLoading: isLoadingSales, isFetching: isFetchingSales, dataUpdatedAt, refetch } = useQuery({ 
-    queryKey: ["sales", currentCompanyId], 
-    queryFn: () => api.get("sales"),
+    queryKey: ["sales_profitability", currentCompanyId, startDateStr], 
+    queryFn: () => api.getPage("sales", { 
+      pageSize: 500, 
+      startDate: startDateStr, 
+      dateField: "sale_date", 
+      orderByField: "sale_date", 
+      orderDir: "desc" 
+    }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.REPORTS
   });
 
   const { data: accountsPayable = [], isLoading: isLoadingExpenses } = useQuery({ 
-    queryKey: ["accountsPayable", currentCompanyId], 
-    queryFn: () => api.get("accountsPayable"),
+    queryKey: ["accountsPayable_profitability", currentCompanyId, startDateStr], 
+    queryFn: () => api.getPage("accountsPayable", { 
+      pageSize: 500, 
+      startDate: startDateStr, 
+      dateField: "payment_date", 
+      orderByField: "payment_date", 
+      orderDir: "desc" 
+    }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.REPORTS
   });

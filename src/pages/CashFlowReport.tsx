@@ -64,30 +64,61 @@ export default function CashFlowReport() {
   });
   const [filterType, setFilterType] = useState("current_month");
 
+  const startDateStr = formatBR(dateRange.start, 'yyyy-MM-dd');
+  const endDateStr = formatBR(dateRange.end, 'yyyy-MM-dd');
+
   const { data: sales = [], isFetching: isFetchingSales, dataUpdatedAt: salesUpdatedAt, refetch: refetchSales } = useQuery({ 
-    queryKey: ["sales", currentCompanyId], 
-    queryFn: () => api.get("sales"),
+    queryKey: ["sales_report", currentCompanyId, startDateStr, endDateStr], 
+    queryFn: () => api.getPage("sales", { 
+      pageSize: 500, 
+      startDate: startDateStr, 
+      endDate: endDateStr + "T23:59:59", 
+      dateField: "sale_date", 
+      orderByField: "sale_date", 
+      orderDir: "desc" 
+    }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.REPORTS
   });
 
   const { data: purchases = [] } = useQuery({ 
-    queryKey: ["purchases", currentCompanyId], 
-    queryFn: () => api.get("purchases"),
+    queryKey: ["purchases_report", currentCompanyId, startDateStr, endDateStr], 
+    queryFn: () => api.getPage("purchases", { 
+      pageSize: 500, 
+      startDate: startDateStr, 
+      endDate: endDateStr + "T23:59:59", 
+      dateField: "purchase_date", 
+      orderByField: "purchase_date", 
+      orderDir: "desc" 
+    }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.REPORTS
   });
 
   const { data: accountsPayable = [] } = useQuery({ 
-    queryKey: ["accountsPayable", currentCompanyId], 
-    queryFn: () => api.get("accountsPayable"),
+    queryKey: ["accountsPayable_report", currentCompanyId, startDateStr, endDateStr], 
+    queryFn: () => api.getPage("accountsPayable", { 
+      pageSize: 500, 
+      startDate: startDateStr, 
+      endDate: endDateStr + "T23:59:59", 
+      dateField: "payment_date", 
+      orderByField: "payment_date", 
+      orderDir: "desc" 
+    }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.REPORTS
   });
 
   const { data: accountsReceivable = [] } = useQuery({ 
-    queryKey: ["accountsReceivable", currentCompanyId], 
-    queryFn: () => api.get("accountsReceivable"),
+    queryKey: ["accountsReceivable_report", currentCompanyId, startDateStr, endDateStr], 
+    queryFn: () => api.getPage("accountsReceivable", { 
+      pageSize: 500, 
+      startDate: startDateStr, 
+      endDate: endDateStr + "T23:59:59", 
+      dateField: "receipt_date", 
+      orderByField: "receipt_date", 
+      orderDir: "desc" 
+    }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.REPORTS
   });

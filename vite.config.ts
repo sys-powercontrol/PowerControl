@@ -64,17 +64,18 @@ export default defineConfig(({mode}) => {
     },
     build: {
       rollupOptions: {
-        onwarn(warning, defaultHandler) {
-          const msg = warning.message || (warning as any).text || '';
+        onwarn(warning, warn) {
           if (
             warning.code === 'MODULE_LEVEL_DIRECTIVE' ||
-            msg.includes('Module level directives cause errors') ||
-            msg.includes('"use client"') ||
-            msg.includes('use client')
+            (warning.message && (
+              warning.message.includes('Module level directives') ||
+              warning.message.includes('"use client"') ||
+              warning.message.includes('use client')
+            ))
           ) {
             return;
           }
-          defaultHandler(warning);
+          warn(warning);
         },
       },
     },

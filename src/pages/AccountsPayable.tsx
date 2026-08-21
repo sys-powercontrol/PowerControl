@@ -67,7 +67,7 @@ export default function AccountsPayable() {
 
   const { data: accountsData = [], isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({ 
     queryKey: ["accountsPayable", currentCompanyId], 
-    queryFn: () => api.get("accountsPayable", { _orderBy: "due_date", _orderDir: "desc" }),
+    queryFn: () => api.getPage("accountsPayable", { pageSize: 150, orderByField: "due_date", orderDir: "desc" }).then(r => r.items),
     enabled: !!user,
     ...CACHE_TIERS.TRANSACTIONAL
   });
