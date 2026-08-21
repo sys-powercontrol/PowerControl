@@ -758,16 +758,16 @@ if (!canView) {
             Nenhuma venda encontrada.
           </div>
         ) : filteredSales.map((sale: any) => (
-          <div key={sale.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group">
-            <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold text-xs">
+          <div key={sale.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group w-full max-w-full min-w-0">
+            <div className="p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 w-full max-w-full min-w-0">
+              <div className="flex items-center gap-3 sm:gap-4 w-full md:w-auto min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold text-xs shrink-0">
                   {sale.id.substr(0, 3).toUpperCase()}
                 </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-gray-900">Venda #{sale.id.substr(0, 8).toUpperCase()}</h3>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">Venda #{sale.id.substr(0, 8).toUpperCase()}</h3>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
                       sale.status === "Cancelada" ? "bg-red-100 text-red-700" :
                       sale.status === "Pendente de Estoque" ? "bg-amber-100 text-amber-700 font-extrabold border border-amber-300" :
                       (sale.is_offline_sync || sale.synced_at || sale.isOfflineSync) ? "bg-purple-100 text-purple-700 border border-purple-200" :
@@ -778,30 +778,30 @@ if (!canView) {
                        sale.status || "Concluída"}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
-                    <span className="font-medium text-gray-700">{sale.client_name}</span>
-                    <span className="hidden sm:inline text-gray-300">•</span>
-                    <span className="text-gray-400">{new Date(sale.sale_date).toLocaleString()}</span>
+                  <div className="text-xs text-gray-500 mt-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5 min-w-0">
+                    <span className="font-medium text-gray-700 truncate">{sale.client_name}</span>
+                    <span className="hidden sm:inline text-gray-300 shrink-0">•</span>
+                    <span className="text-gray-400 shrink-0">{new Date(sale.sale_date).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between md:justify-end gap-3 sm:gap-8 w-full md:w-auto pt-3 sm:pt-0 border-t border-gray-100/80 sm:border-t-0">
-                <div className="text-left sm:text-right flex flex-col items-start sm:items-end gap-1 w-full sm:w-auto">
-                  <span className="text-lg sm:text-xl font-bold text-gray-900 block leading-tight">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between md:justify-end gap-3 sm:gap-8 w-full md:w-auto pt-3 sm:pt-0 border-t border-gray-100/80 sm:border-t-0 min-w-0">
+                <div className="text-left sm:text-right flex flex-col items-start sm:items-end gap-1 w-full sm:w-auto min-w-0">
+                  <span className="text-lg sm:text-xl font-bold text-gray-900 block leading-tight truncate max-w-full">
                     {formatCurrency(sale.total || 0)}
                   </span>
-                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider block">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider block truncate max-w-full">
                     {sale.payment_method}
                   </span>
                   {(["A Prazo", "Boleto", "Fiado"].includes(sale.payment_method) || sale.due_date) && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg mt-0.5 self-start sm:self-end">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg mt-0.5 self-start sm:self-end max-w-full truncate">
                       <Calendar size={12} className="text-amber-600 shrink-0" />
-                      <span>Vencimento: {formatDueDateDisplay(getSaleDueDate(sale))}</span>
+                      <span className="truncate">Vencimento: {formatDueDateDisplay(getSaleDueDate(sale))}</span>
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end">
+                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end shrink-0">
                   <button 
                     onClick={() => { setSelectedSale(sale); setIsDetailsModalOpen(true); }}
                     className="flex-1 sm:flex-none p-2 sm:p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100/80 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-1"
@@ -843,7 +843,7 @@ if (!canView) {
             {/* Items Summary (Collapsed) */}
             <div 
               onClick={() => { setSelectedSale(sale); setIsDetailsModalOpen(true); }}
-              className="px-6 py-3 bg-gray-50/50 border-t border-gray-50 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
+              className="px-4 sm:px-6 py-3 bg-gray-50/50 border-t border-gray-50 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors w-full max-w-full min-w-0"
             >
               <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
                 <ChevronDown size={14} /> {sale.items?.length || 0} itens no pedido
