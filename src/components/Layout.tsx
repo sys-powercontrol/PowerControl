@@ -6,8 +6,6 @@ import {
   Users, 
   Wallet, 
   CreditCard, 
-  User, 
-  UserPlus,
   Crown, 
   HelpCircle,
   Menu,
@@ -152,12 +150,6 @@ export default function Layout() {
     };
   }, []);
 
-  const { data: company } = useQuery({ 
-    queryKey: ["company", effectiveCompanyId], 
-    queryFn: () => effectiveCompanyId ? api.get(`companies/${effectiveCompanyId}`) : null,
-    enabled: !!effectiveCompanyId
-  });
-
   const handleCompanyChange = (id: string | null) => {
     if (user?.role !== 'master' && id === "global") {
       return;
@@ -269,8 +261,6 @@ export default function Layout() {
     },
     { name: "Minha Empresa", path: "/Empresa", icon: Building2, requiresCompany: true, permission: 'settings.manage' },
     { name: "Funcionários", path: "/Funcionarios", icon: Users, requiresCompany: true, permission: 'employees.manage' },
-    { name: "Convites", path: "/Convites", icon: UserPlus, requiresCompany: true, permission: 'employees.manage' },
-    { name: "Meu Perfil", path: "/MeuPerfil", icon: User },
     { name: "Configurações", path: "/Configuracoes", icon: Zap, requiresCompany: true, permission: 'settings.manage' },
     { name: "Suporte", path: "/Suporte", icon: HelpCircle },
   ];
@@ -462,22 +452,9 @@ export default function Layout() {
               </select>
             </div>
           ) : null}
-          <div className="flex items-center gap-3 p-2">
-            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold overflow-hidden shrink-0">
-              {user?.avatar ? (
-                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                user?.full_name?.charAt(0) || "U"
-              )}
-            </div>
-            <div className="overflow-hidden min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">{user?.full_name || "Carregando..."}</p>
-              <p className="text-xs text-gray-500 truncate">{company?.name || (user?.role === 'master' && !selectedCompanyId ? "Visão Global" : "Sem empresa")}</p>
-            </div>
-          </div>
           <button 
             onClick={handleLogout}
-            className="w-full mt-2 p-2 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer"
+            className="w-full p-2 text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer"
           >
             <LogOut size={18} />
             Sair do Sistema

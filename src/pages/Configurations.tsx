@@ -28,13 +28,15 @@ import {
   ChevronDown,
   FileText,
   Lock,
-  ExternalLink
+  ExternalLink,
+  UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { InputMask } from "../components/ui/InputMask";
 import ConfirmationModal from "../components/ConfirmationModal";
 import TermsAcceptanceCard from "../components/TermsAcceptanceCard";
 import LegalModal from "../components/LegalModal";
+import InvitesManager from "../components/InvitesManager";
 
 export default function Configurations() {
   const queryClient = useQueryClient();
@@ -330,9 +332,9 @@ export default function Configurations() {
     { id: "general", name: "Geral", icon: Building2 },
     { id: "payments", name: "Pagamentos", icon: CreditCard },
     { id: "notifications", name: "Notificações", icon: Bell },
+    { id: "invites", name: "Convites", icon: UserPlus },
     { id: "fiscal", name: "Fiscal / API", icon: Zap },
     { id: "permissions", name: "Permissões", icon: ShieldCheck },
-    { id: "security", name: "Segurança", icon: Shield },
     { id: "legal", name: "Termos & Privacidade", icon: FileText },
   ];
 
@@ -1055,6 +1057,10 @@ if (!canManage) {
                 </div>
               )}
 
+              {activeTab === "invites" && (
+                <InvitesManager />
+              )}
+
               {activeTab === "legal" && (
                 <div className="space-y-6">
                   <div className="flex items-center gap-4 pb-4 border-b border-gray-50">
@@ -1131,12 +1137,14 @@ if (!canManage) {
                 </div>
               )}
 
-              <div className="flex justify-end pt-8 border-t border-gray-50">
-                <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50">
-                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                  {isSaving ? "Salvando..." : "Salvar Alterações"}
-                </button>
-              </div>
+              {activeTab !== "legal" && activeTab !== "invites" && (
+                <div className="flex justify-end pt-8 border-t border-gray-50">
+                  <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50">
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                    {isSaving ? "Salvando..." : "Salvar Alterações"}
+                  </button>
+                </div>
+              )}
             </form>
           )}
         </div>
