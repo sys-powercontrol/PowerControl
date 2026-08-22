@@ -63,19 +63,19 @@ export default defineConfig(({mode}) => {
       },
     },
     build: {
+      chunkSizeWarningLimit: 2000,
       rollupOptions: {
-        onwarn(warning, warn) {
+        onwarn(warning, defaultHandler) {
           if (
             warning.code === 'MODULE_LEVEL_DIRECTIVE' ||
-            (warning.message && (
+            (typeof warning.message === 'string' && (
               warning.message.includes('Module level directives') ||
-              warning.message.includes('"use client"') ||
               warning.message.includes('use client')
             ))
           ) {
             return;
           }
-          warn(warning);
+          defaultHandler(warning);
         },
       },
     },
