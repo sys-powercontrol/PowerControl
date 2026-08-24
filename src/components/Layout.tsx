@@ -46,6 +46,95 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const MENU_ITEMS: { 
+  name: string; 
+  path?: string; 
+  icon: any; 
+  requiresCompany?: boolean; 
+  requiresAdmin?: boolean;
+  requiresSystemAdmin?: boolean;
+  hideForAdmin?: boolean;
+  permission?: PermissionId;
+  submenu?: { 
+    name: string; 
+    path: string; 
+    icon?: any; 
+    requiresAdmin?: boolean;
+    permission?: PermissionId;
+  }[];
+}[] = [
+  { name: "Dashboard", path: "/", icon: LayoutDashboard, permission: 'dashboard.view' },
+  { name: "Meu Painel", path: "/PainelVendedor", icon: TrendingUp, requiresCompany: true, hideForAdmin: true },
+  { name: "Admin Master", path: "/PainelAdminMaster", icon: Crown, requiresSystemAdmin: true },
+  { name: "Dashboard Global", path: "/DashboardGlobal", icon: Globe, requiresSystemAdmin: true },
+  { 
+    name: "Catálogo", 
+    icon: Package,
+    requiresCompany: true,
+    submenu: [
+      { name: "Produtos", path: "/Produtos", permission: 'products.view' },
+      { name: "Categorias", path: "/Categorias", permission: 'products.view' },
+      { name: "Marcas", path: "/Marcas", permission: 'products.view' },
+      { name: "Serviços", path: "/Servicos", permission: 'products.view' },
+      { name: "Ajustes de Estoque", path: "/AjustesEstoque", permission: 'inventory.manage' },
+      { name: "Histórico de Estoque", path: "/HistoricoEstoque", icon: History, permission: 'inventory.manage' },
+      { name: "Giro e Reposição", path: "/RelatorioGiro", icon: BarChart3, permission: 'reports.view' },
+    ]
+  },
+  { 
+    name: "Compras", 
+    icon: Truck,
+    requiresCompany: true,
+    submenu: [
+      { name: "Comprar", path: "/Compras", permission: 'inventory.manage' },
+      { name: "Histórico", path: "/HistoricoCompras", permission: 'inventory.manage' },
+    ]
+  },
+  { 
+    name: "Vendas", 
+    icon: ShoppingCart,
+    requiresCompany: true,
+    submenu: [
+      { name: "Vender", path: "/Vender", permission: 'sales.create' },
+      { name: "Histórico", path: "/HistoricoVendas", permission: 'sales.view' },
+      { name: "Comissões", path: "/Comissoes", permission: 'reports.view' },
+      { name: "Vendedores", path: "/Vendedores", permission: 'sellers.manage' },
+    ]
+  },
+  { name: "Clientes", path: "/Clientes", icon: Users, requiresCompany: true, permission: 'sales.view' },
+  { 
+    name: "Financeiro", 
+    icon: Wallet,
+    requiresCompany: true,
+    submenu: [
+      { name: "Caixas", path: "/Caixas", icon: CreditCard, permission: 'finance.view' },
+      { name: "Contas a Pagar", path: "/ContasPagar", icon: TrendingDown, permission: 'finance.view' },
+      { name: "Contas a Receber", path: "/ContasReceber", icon: TrendingUp, permission: 'finance.view' },
+      { name: "Lucratividade", path: "/RelatorioLucratividade", icon: TrendingUp, permission: 'reports.view' },
+      { name: "Relatório DRE", path: "/RelatorioDRE", icon: BarChart3, permission: 'reports.view' },
+      { name: "Contas Bancárias", path: "/ContasBancarias", icon: Building2, permission: 'finance.manage' },
+      { name: "Conciliação Bancária", path: "/ConciliacaoBancaria", icon: ArrowRightLeft, permission: 'finance.manage' },
+      { name: "Transferências", path: "/Transferencias", icon: ArrowRightLeft, permission: 'finance.manage' },
+      { name: "Fornecedores", path: "/Fornecedores", icon: Users, permission: 'finance.view' },
+      { name: "Centro de Custos", path: "/Categorias", icon: Tag, permission: 'finance.manage' },
+    ]
+  },
+  { 
+    name: "Fiscal", 
+    icon: Zap, 
+    requiresCompany: true, 
+    submenu: [
+      { name: "Notas Fiscais", path: "/Fiscal", permission: 'fiscal.manage' },
+      { name: "Configurações", path: "/ConfiguracoesFiscais", permission: 'fiscal.manage' },
+      { name: "Certificado Digital", path: "/Certificado", permission: 'fiscal.manage' },
+    ]
+  },
+  { name: "Minha Empresa", path: "/Empresa", icon: Building2, requiresCompany: true, permission: 'settings.manage' },
+  { name: "Funcionários", path: "/Funcionarios", icon: Users, requiresCompany: true, permission: 'employees.manage' },
+  { name: "Configurações", path: "/Configuracoes", icon: Zap, requiresCompany: true, permission: 'settings.manage' },
+  { name: "Suporte", path: "/Suporte", icon: HelpCircle },
+];
+
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -176,99 +265,11 @@ export default function Layout() {
     setOpenSubmenus(prev => ({ ...prev, [name]: !prev[name] }));
   };
 
-  const menuItems: { 
-    name: string; 
-    path?: string; 
-    icon: any; 
-    requiresCompany?: boolean; 
-    requiresAdmin?: boolean;
-    requiresSystemAdmin?: boolean;
-    hideForAdmin?: boolean;
-    permission?: PermissionId;
-    submenu?: { 
-      name: string; 
-      path: string; 
-      icon?: any; 
-      requiresAdmin?: boolean;
-      permission?: PermissionId;
-    }[];
-  }[] = [
-    { name: "Dashboard", path: "/", icon: LayoutDashboard, permission: 'dashboard.view' },
-    { name: "Meu Painel", path: "/PainelVendedor", icon: TrendingUp, requiresCompany: true, hideForAdmin: true },
-    { name: "Admin Master", path: "/PainelAdminMaster", icon: Crown, requiresSystemAdmin: true },
-    { name: "Dashboard Global", path: "/DashboardGlobal", icon: Globe, requiresSystemAdmin: true },
-    { 
-      name: "Catálogo", 
-      icon: Package,
-      requiresCompany: true,
-      submenu: [
-        { name: "Produtos", path: "/Produtos", permission: 'products.view' },
-        { name: "Categorias", path: "/Categorias", permission: 'products.view' },
-        { name: "Marcas", path: "/Marcas", permission: 'products.view' },
-        { name: "Serviços", path: "/Servicos", permission: 'products.view' },
-        { name: "Ajustes de Estoque", path: "/AjustesEstoque", permission: 'inventory.manage' },
-        { name: "Histórico de Estoque", path: "/HistoricoEstoque", icon: History, permission: 'inventory.manage' },
-        { name: "Giro e Reposição", path: "/RelatorioGiro", icon: BarChart3, permission: 'reports.view' },
-      ]
-    },
-    { 
-      name: "Compras", 
-      icon: Truck,
-      requiresCompany: true,
-      submenu: [
-        { name: "Comprar", path: "/Compras", permission: 'inventory.manage' },
-        { name: "Histórico", path: "/HistoricoCompras", permission: 'inventory.manage' },
-      ]
-    },
-    { 
-      name: "Vendas", 
-      icon: ShoppingCart,
-      requiresCompany: true,
-      submenu: [
-        { name: "Vender", path: "/Vender", permission: 'sales.create' },
-        { name: "Histórico", path: "/HistoricoVendas", permission: 'sales.view' },
-        { name: "Comissões", path: "/Comissoes", permission: 'reports.view' },
-        { name: "Vendedores", path: "/Vendedores", permission: 'sellers.manage' },
-      ]
-    },
-    { name: "Clientes", path: "/Clientes", icon: Users, requiresCompany: true, permission: 'sales.view' },
-    { 
-      name: "Financeiro", 
-      icon: Wallet,
-      requiresCompany: true,
-      submenu: [
-        { name: "Contas a Pagar", path: "/ContasPagar", icon: TrendingDown, permission: 'finance.view' },
-        { name: "Contas a Receber", path: "/ContasReceber", icon: TrendingUp, permission: 'finance.view' },
-        { name: "Lucratividade", path: "/RelatorioLucratividade", icon: TrendingUp, permission: 'reports.view' },
-        { name: "Relatório DRE", path: "/RelatorioDRE", icon: BarChart3, permission: 'reports.view' },
-        { name: "Contas Bancárias", path: "/ContasBancarias", icon: Building2, permission: 'finance.manage' },
-        { name: "Conciliação Bancária", path: "/ConciliacaoBancaria", icon: ArrowRightLeft, permission: 'finance.manage' },
-        { name: "Transferências", path: "/Transferencias", icon: ArrowRightLeft, permission: 'finance.manage' },
-        { name: "Fornecedores", path: "/Fornecedores", icon: Users, permission: 'finance.view' },
-        { name: "Centro de Custos", path: "/Categorias", icon: Tag, permission: 'finance.manage' },
-      ]
-    },
-    { name: "Caixas", path: "/Caixas", icon: CreditCard, requiresCompany: true, permission: 'finance.view' },
-    { 
-      name: "Fiscal", 
-      icon: Zap, 
-      requiresCompany: true, 
-      submenu: [
-        { name: "Notas Fiscais", path: "/Fiscal", permission: 'fiscal.manage' },
-        { name: "Configurações", path: "/ConfiguracoesFiscais", permission: 'fiscal.manage' },
-        { name: "Certificado Digital", path: "/Certificado", permission: 'fiscal.manage' },
-      ]
-    },
-    { name: "Minha Empresa", path: "/Empresa", icon: Building2, requiresCompany: true, permission: 'settings.manage' },
-    { name: "Funcionários", path: "/Funcionarios", icon: Users, requiresCompany: true, permission: 'employees.manage' },
-    { name: "Configurações", path: "/Configuracoes", icon: Zap, requiresCompany: true, permission: 'settings.manage' },
-    { name: "Suporte", path: "/Suporte", icon: HelpCircle },
-  ];
   const { hasPermission } = useAuth();
   const isUserAdmin = user?.role === 'admin' || user?.role === 'master';
   const isPendingApproval = Boolean(user && user.role !== 'master' && !user.is_active);
 
-  const filteredMenuItems = menuItems.filter(item => {
+  const filteredMenuItems = MENU_ITEMS.filter(item => {
     if (isPendingApproval) {
       return item.path === "/MeuPerfil" || item.path === "/Suporte";
     }
@@ -305,9 +306,17 @@ export default function Layout() {
 
   const isActive = (path: string) => location.pathname === path;
 
+  useEffect(() => {
+    MENU_ITEMS.forEach(item => {
+      if (item.submenu?.some(sub => sub.path === location.pathname)) {
+        setOpenSubmenus(prev => ({ ...prev, [item.name]: true }));
+      }
+    });
+  }, [location.pathname]);
+
   // Route permission guard
   const currentRouteConfig = (() => {
-    for (const item of menuItems) {
+    for (const item of MENU_ITEMS) {
       if (item.path === location.pathname) {
         return { 
           permission: item.permission, 
