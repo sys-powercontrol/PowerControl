@@ -16,7 +16,8 @@ import {
   Pencil,
   ChevronRight,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Warehouse
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -51,6 +52,32 @@ export default function PurchaseHistory() {
     queryFn: () => api.get("purchases", { _orderBy: "purchase_date", _orderDir: "desc" }),
     enabled: !!user
   });
+
+  const { data: productsData = [] } = useQuery({
+    queryKey: ["products", currentCompanyId],
+    queryFn: () => api.get("products", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    enabled: !!user
+  });
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, any>();
+    productsData.forEach((p: any) => {
+      if (p.id) map.set(p.id, p);
+    });
+    return map;
+  }, [productsData]);
+
+  const getProductLoc = (item: any): string => {
+    if (item.storage_location) return item.storage_location;
+    const prod = item.id ? productMap.get(item.id) : null;
+    if (prod?.storage_location) return prod.storage_location;
+    if (prod?.storage_code) return prod.storage_code;
+    const parts = [item.storage_room || prod?.storage_room, item.storage_rack || prod?.storage_rack, item.storage_shelf || prod?.storage_shelf].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join("-");
+    }
+    return "";
+  };
 
   const filteredPurchases = useMemo(() => {
     return purchasesData.filter((p: any) => 
@@ -384,14 +411,27 @@ if (!canView) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {selectedPurchase.items?.map((item: any, i: number) => (
-                        <tr key={i} className="hover:bg-gray-50/50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
-                          <td className="px-4 py-3 text-center text-gray-600">{item.quantity}</td>
-                          <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(item.cost || 0)}</td>
-                          <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency((item.cost || 0) * (item.quantity || 0))}</td>
-                        </tr>
-                      ))}
+                      {selectedPurchase.items?.map((item: any, i: number) => {
+                        const loc = getProductLoc(item);
+                        return (
+                          <tr key={i} className="hover:bg-gray-50/50">
+                            <td className="px-4 py-3 font-medium text-gray-900">
+                              <div className="flex flex-col">
+                                <span className="truncate">{item.name}</span>
+                                {loc && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold font-mono text-emerald-700 bg-emerald-50 border border-emerald-200/60 rounded px-1.5 py-0.5 w-fit mt-0.5">
+                                    <Warehouse size={10} className="text-emerald-600" />
+                                    {loc}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center text-gray-600">{item.quantity}</td>
+                            <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(item.cost || 0)}</td>
+                            <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency((item.cost || 0) * (item.quantity || 0))}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot className="bg-gray-50 border-t border-gray-100">
                       <tr>

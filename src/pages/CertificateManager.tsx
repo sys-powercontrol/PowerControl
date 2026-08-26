@@ -22,7 +22,9 @@ import { toast } from "sonner";
 import forge from "node-forge";
 import CryptoJS from "crypto-js";
 
-const MASTER_KEY = "powercontrol-secret-key";
+const getTenantCryptoKey = (companyId: string | null) => {
+  return CryptoJS.SHA256(`powercontrol_cert_vault_${companyId || 'system'}_v2`).toString();
+};
 
 export default function CertificateManager() {
   const { hasPermission } = useAuth();
@@ -32,6 +34,7 @@ export default function CertificateManager() {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [currentTime] = useState(() => Date.now());
 
   const { data: certificates = [] } = useQuery({
     queryKey: ["certificates", currentCompanyId],
@@ -40,6 +43,13 @@ export default function CertificateManager() {
   });
 
   const activeCertificate = certificates.find((c: any) => c.active);
+
+  const expirationDaysRemaining = React.useMemo(() => {
+    if (!activeCertificate?.expiration_date) return null;
+    const exp = new Date(activeCertificate.expiration_date).getTime();
+    const diff = Math.ceil((exp - currentTime) / (1000 * 60 * 60 * 24));
+    return diff;
+  }, [activeCertificate, currentTime]);
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -95,7 +105,7 @@ export default function CertificateManager() {
         }
 
         // 4. Store metadata in Firestore
-        const encryptedPassword = CryptoJS.AES.encrypt(password, MASTER_KEY).toString();
+        const encryptedPassword = CryptoJS.AES.encrypt(password, getTenantCryptoKey(currentCompanyId)).toString();
 
         const certData = {
           company_id: currentCompanyId,
@@ -193,9 +203,19 @@ if (!canManage) {
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4">
               {activeCertificate ? (
-                <div className="flex items-center gap-1 px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold">
-                  <CheckCircle2 size={14} /> Ativo
-                </div>
+                expirationDaysRemaining !== null && expirationDaysRemaining <= 0 ? (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-bold">
+                    <AlertCircle size={14} /> Vencido
+                  </div>
+                ) : expirationDaysRemaining !== null && expirationDaysRemaining <= 30 ? (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-bold">
+                    <AlertCircle size={14} /> Expira em {expirationDaysRemaining} dia{expirationDaysRemaining > 1 ? 's' : ''}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold">
+                    <CheckCircle2 size={14} /> Ativo e Válido
+                  </div>
+                )
               ) : (
                 <div className="flex items-center gap-1 px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-bold">
                   <AlertCircle size={14} /> Não Configurado
@@ -243,6 +263,19 @@ if (!canManage) {
                         ••••••••
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {activeCertificate && expirationDaysRemaining !== null && expirationDaysRemaining <= 30 && (
+                  <div className={`p-3.5 rounded-2xl flex items-start gap-2.5 text-xs font-semibold ${
+                    expirationDaysRemaining <= 0 ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                  }`}>
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    <span>
+                      {expirationDaysRemaining <= 0
+                        ? "Atenção: Este certificado está expirado! A emissão de notas fiscais (NF-e/NFC-e) será rejeitada pela SEFAZ até que um novo arquivo seja configurado."
+                        : `Atenção: Este certificado expira em ${expirationDaysRemaining} dia(s). Providencie a renovação do arquivo A1 junto à sua autoridade certificadora.`}
+                    </span>
                   </div>
                 )}
               </div>

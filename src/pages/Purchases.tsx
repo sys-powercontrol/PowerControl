@@ -9,13 +9,28 @@ import {
   CheckCircle2,
   Truck,
   Package,
-  Search
+  Search,
+  FileCode,
+  Warehouse
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR } from "../lib/dateUtils";
 import { formatCurrency } from "../lib/currencyUtils";
 import { subDays } from "date-fns";
+import { NFeXMLImporter } from "../components/Purchases/NFeXMLImporter";
+
+const getProductLocation = (p: any): string => {
+  if (!p) return "";
+  if (p.storage_location) return p.storage_location;
+  if (p.storage_code) return p.storage_code;
+  const parts = [p.storage_room, p.storage_rack, p.storage_shelf].filter(Boolean);
+  if (parts.length > 0) {
+    if (p.storage_room && p.storage_rack && p.storage_shelf) return `${p.storage_room}-${p.storage_rack}/${p.storage_shelf}`;
+    return parts.join("-");
+  }
+  return "";
+};
 
 export default function Purchases() {
   const { user, hasPermission } = useAuth();
@@ -26,6 +41,7 @@ export default function Purchases() {
   const [dueDate, setDueDate] = useState(formatBR(subDays(getNowBR(), -30), 'yyyy-MM-dd'));
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showXmlImporter, setShowXmlImporter] = useState(false);
 
   const canManage = hasPermission('inventory.manage');
 
@@ -89,10 +105,18 @@ export default function Purchases() {
     return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
   }, [cashiersData, currentCompanyId]);
 
-  const filteredProducts = products.filter((p: any) => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return products.filter((p: any) => {
+      const loc = getProductLocation(p).toLowerCase();
+      return (
+        (p.name || '').toLowerCase().includes(term) ||
+        (p.barcode || '').toLowerCase().includes(term) ||
+        (p.sku || '').toLowerCase().includes(term) ||
+        loc.includes(term)
+      );
+    });
+  }, [products, searchTerm]);
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0), [cart]);
 
@@ -271,12 +295,39 @@ if (!canManage) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-orange-600 text-white rounded-lg">
-            <Truck size={24} />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-600 text-white rounded-lg">
+              <Truck size={24} />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Compras (Entrada de Estoque)</h1>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Compras (Entrada de Estoque)</h1>
+          <button
+            type="button"
+            onClick={() => setShowXmlImporter(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-xl font-bold text-xs shadow-xs transition-colors"
+          >
+            <FileCode size={16} /> Importar XML (NF-e)
+          </button>
         </div>
+
+        {showXmlImporter && (
+          <NFeXMLImporter
+            products={products}
+            suppliers={suppliers}
+            currentCompanyId={currentCompanyId || ""}
+            onImportComplete={({ supplier, items }) => {
+              if (supplier) setSelectedSupplier(supplier);
+              if (items && items.length > 0) {
+                setCart(items);
+              }
+              queryClient.invalidateQueries({ queryKey: ["products"] });
+              queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+              queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+            }}
+            onClose={() => setShowXmlImporter(false)}
+          />
+        )}
 
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
           <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
@@ -309,23 +360,34 @@ if (!canManage) {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2">
-            {filteredProducts.map((p: any) => (
-              <button
-                key={p.id}
-                onClick={() => addToCart(p)}
-                className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:border-orange-200 hover:bg-orange-50 transition-all text-left group"
-              >
-                <div>
-                  <p className="font-bold text-gray-900">{p.name}</p>
-                  <p className="text-xs text-gray-500">Custo: {formatCurrency(p.cost || 0)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-1 bg-orange-100 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                    <Plus size={16} />
+            {filteredProducts.map((p: any) => {
+              const loc = getProductLocation(p);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => addToCart(p)}
+                  className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:border-orange-200 hover:bg-orange-50 transition-all text-left group"
+                >
+                  <div className="min-w-0 pr-2">
+                    <p className="font-bold text-gray-900 truncate">{p.name}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      <p className="text-xs text-gray-500">Custo: {formatCurrency(p.cost || 0)}</p>
+                      {loc && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded text-[10px] font-bold font-mono">
+                          <Warehouse size={10} className="text-emerald-600 shrink-0" />
+                          <span className="truncate max-w-[120px]">{loc}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="p-1 bg-orange-100 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                      <Plus size={16} />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -338,34 +400,45 @@ if (!canManage) {
             </div>
           ) : (
             <div className="space-y-4">
-              {cart.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900">{item.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-gray-500">Custo: R$</span>
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        className="w-20 px-2 py-0.5 text-xs border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500"
-                        value={item.cost ?? 0}
-                        onChange={(e) => updateCost(item.id, parseFloat(e.target.value) || 0)}
-                      />
+              {cart.map((item) => {
+                const loc = getProductLocation(item);
+                return (
+                  <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <p className="font-bold text-gray-900 truncate">{item.name}</p>
+                      {loc && (
+                        <div className="mt-0.5">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded text-[10px] font-bold font-mono">
+                            <Warehouse size={10} className="text-emerald-600 shrink-0" />
+                            <span>{loc}</span>
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-gray-500">Custo: R$</span>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          className="w-20 px-2 py-0.5 text-xs border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500"
+                          value={item.cost ?? 0}
+                          onChange={(e) => updateCost(item.id, parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 hover:bg-white rounded-md text-gray-500">-</button>
+                        <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 hover:bg-white rounded-md text-gray-500">+</button>
+                      </div>
+                      <p className="w-24 text-right font-bold text-gray-900">{formatCurrency(item.cost * item.quantity)}</p>
+                      <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-400 hover:text-red-600">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                      <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 hover:bg-white rounded-md text-gray-500">-</button>
-                      <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 hover:bg-white rounded-md text-gray-500">+</button>
-                    </div>
-                    <p className="w-24 text-right font-bold text-gray-900">{formatCurrency(item.cost * item.quantity)}</p>
-                    <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-400 hover:text-red-600">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

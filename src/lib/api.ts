@@ -48,6 +48,49 @@ const cleanObject = (obj: unknown): Record<string, unknown> | unknown => {
   return newObj;
 };
 
+const SENSITIVE_KEYS = new Set([
+  'password',
+  'senha',
+  'token',
+  'fiscal_token',
+  'secret',
+  'secret_key',
+  'master_key',
+  'access_token',
+  'refresh_token',
+  'api_key',
+  'apikey',
+  'credit_card',
+  'card_number',
+  'cvv',
+  'cvc',
+  'pin',
+  'private_key',
+  'certificate_password'
+]);
+
+export const sanitizeLogPayload = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeLogPayload(item));
+  }
+
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const lowerKey = key.toLowerCase();
+    if (SENSITIVE_KEYS.has(lowerKey) || lowerKey.includes('password') || lowerKey.includes('secret')) {
+      sanitized[key] = '********';
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeLogPayload(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+};
+
 // Helper for local caching to survive quota limitations
 const getCacheKey = (path: string, params?: any) => `api_cache_${path}_${JSON.stringify(params || {})}`;
 
@@ -663,12 +706,14 @@ export const api = {
     const user = userContext ? userContext : auth.currentUser;
     if (!user) return;
 
+    const sanitizedData = sanitizeLogPayload(data);
+
     const logData = {
-      ...data,
+      ...sanitizedData,
       user_id: userContext?.id || (user as any).uid || (user as any).id,
       user_name: userContext?.full_name || (userContext as any)?.email || currentUserData?.full_name || (user as any).email || "Sistema",
       timestamp: serverTimestamp(),
-      company_id: data.company_id || userContext?.company_id || currentCompanyId
+      company_id: sanitizedData.company_id || userContext?.company_id || currentCompanyId
     };
 
     try {

@@ -119,13 +119,15 @@ export default function Employees() {
     mutationFn: async (formData: any) => {
       if (!currentCompanyId) throw new Error("Nenhuma empresa ativa selecionada.");
 
+      const safeRole = (formData.role === "admin" || (editingEmployee?.role === "admin" && !formData.role)) ? "admin" : "user";
+
       if (editingEmployee) {
         // Update existing user
         return api.put("users", editingEmployee.id, {
           full_name: formData.full_name,
           phone: formData.phone || null,
           document: formData.document || null,
-          role: formData.role || editingEmployee.role || "user",
+          role: editingEmployee.role === "master" ? "master" : safeRole,
           is_active: formData.is_active,
           active: formData.is_active,
           permissions: selectedPermissions
@@ -158,7 +160,7 @@ export default function Employees() {
         // Create new user in Firestore linked to this company
         const initialPermissions = selectedPermissions.length > 0 
           ? selectedPermissions 
-          : (formData.role === "admin" ? DEFAULT_ROLE_PERMISSIONS.admin : DEFAULT_ROLE_PERMISSIONS.user);
+          : (safeRole === "admin" ? DEFAULT_ROLE_PERMISSIONS.admin : DEFAULT_ROLE_PERMISSIONS.user);
 
         return api.post("users", {
           full_name: formData.full_name || cleanEmail.split("@")[0],
@@ -166,7 +168,7 @@ export default function Employees() {
           password: formData.password || "123456",
           phone: formData.phone || null,
           document: formData.document || null,
-          role: formData.role || "user",
+          role: safeRole,
           company_id: currentCompanyId,
           company_ids: [currentCompanyId],
           is_active: formData.is_active !== false,

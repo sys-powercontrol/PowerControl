@@ -22,7 +22,8 @@ import {
   CreditCard,
   FileText,
   ReceiptText,
-  Menu
+  Menu,
+  Warehouse
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -77,6 +78,14 @@ export default function Sales() {
   const [nfceUrl, setNfceUrl] = useState<string | null>(null);
   const [nfceErrorMsg, setNfceErrorMsg] = useState<string | null>(null);
 
+  const [splitPayments, setSplitPayments] = useState<Array<{
+    id: string;
+    method: string;
+    amount: number;
+    cashier_id?: string;
+    bank_account_id?: string;
+  }>>([]);
+
   const validateCheckout = (): boolean => {
     const errors: Record<string, string> = {};
     
@@ -96,6 +105,28 @@ export default function Sales() {
     
     if (["PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"].includes(paymentMethod) && !selectedBankAccount) {
       errors.bankAccount = "Selecione a conta bancária destino.";
+    }
+
+    if (paymentMethod === "Misto") {
+      if (splitPayments.length < 2) {
+        errors.splitPayments = "Adicione ao menos duas formas de pagamento.";
+      } else {
+        const splitSum = splitPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        if (Math.abs(splitSum - total) > 0.05) {
+          errors.splitPayments = `A soma dos pagamentos (${formatCurrency(splitSum)}) deve ser igual ao total (${formatCurrency(total)}).`;
+        }
+        splitPayments.forEach((p, idx) => {
+          if (!p.amount || p.amount <= 0) {
+            errors[`split_amount_${idx}`] = "Informe o valor.";
+          }
+          if (p.method === "Dinheiro" && !p.cashier_id && !selectedCashier) {
+            errors[`split_acc_${idx}`] = "Selecione o caixa.";
+          }
+          if (["PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"].includes(p.method) && !p.bank_account_id && !selectedBankAccount) {
+            errors[`split_acc_${idx}`] = "Selecione o banco.";
+          }
+        });
+      }
     }
     
     if (["A Prazo", "Fiado", "Boleto"].includes(paymentMethod)) {
@@ -425,12 +456,31 @@ export default function Sales() {
     }
   }, [clients, sellers]);
 
+  const getProductLocation = (p: any): string => {
+    if (!p) return "";
+    if (p.storage_location) return p.storage_location;
+    if (p.storage_code) return p.storage_code;
+    const parts = [p.storage_room, p.storage_rack, p.storage_shelf].filter(Boolean);
+    if (parts.length > 0) {
+      if (p.storage_room && p.storage_rack && p.storage_shelf) return `${p.storage_room}-${p.storage_rack}/${p.storage_shelf}`;
+      return parts.join("-");
+    }
+    return "";
+  };
+
   const filteredItems = useMemo(() => {
-    const p = products.map((item: any) => ({ ...item, type: 'product' }));
-    const s = services.map((item: any) => ({ ...item, type: 'service', stock_quantity: Infinity }));
+    const p = products.map((item: any) => ({
+      ...item,
+      type: 'product',
+      resolvedLocation: getProductLocation(item)
+    }));
+    const s = services.map((item: any) => ({ ...item, type: 'service', stock_quantity: Infinity, resolvedLocation: "" }));
+    const term = searchTerm.toLowerCase().trim();
     return [...p, ...s].filter((item: any) => 
-      item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
+      (item.name || '').toLowerCase().includes(term) ||
+      (item.barcode || '').toLowerCase().includes(term) ||
+      (item.sku || '').toLowerCase().includes(term) ||
+      (item.resolvedLocation || '').toLowerCase().includes(term)
     );
   }, [products, services, searchTerm]);
 
@@ -555,6 +605,7 @@ export default function Sales() {
         discount,
         total_taxes: totalTaxes,
         payment_method: paymentMethod,
+        ...(paymentMethod === "Misto" ? { payments: splitPayments } : {}),
         ...(paymentMethod === "A Prazo" || paymentMethod === "Fiado" || paymentMethod === "Boleto" ? { due_date: dueDate } : {}),
         status: "Concluída",
         sale_date: new Date().toISOString()
@@ -772,6 +823,31 @@ if (!canCreate) {
           </div>
         </div>
 
+        {/* Quick Cart banner when browsing items on mobile */}
+        {cart.length > 0 && (
+          <div className="lg:hidden p-3.5 bg-blue-50 border border-blue-200/80 rounded-2xl flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xs shadow-xs">
+                {cart.reduce((acc, i) => acc + i.quantity, 0)}
+              </div>
+              <div>
+                <p className="text-xs font-bold text-blue-950">
+                  {cart.length} {cart.length === 1 ? 'item no carrinho' : 'itens no carrinho'}
+                </p>
+                <p className="text-xs text-blue-700 font-bold">{formatCurrency(total)}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("cart")}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1 shadow-xs touch-manipulation"
+            >
+              <span>Ver / Editar Carrinho</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Product & Service Selection */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
@@ -788,94 +864,305 @@ if (!canCreate) {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2">
-            {filteredItems.map((p: any) => (
-              <button
-                key={p.id}
-                onClick={() => addToCart(p)}
-                disabled={p.type === 'product' && p.stock_quantity <= 0}
-                className={`flex items-center justify-between p-4 border border-gray-100 rounded-xl transition-all text-left group ${
-                  p.type === 'product' && p.stock_quantity <= 0 ? "opacity-50 cursor-not-allowed bg-gray-50" : "hover:border-blue-200 hover:bg-blue-50"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${p.type === 'service' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
-                    {p.type === 'service' ? <Tag size={16} /> : <Package size={16} />}
+            {filteredItems.map((p: any) => {
+              const inCart = cart.find(i => i.id === p.id);
+              return (
+                <div
+                  key={p.id}
+                  className={`flex items-center justify-between p-3.5 sm:p-4 border rounded-xl transition-all text-left ${
+                    p.type === 'product' && p.stock_quantity <= 0 
+                      ? "opacity-50 cursor-not-allowed bg-gray-50 border-gray-100" 
+                      : inCart
+                        ? "border-blue-300 bg-blue-50/40 shadow-xs"
+                        : "border-gray-100 hover:border-blue-200 hover:bg-blue-50/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                    <div className={`p-2 rounded-lg shrink-0 ${p.type === 'service' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {p.type === 'service' ? <Tag size={16} /> : <Package size={16} />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 truncate text-sm sm:text-base">{p.name}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <p className={`text-xs ${p.type === 'product' && p.stock_quantity <= p.min_stock ? "text-red-500 font-bold" : "text-gray-500"}`}>
+                          {p.type === 'service' ? 'Serviço' : `Estoque: ${p.stock_quantity} ${p.unit || "un"}`}
+                        </p>
+                        {p.type === 'product' && p.resolvedLocation && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded text-[10px] font-bold font-mono">
+                            <Warehouse size={10} className="text-emerald-600 shrink-0" />
+                            <span className="truncate max-w-[120px]">{p.resolvedLocation}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-900">{p.name}</p>
-                    <p className={`text-xs ${p.type === 'product' && p.stock_quantity <= p.min_stock ? "text-red-500 font-bold" : "text-gray-500"}`}>
-                      {p.type === 'service' ? 'Serviço' : `Estoque: ${p.stock_quantity} ${p.unit || "un"}`}
-                    </p>
+                  
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span className="font-bold text-blue-600 text-sm sm:text-base">{formatCurrency(p.price || 0)}</span>
+                    
+                    {inCart ? (
+                      <div className="flex items-center bg-white border border-blue-200 rounded-lg p-0.5 shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (inCart.quantity === 1) {
+                              removeFromCart(p.id);
+                            } else {
+                              updateQuantity(p.id, inCart.quantity - 1);
+                            }
+                          }}
+                          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 active:scale-95 rounded text-xs font-bold touch-manipulation"
+                          title="Diminuir"
+                        >
+                          -
+                        </button>
+                        <span className="w-6 text-center font-bold text-xs text-blue-700">{inCart.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => addToCart(p)}
+                          disabled={p.type === 'product' && inCart.quantity >= p.stock_quantity}
+                          className="w-7 h-7 flex items-center justify-center text-blue-600 hover:bg-blue-50 active:scale-95 rounded text-xs font-bold disabled:opacity-40 touch-manipulation"
+                          title="Adicionar mais"
+                        >
+                          +
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => addToCart(p)}
+                        disabled={p.type === 'product' && p.stock_quantity <= 0}
+                        className="p-2 sm:p-2.5 bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white active:scale-95 rounded-xl transition-all touch-manipulation disabled:opacity-40"
+                        title="Adicionar ao carrinho"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-blue-600">{formatCurrency(p.price || 0)}</span>
-                  <div className="p-1 bg-blue-100 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <Plus size={16} />
-                  </div>
-                </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Cart */}
-        <div className={`bg-white p-6 rounded-2xl border border-gray-100 shadow-sm ${activeTab !== "cart" ? "hidden lg:block" : ""}`}>
-          <h2 className="font-bold text-lg mb-4">Carrinho</h2>
+        {/* Cart on Desktop (Hidden on mobile because mobile renders it in activeTab === 'cart') */}
+        <div className="hidden lg:block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="text-blue-600" size={20} />
+              <h2 className="font-bold text-lg text-gray-900">Itens Selecionados no Carrinho</h2>
+            </div>
+            {cart.length > 0 && (
+              <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-200/60">
+                {cart.reduce((acc, i) => acc + i.quantity, 0)} {cart.reduce((acc, i) => acc + i.quantity, 0) === 1 ? 'item' : 'itens'}
+              </span>
+            )}
+          </div>
           {cart.length === 0 ? (
-            <div className="py-12 text-center text-gray-400">
-              <ShoppingCart size={48} className="mx-auto mb-4 opacity-20" />
-              <p>O carrinho está vazio.</p>
+            <div className="py-12 text-center text-gray-400 space-y-2">
+              <ShoppingCart size={48} className="mx-auto mb-2 opacity-20" />
+              <p className="font-medium text-sm">O carrinho está vazio.</p>
+              <p className="text-xs text-gray-400">Adicione produtos ou serviços acima para iniciar a venda.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {cart.map((item) => (
-                <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900">{item.name}</p>
-                    {canEditPrices ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-500">R$</span>
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          value={item.price}
-                          onChange={(e) => {
-                            const newPrice = parseFloat(e.target.value) || 0;
-                            setCart(prev => prev.map(i => i.id === item.id ? { ...i, price: newPrice } : i));
-                          }}
-                          className="w-20 px-1 py-0.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                        <span className="text-xs text-gray-500">/ {item.unit || "un"}</span>
+            <div className="space-y-3 divide-y divide-gray-100">
+              {cart.map((item) => {
+                const loc = item.resolvedLocation || getProductLocation(item);
+                return (
+                  <div key={item.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`p-1 rounded text-[10px] font-bold ${item.type === 'service' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {item.type === 'service' ? 'Serviço' : 'Produto'}
+                        </span>
+                        <p className="font-bold text-gray-900 truncate text-sm">{item.name}</p>
                       </div>
-                    ) : (
-                      <p className="text-xs text-gray-500">{formatCurrency(item.price || 0)} / {item.unit || "un"}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                      <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1 hover:bg-white rounded-md text-gray-500">
-                        -
-                      </button>
-                      <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1 hover:bg-white rounded-md text-gray-500">
-                        +
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {item.type === 'product' && loc && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded text-[10px] font-bold font-mono">
+                            <Warehouse size={10} className="text-emerald-600 shrink-0" />
+                            <span>{loc}</span>
+                          </span>
+                        )}
+                        {canEditPrices ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500 font-medium">Preço un: R$</span>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              value={item.price}
+                              onChange={(e) => {
+                                const newPrice = parseFloat(e.target.value) || 0;
+                                setCart(prev => prev.map(i => i.id === item.id ? { ...i, price: newPrice } : i));
+                              }}
+                              className="w-20 px-1 py-0.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-gray-400">/ {item.unit || "un"}</span>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500 font-medium">{formatCurrency(item.price || 0)} / {item.unit || "un"}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center bg-gray-100 border border-gray-200 rounded-xl p-0.5">
+                        <button 
+                          type="button"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)} 
+                          className="w-7 h-7 flex items-center justify-center bg-white hover:bg-gray-200 active:scale-95 rounded-lg text-gray-700 font-bold text-xs shadow-xs transition-all"
+                          title="Diminuir quantidade"
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center font-bold text-xs">{item.quantity}</span>
+                        <button 
+                          type="button"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)} 
+                          className="w-7 h-7 flex items-center justify-center bg-white hover:bg-gray-200 active:scale-95 rounded-lg text-gray-700 font-bold text-xs shadow-xs transition-all"
+                          title="Aumentar quantidade"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className="w-24 text-right font-bold text-gray-900 text-sm">{formatCurrency(item.price * item.quantity)}</p>
+                      <button 
+                        type="button"
+                        onClick={() => removeFromCart(item.id)} 
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                        title="Remover do carrinho"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     </div>
-                    <p className="w-24 text-right font-bold text-gray-900">{formatCurrency(item.price * item.quantity)}</p>
-                    <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-400 hover:text-red-600">
-                      <Trash2 size={18} />
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* Sidebar Summary */}
+      {/* Sidebar Summary & Mobile Cart Section */}
       <div className={`space-y-6 ${activeTab !== "cart" ? "hidden lg:block" : ""}`}>
+        {/* Selected Items / Cart - Exibido no topo em dispositivos móveis e PWA na aba Carrinho */}
+        <div className="lg:hidden bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="text-blue-600" size={20} />
+              <h2 className="font-bold text-base sm:text-lg text-gray-900">Itens Selecionados no Carrinho</h2>
+            </div>
+            {cart.length > 0 && (
+              <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-200/60">
+                {cart.reduce((acc, i) => acc + i.quantity, 0)} {cart.reduce((acc, i) => acc + i.quantity, 0) === 1 ? 'item' : 'itens'}
+              </span>
+            )}
+          </div>
+
+          {cart.length === 0 ? (
+            <div className="py-8 text-center text-gray-400 space-y-3">
+              <ShoppingCart size={40} className="mx-auto opacity-30 text-gray-400" />
+              <p className="text-sm font-semibold text-gray-600">O carrinho está vazio</p>
+              <p className="text-xs text-gray-400">Adicione produtos ou serviços da lista para continuar.</p>
+              <button
+                type="button"
+                onClick={() => setActiveTab("items")}
+                className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-xs touch-manipulation"
+              >
+                + Adicionar Produtos
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3 divide-y divide-gray-100">
+              {cart.map((item) => {
+                const loc = item.resolvedLocation || getProductLocation(item);
+                return (
+                  <div key={item.id} className="pt-3 first:pt-0 flex flex-col space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.type === 'service' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {item.type === 'service' ? 'Serviço' : 'Produto'}
+                          </span>
+                          <p className="font-bold text-sm text-gray-900 truncate">{item.name}</p>
+                        </div>
+                        
+                        {item.type === 'product' && loc && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded text-[10px] font-bold font-mono">
+                              <Warehouse size={10} className="text-emerald-600 shrink-0" />
+                              <span className="truncate">{loc}</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button 
+                        type="button"
+                        onClick={() => removeFromCart(item.id)} 
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-95 rounded-lg transition-colors touch-manipulation"
+                        title="Remover item"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      {/* Preço Unitário */}
+                      <div className="text-xs text-gray-500 font-medium">
+                        {canEditPrices ? (
+                          <div className="flex items-center gap-1">
+                            <span>R$</span>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              value={item.price}
+                              onChange={(e) => {
+                                const newPrice = parseFloat(e.target.value) || 0;
+                                setCart(prev => prev.map(i => i.id === item.id ? { ...i, price: newPrice } : i));
+                              }}
+                              className="w-16 px-1 py-0.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <span>/ {item.unit || "un"}</span>
+                          </div>
+                        ) : (
+                          <span>{formatCurrency(item.price || 0)} / {item.unit || "un"}</span>
+                        )}
+                      </div>
+
+                      {/* Controles de Quantidade */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center bg-gray-100 border border-gray-200 rounded-xl p-0.5">
+                          <button 
+                            type="button"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)} 
+                            className="w-8 h-8 flex items-center justify-center bg-white hover:bg-gray-200 active:scale-95 rounded-lg text-gray-700 font-bold text-sm shadow-xs transition-all touch-manipulation"
+                            title="Diminuir quantidade"
+                          >
+                            -
+                          </button>
+                          <span className="w-8 text-center font-bold text-sm text-gray-900">{item.quantity}</span>
+                          <button 
+                            type="button"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)} 
+                            className="w-8 h-8 flex items-center justify-center bg-white hover:bg-gray-200 active:scale-95 rounded-lg text-gray-700 font-bold text-sm shadow-xs transition-all touch-manipulation"
+                            title="Aumentar quantidade"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* Total do Item */}
+                        <p className="font-bold text-sm text-gray-900 min-w-[70px] text-right">
+                          {formatCurrency(item.price * item.quantity)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 sticky top-8">
           <div className="flex justify-between items-center">
             <h2 className="font-bold text-xl">Resumo</h2>
@@ -904,8 +1191,175 @@ if (!canCreate) {
                 <option value="Boleto">Boleto</option>
                 <option value="A Prazo">A Prazo</option>
                 <option value="Fiado">Fiado</option>
+                <option value="Misto">Misto (Múltiplos Meios)</option>
               </select>
             </div>
+
+            {paymentMethod === "Misto" && (
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 uppercase">Divisão de Pagamentos</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const splitSum = splitPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+                      const rem = Math.max(0, total - splitSum);
+                      setSplitPayments(prev => [
+                        ...prev,
+                        {
+                          id: "pay_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+                          method: prev.length === 0 ? "Dinheiro" : "PIX",
+                          amount: rem,
+                          cashier_id: selectedCashier?.id || cashiers[0]?.id,
+                          bank_account_id: selectedBankAccount?.id || bankAccounts[0]?.id
+                        }
+                      ]);
+                    }}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200"
+                  >
+                    + Adicionar Meio
+                  </button>
+                </div>
+
+                {splitPayments.length === 0 ? (
+                  <div className="text-center py-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const half = Number((total / 2).toFixed(2));
+                        const otherHalf = Number((total - half).toFixed(2));
+                        setSplitPayments([
+                          {
+                            id: "pay_1",
+                            method: "Dinheiro",
+                            amount: half,
+                            cashier_id: selectedCashier?.id || cashiers[0]?.id
+                          },
+                          {
+                            id: "pay_2",
+                            method: "PIX",
+                            amount: otherHalf,
+                            bank_account_id: selectedBankAccount?.id || bankAccounts[0]?.id
+                          }
+                        ]);
+                      }}
+                      className="text-xs font-bold text-blue-600 bg-white border border-blue-200 px-3 py-2 rounded-xl shadow-xs hover:bg-blue-50"
+                    >
+                      Iniciar Divisão (Dinheiro + PIX)
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {splitPayments.map((payment, idx) => {
+                      const isCash = payment.method === "Dinheiro";
+                      const isBank = ["PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"].includes(payment.method);
+
+                      return (
+                        <div key={payment.id} className="p-3 bg-white border border-gray-200 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <select
+                              value={payment.method}
+                              onChange={(e) => {
+                                const newMethod = e.target.value;
+                                setSplitPayments(prev => prev.map((p, i) => i === idx ? {
+                                  ...p,
+                                  method: newMethod,
+                                  cashier_id: newMethod === "Dinheiro" ? (p.cashier_id || selectedCashier?.id || cashiers[0]?.id) : undefined,
+                                  bank_account_id: ["PIX", "Cartão de Crédito", "Cartão de Débito", "Boleto"].includes(newMethod) ? (p.bank_account_id || selectedBankAccount?.id || bankAccounts[0]?.id) : undefined
+                                } : p));
+                              }}
+                              className="text-xs font-bold px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg outline-none flex-1"
+                            >
+                              <option value="Dinheiro">Dinheiro</option>
+                              <option value="PIX">PIX</option>
+                              <option value="Cartão de Crédito">Cartão de Crédito</option>
+                              <option value="Cartão de Débito">Cartão de Débito</option>
+                              <option value="Boleto">Boleto</option>
+                              <option value="A Prazo">A Prazo</option>
+                              <option value="Fiado">Fiado</option>
+                            </select>
+
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-gray-500">R$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={payment.amount || ""}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setSplitPayments(prev => prev.map((p, i) => i === idx ? { ...p, amount: val } : p));
+                                }}
+                                placeholder="0,00"
+                                className="w-24 px-2 py-1 text-xs font-bold text-right border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSplitPayments(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-gray-400 hover:text-red-600 p-1"
+                              title="Remover meio"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          {isCash && (
+                            <select
+                              value={payment.cashier_id || selectedCashier?.id || ""}
+                              onChange={(e) => {
+                                const cId = e.target.value;
+                                setSplitPayments(prev => prev.map((p, i) => i === idx ? { ...p, cashier_id: cId } : p));
+                              }}
+                              className="w-full text-xs px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg outline-none"
+                            >
+                              <option value="">Selecione o caixa...</option>
+                              {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                          )}
+
+                          {isBank && (
+                            <select
+                              value={payment.bank_account_id || selectedBankAccount?.id || ""}
+                              onChange={(e) => {
+                                const bId = e.target.value;
+                                setSplitPayments(prev => prev.map((p, i) => i === idx ? { ...p, bank_account_id: bId } : p));
+                              }}
+                              className="w-full text-xs px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg outline-none"
+                            >
+                              <option value="">Selecione a conta bancária...</option>
+                              {bankAccounts.map((a: any) => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Remaining balance indicator */}
+                    {(() => {
+                      const splitSum = splitPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+                      const diff = total - splitSum;
+                      const isBalanced = Math.abs(diff) <= 0.05;
+
+                      return (
+                        <div className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-between ${isBalanced ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
+                          <span>Total dividido: {formatCurrency(splitSum)}</span>
+                          <span>{isBalanced ? '✓ 100% Alocado' : `Falta: ${formatCurrency(diff)}`}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {validationErrors.splitPayments && (
+                  <p className="text-xs text-red-500">{validationErrors.splitPayments}</p>
+                )}
+              </div>
+            )}
 
             {paymentMethod === "Dinheiro" ? (
               <div>

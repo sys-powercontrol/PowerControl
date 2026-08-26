@@ -241,6 +241,7 @@ export const inventory = {
       // 3. Read all products, components, accounts, and daily summary FIRST
       const productDocs = new Map();
       const componentDocs = new Map();
+      const accountsMap = new Map();
       let accountDoc = null;
       let accountRef = null;
 
@@ -249,7 +250,31 @@ export const inventory = {
       const summaryDoc = await transaction.get(summaryRef);
       const prevSummary = summaryDoc.exists() ? summaryDoc.data() : {};
 
-      if (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado") {
+      const splitPayments = Array.isArray(saleData.payments) && saleData.payments.length > 0
+        ? (saleData.payments as Array<{ method: string; amount: number; cashier_id?: string; bank_account_id?: string; account_type?: string; account_id?: string }>)
+        : null;
+
+      if (splitPayments) {
+        for (const payment of splitPayments) {
+          if (payment.method !== "A Prazo" && payment.method !== "Fiado") {
+            const accId = payment.account_id || payment.bank_account_id || payment.cashier_id || saleData.bank_account_id || saleData.cashier_id;
+            const isBank = !!(payment.bank_account_id || (payment.account_type === 'Banco') || (!payment.cashier_id && saleData.bank_account_id));
+            const collectionName = isBank ? "bankAccounts" : "cashiers";
+            if (!accId) {
+              throw new Error(`Pagamento parcial (${payment.method}) requer uma conta vinculada.`);
+            }
+            const key = `${collectionName}:${accId}`;
+            if (!accountsMap.has(key)) {
+              const aRef = doc(db, collectionName, accId as string);
+              const aDoc = await transaction.get(aRef);
+              if (!aDoc.exists()) {
+                throw new Error(`Conta de destino (${collectionName}) não encontrada.`);
+              }
+              accountsMap.set(key, { ref: aRef, doc: aDoc, type: isBank ? 'Banco' : 'Caixa' });
+            }
+          }
+        }
+      } else if (saleData.payment_method !== "A Prazo" && saleData.payment_method !== "Fiado") {
         if (!saleData.cashier_id && !saleData.bank_account_id) {
           throw new Error("Transação imediata (paga) requer uma conta de destino (Caixa ou Banco) válida.");
         }
@@ -384,8 +409,54 @@ export const inventory = {
       
       transaction.set(saleRef, finalSaleData);
 
-      // 6. Create financial record if "A Prazo" or "Fiado"
-      if (saleData.payment_method === "A Prazo" || saleData.payment_method === "Fiado") {
+      // 6. Create financial records
+      if (splitPayments) {
+        for (const payment of splitPayments) {
+          const pAmount = Number(payment.amount) || 0;
+          if (payment.method === "A Prazo" || payment.method === "Fiado") {
+            const receivableRef = doc(collection(db, "accountsReceivable"));
+            transaction.set(receivableRef, {
+              company_id: user.company_id,
+              client_id: saleData.client_id,
+              client_name: saleData.client_name,
+              sale_id: saleRef.id,
+              reconciliation_id: reconciliationId,
+              description: `Venda #${saleRef.id.substr(0, 8).toUpperCase()} (${payment.method})`,
+              amount: pAmount,
+              due_date: saleData.due_date || new Date().toISOString(),
+              status: "Pendente",
+              created_at: serverTimestamp()
+            });
+          } else {
+            const accId = payment.account_id || payment.bank_account_id || payment.cashier_id || saleData.bank_account_id || saleData.cashier_id;
+            const isBank = !!(payment.bank_account_id || (payment.account_type === 'Banco') || (!payment.cashier_id && saleData.bank_account_id));
+            const collectionName = isBank ? "bankAccounts" : "cashiers";
+            const key = `${collectionName}:${accId}`;
+            const accEntry = accountsMap.get(key);
+
+            if (accEntry) {
+              const currentBalance = accEntry.doc.data().balance || 0;
+              const newBalance = currentBalance + pAmount;
+              transaction.update(accEntry.ref, { balance: newBalance });
+
+              const movementRef = doc(collection(db, "movements"));
+              transaction.set(movementRef, {
+                company_id: user.company_id,
+                type: "Entrada",
+                description: `Venda #${saleRef.id.substr(0, 8).toUpperCase()} (${payment.method})`,
+                amount: pAmount,
+                to_account_type: accEntry.type,
+                to_account_id: accId,
+                to_account_name: accEntry.doc.data().name || "Conta",
+                category: "Vendas",
+                reconciliation_id: reconciliationId,
+                movement_date: new Date().toISOString(),
+                created_at: serverTimestamp()
+              });
+            }
+          }
+        }
+      } else if (saleData.payment_method === "A Prazo" || saleData.payment_method === "Fiado") {
         const receivableRef = doc(collection(db, "accountsReceivable"));
         transaction.set(receivableRef, {
           company_id: user.company_id,
@@ -762,5 +833,9 @@ export const inventory = {
         }
       }
     });
+  },
+
+  async recordSale(saleData: Partial<Sale> & Record<string, unknown>, items: SaleItem[], userContext?: User) {
+    return this.processSale(saleData, items, userContext);
   }
 };

@@ -24,13 +24,19 @@ import {
   TrendingUp,
   Box,
   Warehouse,
-  MapPin
+  MapPin,
+  ArrowUpDown,
+  HelpCircle,
+  Eye,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import BOMBuilder from "../components/BOMBuilder";
 import LabelPrinter from "../components/LabelPrinter";
 import ExportButton from "../components/ExportButton";
+import ProductDetailsModal from "../components/ProductDetailsModal";
 
 interface ProductsProps {
   defaultTab?: string;
@@ -76,6 +82,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [viewingProduct, setViewingProduct] = useState<any>(null);
   const [bomItems, setBomItems] = useState<any[]>([]);
   const [storageRoom, setStorageRoom] = useState("");
   const [storageRack, setStorageRack] = useState("");
@@ -83,6 +90,9 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   const [storageLocation, setStorageLocation] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [locationFilter, setLocationFilter] = useState<"ALL" | "ASSIGNED" | "UNASSIGNED">("ALL");
+  const [sortBy, setSortBy] = useState<"NAME_ASC" | "NAME_DESC" | "LOCATION_ASC" | "STOCK_DESC" | "STOCK_ASC">("NAME_ASC");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
@@ -146,10 +156,65 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
     return brandsData.filter((item: any) => item.company_id === currentCompanyId);
   }, [brandsData, currentCompanyId]);
 
-  const filteredProducts = products.filter((p: any) => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+
+    return products
+      .filter((p: any) => {
+        // Search term check across name, sku, and all storage location attributes
+        const pLoc = (p.storage_location || p.storage_code || generateStorageCode(p.storage_room, p.storage_rack, p.storage_shelf) || "").toLowerCase();
+        const pRoom = (p.storage_room || "").toLowerCase();
+        const pRack = (p.storage_rack || "").toLowerCase();
+        const pShelf = (p.storage_shelf || "").toLowerCase();
+        const pName = (p.name || "").toLowerCase();
+        const pSku = (p.sku || "").toLowerCase();
+        const pBarcode = (p.barcode || "").toLowerCase();
+
+        const matchesSearch = !term || 
+          pName.includes(term) ||
+          pSku.includes(term) ||
+          pBarcode.includes(term) ||
+          pLoc.includes(term) ||
+          pRoom.includes(term) ||
+          pRack.includes(term) ||
+          pShelf.includes(term);
+
+        if (!matchesSearch) return false;
+
+        // Location assignment status check
+        const hasLocation = Boolean(p.storage_location || p.storage_code || p.storage_room || p.storage_rack || p.storage_shelf);
+        if (locationFilter === "ASSIGNED" && !hasLocation) return false;
+        if (locationFilter === "UNASSIGNED" && hasLocation) return false;
+
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        if (sortBy === "LOCATION_ASC") {
+          const locA = a.storage_location || a.storage_code || generateStorageCode(a.storage_room, a.storage_rack, a.storage_shelf) || "";
+          const locB = b.storage_location || b.storage_code || generateStorageCode(b.storage_room, b.storage_rack, b.storage_shelf) || "";
+          if (!locA && locB) return 1;
+          if (locA && !locB) return -1;
+          return locA.localeCompare(locB, "pt-BR");
+        }
+        if (sortBy === "STOCK_DESC") {
+          return (Number(b.stock_quantity) || 0) - (Number(a.stock_quantity) || 0);
+        }
+        if (sortBy === "STOCK_ASC") {
+          return (Number(a.stock_quantity) || 0) - (Number(b.stock_quantity) || 0);
+        }
+        if (sortBy === "NAME_DESC") {
+          return (b.name || "").localeCompare(a.name || "", "pt-BR");
+        }
+        return (a.name || "").localeCompare(b.name || "", "pt-BR");
+      });
+  }, [products, searchTerm, locationFilter, sortBy]);
+
+  const exportProducts = useMemo(() => {
+    return filteredProducts.map((p: any) => ({
+      ...p,
+      storage_location: p.storage_location || p.storage_code || generateStorageCode(p.storage_room, p.storage_rack, p.storage_shelf) || "Não informada"
+    }));
+  }, [filteredProducts]);
 
   const filteredCategories = categories.filter((c: any) => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -409,7 +474,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
             {activeTab === "Produtos" && (
               <>
                 <ExportButton 
-                  data={filteredProducts} 
+                  data={exportProducts} 
                   filename="produtos" 
                   format="xlsx" 
                   headers={productExportHeaders} 
@@ -428,7 +493,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                 </ExportButton>
 
                 <ExportButton 
-                  data={filteredProducts} 
+                  data={exportProducts} 
                   filename="produtos" 
                   format="pdf" 
                   title="Relatório de Produtos"
@@ -645,108 +710,363 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
 
       {activeTab === "Produtos" && (
         <div className="space-y-6">
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-            <input 
-              type="text" 
-              placeholder="Buscar por nome ou código..." 
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          {/* Search, Location Status Filter, and Sorting */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Buscar por nome, SKU, sala, armário ou gaveta..." 
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder:text-gray-400 shadow-2xs"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Location Status Filters */}
+              <div className="flex items-center p-1 bg-gray-100/90 rounded-xl border border-gray-200/80">
+                <button
+                  type="button"
+                  onClick={() => setLocationFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    locationFilter === "ALL"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Todos ({products.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocationFilter("ASSIGNED")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    locationFilter === "ASSIGNED"
+                      ? "bg-emerald-600 text-white shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-emerald-700"
+                  }`}
+                  title="Produtos com endereço de estoque cadastrado"
+                >
+                  <Warehouse size={13} />
+                  <span>Com Localização</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocationFilter("UNASSIGNED")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    locationFilter === "UNASSIGNED"
+                      ? "bg-amber-600 text-white shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-amber-700"
+                  }`}
+                  title="Produtos sem endereço de estoque cadastrado"
+                >
+                  <HelpCircle size={13} />
+                  <span>Sem Localização</span>
+                </button>
+              </div>
+
+              {/* Sort By Dropdown */}
+              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-2xs">
+                <ArrowUpDown size={14} className="text-gray-400" />
+                <span className="text-xs text-gray-500 font-medium">Ordem:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e: any) => setSortBy(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-transparent border-0 focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="NAME_ASC">Nome (A-Z)</option>
+                  <option value="NAME_DESC">Nome (Z-A)</option>
+                  <option value="LOCATION_ASC">Localização (A-Z)</option>
+                  <option value="STOCK_DESC">Maior Estoque</option>
+                  <option value="STOCK_ASC">Menor Estoque</option>
+                </select>
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center p-1 bg-gray-100/90 rounded-xl border border-gray-200/80">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  title="Visualização em Grade"
+                  className={`p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    viewMode === "grid"
+                      ? "bg-white text-blue-600 shadow-2xs font-bold"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <LayoutGrid size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  title="Visualização em Tabela / Lista"
+                  className={`p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    viewMode === "table"
+                      ? "bg-white text-blue-600 shadow-2xs font-bold"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <List size={15} />
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Product Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {isLoadingProducts ? (
-              <div className="col-span-full py-12 text-center text-gray-500">Carregando produtos...</div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
-                Nenhum produto encontrado.
+          {/* Product Listing (Grid or Table) */}
+          {isLoadingProducts ? (
+            <div className="py-12 text-center text-gray-500">Carregando produtos...</div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100">
+              Nenhum produto encontrado.
+            </div>
+          ) : viewMode === "table" ? (
+            /* Table View */
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[760px]">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-slate-50/70 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-3.5 px-4">Produto</th>
+                      <th className="py-3.5 px-4">Categoria / Marca</th>
+                      <th className="py-3.5 px-4">Localização Estoque</th>
+                      <th className="py-3.5 px-4 text-center">Estoque</th>
+                      <th className="py-3.5 px-4 text-right">Preço</th>
+                      <th className="py-3.5 px-4 text-right pr-6">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-sm">
+                    {filteredProducts.map((p: any) => {
+                      const rawLoc = p.storage_location || p.storage_code;
+                      const synthesizedLoc = [p.storage_room, p.storage_rack, p.storage_shelf].filter(Boolean).join("-");
+                      const displayLocation = rawLoc || synthesizedLoc || "";
+                      const isLowStock = p.stock_quantity <= (p.min_stock || 0);
+
+                      return (
+                        <tr 
+                          key={p.id} 
+                          id={`product-table-row-${p.id}`}
+                          className="hover:bg-blue-50/40 transition-colors group"
+                        >
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              {!disableProductImages && (
+                                <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center shrink-0">
+                                  {p.image_url ? (
+                                    <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Package size={18} className="text-gray-300" />
+                                  )}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 truncate max-w-[220px]">{p.name}</p>
+                                <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-0.5">
+                                  {p.sku && <span>SKU: {p.sku}</span>}
+                                  {p.barcode && <span>EAN: {p.barcode}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-bold uppercase">
+                                {p.category_name || "Geral"}
+                              </span>
+                              {p.brand_name && (
+                                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold uppercase">
+                                  {p.brand_name}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            {displayLocation ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/70 rounded-lg text-xs font-bold font-mono">
+                                <Warehouse size={12} className="text-emerald-600 shrink-0" />
+                                <span>{displayLocation}</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">Não informada</span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-flex items-center gap-1 font-bold text-xs px-2 py-0.5 rounded-full ${
+                              isLowStock 
+                                ? "bg-red-50 text-red-600 font-extrabold border border-red-100" 
+                                : "text-slate-700"
+                            }`}>
+                              {p.stock_quantity || 0} {p.unit || "un"}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right">
+                            <span className="font-bold text-blue-600 font-mono">
+                              {formatCurrency(p.price || 0)}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right pr-6">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Inject Eye Icon Button at the end of each product row */}
+                              <button
+                                id={`btn-view-product-row-${p.id}`}
+                                onClick={() => setViewingProduct(p)}
+                                title="Visualizar Detalhes Completos"
+                                className="p-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-2xs border border-indigo-100/60"
+                              >
+                                <Eye size={15} />
+                              </button>
+
+                              {canManage && (
+                                <>
+                                  <button
+                                    id={`btn-edit-product-row-${p.id}`}
+                                    onClick={() => { 
+                                      setEditingProduct(p); 
+                                      setImageBase64(p.image_url || null); 
+                                      setBomItems(p.bom_items || []);
+                                      setStorageRoom(p.storage_room || "");
+                                      setStorageRack(p.storage_rack || "");
+                                      setStorageShelf(p.storage_shelf || "");
+                                      setStorageLocation(p.storage_location || p.storage_code || "");
+                                      setIsModalOpen(true); 
+                                    }}
+                                    title="Editar Produto"
+                                    className="p-2 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-2xs border border-blue-100/60"
+                                  >
+                                    <Edit2 size={15} />
+                                  </button>
+
+                                  <button
+                                    id={`btn-delete-product-row-${p.id}`}
+                                    onClick={() => {
+                                      setConfirmModal({
+                                        isOpen: true,
+                                        title: "Excluir Produto",
+                                        message: "Deseja realmente excluir este produto? Esta ação não pode ser desfeita.",
+                                        onConfirm: () => {
+                                          deleteMutation.mutate({ entity: "products", id: p.id });
+                                          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                                        }
+                                      });
+                                    }}
+                                    title="Excluir Produto"
+                                    className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-2xs border border-red-100/60"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            ) : filteredProducts.map((p: any) => (
-              <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group relative">
-                {!disableProductImages && (
-                  <div className="aspect-square bg-gray-50 flex items-center justify-center relative">
-                    {p.image_url ? (
-                      <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon size={48} className="text-gray-200" />
-                    )}
-                  </div>
-                )}
-                {canManage && (
-                  <div className={`absolute ${disableProductImages ? 'top-2 right-2' : 'top-2 right-2'} flex gap-1.5 z-10`}>
-                    <button 
-                      onClick={() => { 
-                        setEditingProduct(p); 
-                        setImageBase64(p.image_url || null); 
-                        setBomItems(p.bom_items || []);
-                        setStorageRoom(p.storage_room || "");
-                        setStorageRack(p.storage_rack || "");
-                        setStorageShelf(p.storage_shelf || "");
-                        setStorageLocation(p.storage_location || p.storage_code || "");
-                        setIsModalOpen(true); 
-                      }}
-                      title="Editar Produto"
-                      className="p-2 bg-white/95 hover:bg-blue-600 text-blue-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer mt-[39px]"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setConfirmModal({
-                          isOpen: true,
-                          title: "Excluir Produto",
-                          message: "Deseja realmente excluir este produto? Esta ação não pode ser desfeita.",
-                          onConfirm: () => {
-                            deleteMutation.mutate({ entity: "products", id: p.id });
-                            setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                          }
-                        });
-                      }}
-                      title="Excluir Produto"
-                      className="p-2 bg-white/95 hover:bg-red-600 text-red-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer mt-[39px]"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                )}
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-bold text-gray-900 truncate flex-1">{p.name}</h3>
-                    <span className="text-blue-600 font-bold">{formatCurrency(p.price || 0)}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase">
-                      {p.category_name || "Geral"}
-                    </span>
-                    {p.brand_name && (
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase">
-                        {p.brand_name}
-                      </span>
-                    )}
-                    {(p.storage_location || p.storage_code) && (
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded text-[10px] font-bold flex items-center gap-1" title={`Localização de Armazenagem: ${p.storage_location || p.storage_code}`}>
-                        <Warehouse size={10} className="text-emerald-600" />
-                        {p.storage_location || p.storage_code}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-gray-50">
-                    <div className="flex items-center gap-1">
-                      <Package size={14} className="text-gray-400" />
-                      <span className={`text-xs font-bold ${p.stock_quantity <= p.min_stock ? "text-red-500" : "text-gray-500"}`}>
-                        {p.stock_quantity} un
-                      </span>
+            </div>
+          ) : (
+            /* Product Grid View */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map((p: any) => (
+                <div key={p.id} id={`product-card-${p.id}`} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group relative">
+                  {!disableProductImages && (
+                    <div className="aspect-square bg-gray-50 flex items-center justify-center relative">
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon size={48} className="text-gray-200" />
+                      )}
                     </div>
-                    <span className="text-[10px] text-gray-400 font-mono">{p.sku || "S/ COD"}</span>
+                  )}
+                  <div className="absolute top-2 right-2 flex gap-1.5 z-10 mt-[60px] pl-[1px]">
+                    <button 
+                      id={`btn-view-product-${p.id}`}
+                      onClick={() => setViewingProduct(p)}
+                      title="Visualizar Detalhes do Produto"
+                      className="p-2 bg-white/95 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    {canManage && (
+                      <>
+                        <button 
+                          id={`btn-edit-product-${p.id}`}
+                          onClick={() => { 
+                            setEditingProduct(p); 
+                            setImageBase64(p.image_url || null); 
+                            setBomItems(p.bom_items || []);
+                            setStorageRoom(p.storage_room || "");
+                            setStorageRack(p.storage_rack || "");
+                            setStorageShelf(p.storage_shelf || "");
+                            setStorageLocation(p.storage_location || p.storage_code || "");
+                            setIsModalOpen(true); 
+                          }}
+                          title="Editar Produto"
+                          className="p-2 bg-white/95 hover:bg-blue-600 text-blue-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          id={`btn-delete-product-${p.id}`}
+                          onClick={() => {
+                            setConfirmModal({
+                              isOpen: true,
+                              title: "Excluir Produto",
+                              message: "Deseja realmente excluir este produto? Esta ação não pode ser desfeita.",
+                              onConfirm: () => {
+                                deleteMutation.mutate({ entity: "products", id: p.id });
+                                setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                              }
+                            });
+                          }}
+                          title="Excluir Produto"
+                          className="p-2 bg-white/95 hover:bg-red-600 text-red-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="p-4 pt-[42px]">
+                    <div className="flex justify-between items-start mb-1">
+                      <h3 className="font-bold text-gray-900 truncate flex-1">{p.name}</h3>
+                      <span className="text-blue-600 font-bold">{formatCurrency(p.price || 0)}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase">
+                        {p.category_name || "Geral"}
+                      </span>
+                      {p.brand_name && (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase">
+                          {p.brand_name}
+                        </span>
+                      )}
+                      {(p.storage_location || p.storage_code) && (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded text-[10px] font-bold flex items-center gap-1" title={`Localização de Armazenagem: ${p.storage_location || p.storage_code}`}>
+                          <Warehouse size={10} className="text-emerald-600" />
+                          {p.storage_location || p.storage_code}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-50">
+                      <div className="flex items-center gap-1">
+                        <Package size={14} className="text-gray-400" />
+                        <span className={`text-xs font-bold ${p.stock_quantity <= p.min_stock ? "text-red-500" : "text-gray-500"}`}>
+                          {p.stock_quantity} un
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-mono">{p.sku || "S/ COD"}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1342,6 +1662,23 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
         isOpen={isLabelModalOpen}
         onClose={() => setIsLabelModalOpen(false)}
         products={products}
+      />
+
+      <ProductDetailsModal
+        isOpen={!!viewingProduct}
+        product={viewingProduct}
+        onClose={() => setViewingProduct(null)}
+        canEdit={canManage}
+        onEdit={(p) => {
+          setEditingProduct(p); 
+          setImageBase64(p.image_url || null); 
+          setBomItems(p.bom_items || []);
+          setStorageRoom(p.storage_room || "");
+          setStorageRack(p.storage_rack || "");
+          setStorageShelf(p.storage_shelf || "");
+          setStorageLocation(p.storage_location || p.storage_code || "");
+          setIsModalOpen(true);
+        }}
       />
     </div>
   );

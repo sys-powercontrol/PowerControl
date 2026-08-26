@@ -9,7 +9,9 @@ import {
   ArrowUpRight, 
   ArrowDownLeft,
   ArrowRightLeft,
-  Check
+  Check,
+  Zap,
+  PlusCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatBR } from "../../lib/dateUtils";
@@ -152,6 +154,36 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
   const [isSavingRule, setIsSavingRule] = useState<string | null>(null);
 
   const currentCompanyId = api.getCompanyId();
+
+  // Quick Launch state
+  const [quickLaunchTx, setQuickLaunchTx] = useState<OFXTransaction | null>(null);
+  const [quickLaunchData, setQuickLaunchData] = useState({
+    description: "",
+    amount: 0,
+    due_date: "",
+    category_id: "",
+    supplier_id: "",
+    client_id: ""
+  });
+
+  // Fetch categories, suppliers, clients for quick launch
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories", currentCompanyId],
+    queryFn: () => api.get("categories"),
+    enabled: !!quickLaunchTx
+  });
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ["suppliers", currentCompanyId],
+    queryFn: () => api.get("suppliers"),
+    enabled: !!quickLaunchTx
+  });
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients", currentCompanyId],
+    queryFn: () => api.get("clients"),
+    enabled: !!quickLaunchTx
+  });
 
   // Fetch rules
   const { data: rules = [] } = useQuery({
@@ -414,6 +446,100 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
     toast.success("Vínculo manual estabelecido!");
   };
 
+  const openQuickLaunch = (t: OFXTransaction) => {
+    setQuickLaunchTx(t);
+    setQuickLaunchData({
+      description: t.memo,
+      amount: Math.abs(t.amount || 0),
+      due_date: t.date ? t.date.split("T")[0] : new Date().toISOString().split("T")[0],
+      category_id: "",
+      supplier_id: "",
+      client_id: ""
+    });
+  };
+
+  const quickLaunchMutation = useMutation({
+    mutationFn: async () => {
+      if (!quickLaunchTx) return;
+      const isExpense = quickLaunchTx.type === "DEBIT";
+      const endpoint = isExpense ? "accountsPayable" : "accountsReceivable";
+      const { processAccountPayment, processAccountReceipt } = await import("../../lib/finance");
+
+      const createdAcc = await api.post(endpoint, {
+        company_id: currentCompanyId,
+        description: quickLaunchData.description || quickLaunchTx.memo,
+        amount: Number(quickLaunchData.amount) || Math.abs(quickLaunchTx.amount),
+        due_date: quickLaunchData.due_date || quickLaunchTx.date,
+        [isExpense ? "payment_date" : "receipt_date"]: quickLaunchData.due_date || quickLaunchTx.date,
+        status: isExpense ? "Pago" : "Recebido",
+        reconciled: true,
+        reconciliation_date: new Date().toISOString(),
+        bank_account_id: bankAccountId,
+        category_id: quickLaunchData.category_id || null,
+        supplier_id: isExpense ? (quickLaunchData.supplier_id || null) : null,
+        client_id: !isExpense ? (quickLaunchData.client_id || null) : null,
+        created_at: new Date().toISOString()
+      });
+
+      if (createdAcc && createdAcc.id) {
+        const docId = String(createdAcc.id);
+        if (isExpense) {
+          await processAccountPayment(docId, createdAcc, { type: 'bank', id: bankAccountId });
+        } else {
+          await processAccountReceipt(docId, createdAcc, { type: 'bank', id: bankAccountId });
+        }
+      }
+
+      setManualMatches(prev => ({ ...prev, [quickLaunchTx.id]: createdAcc }));
+      setSelectedTransactions(prev => {
+        const next = new Set(prev);
+        next.add(quickLaunchTx.id);
+        return next;
+      });
+      return createdAcc;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
+      queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
+      queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      toast.success("Lançamento criado e conciliado no ERP com sucesso!");
+      const txId = quickLaunchTx?.id;
+      setQuickLaunchTx(null);
+      if (txId) {
+        setIsSavingRule(txId);
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao criar lançamento rápido.");
+    }
+  });
+
+  const handleAutoReconcileHighConfidence = () => {
+    const highConfidenceIds: string[] = [];
+    transactions.forEach((t) => {
+      const isExpense = t.type === "DEBIT";
+      const existing = isExpense ? payables : receivables;
+      const manual = manualMatches[t.id];
+      if (manual) {
+        highConfidenceIds.push(t.id);
+        return;
+      }
+      const matchRes = findBestMatch(t, existing);
+      if (matchRes && matchRes.score >= 90) {
+        highConfidenceIds.push(t.id);
+      }
+    });
+
+    if (highConfidenceIds.length === 0) {
+      toast.info("Nenhuma transação com correspondência de alta certeza (≥ 90%) encontrada.");
+      return;
+    }
+
+    setSelectedTransactions(new Set(highConfidenceIds));
+    importMutation.mutate(highConfidenceIds);
+    toast.success(`${highConfidenceIds.length} transações conciliadas automaticamente com sucesso!`);
+  };
+
   const saveRuleMutation = useMutation({
     mutationFn: async (transactionId: string) => {
       const t = transactions.find(tr => tr.id === transactionId);
@@ -494,15 +620,26 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                     {selectedTransactions.size} de {transactions.length} selecionados
                   </span>
                 </div>
-                <button 
-                  onClick={() => {
-                    setTransactions([]);
-                    setManualMatches({});
-                  }}
-                  className="text-sm font-bold text-red-600 hover:text-red-700"
-                >
-                  Trocar Arquivo
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleAutoReconcileHighConfidence}
+                    disabled={importMutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all shadow-xs"
+                    title="Conciliar automaticamente todas as transações com correspondência confiável (≥90%)"
+                  >
+                    <Zap size={14} className="text-amber-600 fill-amber-500" />
+                    Auto Conciliar (≥90%)
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setTransactions([]);
+                      setManualMatches({});
+                    }}
+                    className="text-sm font-bold text-red-600 hover:text-red-700"
+                  >
+                    Trocar Arquivo
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -594,7 +731,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                           )}
                         </div>
                         
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 items-end">
                           {match ? (
                             <button 
                               onClick={() => setManualMatches(prev => {
@@ -607,12 +744,21 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                               Remover Vínculo
                             </button>
                           ) : (
-                            <button 
-                              onClick={() => setIsManualMatching(t.id)}
-                              className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"
-                            >
-                              <ArrowRightLeft size={10} /> Vincular Manual
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => openQuickLaunch(t)}
+                                className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors flex items-center gap-1"
+                                title="Criar novo lançamento financeiro direto do extrato"
+                              >
+                                <PlusCircle size={11} /> Lançar no ERP
+                              </button>
+                              <button 
+                                onClick={() => setIsManualMatching(t.id)}
+                                className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                              >
+                                <ArrowRightLeft size={10} /> Vincular
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -689,6 +835,122 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                     ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Launch Modal */}
+      {quickLaunchTx && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setQuickLaunchTx(null)} />
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Lançar no ERP ({quickLaunchTx.type === "DEBIT" ? "Conta a Pagar" : "Conta a Receber"})
+                </h3>
+                <p className="text-xs text-gray-500">Cria o lançamento e já realiza a baixa e conciliação bancária.</p>
+              </div>
+              <button onClick={() => setQuickLaunchTx(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Descrição *</label>
+                <input 
+                  type="text"
+                  value={quickLaunchData.description}
+                  onChange={(e) => setQuickLaunchData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+                  placeholder="Descrição do lançamento..."
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Valor (R$) *</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={quickLaunchData.amount}
+                    onChange={(e) => setQuickLaunchData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                    className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Data *</label>
+                  <input 
+                    type="date"
+                    value={quickLaunchData.due_date}
+                    onChange={(e) => setQuickLaunchData(prev => ({ ...prev, due_date: e.target.value }))}
+                    className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Categoria</label>
+                <select
+                  value={quickLaunchData.category_id}
+                  onChange={(e) => setQuickLaunchData(prev => ({ ...prev, category_id: e.target.value }))}
+                  className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="">Selecione uma categoria...</option>
+                  {categories.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {quickLaunchTx.type === "DEBIT" ? (
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Fornecedor (Opcional)</label>
+                  <select
+                    value={quickLaunchData.supplier_id}
+                    onChange={(e) => setQuickLaunchData(prev => ({ ...prev, supplier_id: e.target.value }))}
+                    className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">Selecione um fornecedor...</option>
+                    {suppliers.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Cliente (Opcional)</label>
+                  <select
+                    value={quickLaunchData.client_id}
+                    onChange={(e) => setQuickLaunchData(prev => ({ ...prev, client_id: e.target.value }))}
+                    className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">Selecione um cliente...</option>
+                    {clients.map((cl: any) => (
+                      <option key={cl.id} value={cl.id}>{cl.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 sticky bottom-0">
+              <button
+                onClick={() => setQuickLaunchTx(null)}
+                className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => quickLaunchMutation.mutate()}
+                disabled={quickLaunchMutation.isPending || !quickLaunchData.description}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-emerald-200 disabled:opacity-50 flex items-center gap-2"
+              >
+                <CheckCircle2 size={16} />
+                {quickLaunchMutation.isPending ? "Criando..." : "Lançar e Conciliar"}
+              </button>
             </div>
           </div>
         </div>

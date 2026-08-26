@@ -606,9 +606,16 @@ export default function AdminMaster() {
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
     
+    let targetRole = selectedUserRole;
+    const userEmail = (data.email as string || editingUser?.email || "").trim().toLowerCase();
+    if (targetRole === 'master' && userEmail !== 'sys.powercontrol@gmail.com') {
+      toast.error("A role 'master' é exclusiva da conta root (sys.powercontrol@gmail.com). O usuário foi configurado como 'admin'.");
+      targetRole = 'admin';
+    }
+
     const userData: any = {
       ...data,
-      role: selectedUserRole,
+      role: targetRole,
       permissions: selectedPermissions,
       company_ids: selectedUserCompanyIds,
       company_id: selectedUserCompanyIds.length > 0 ? selectedUserCompanyIds[0] : null,

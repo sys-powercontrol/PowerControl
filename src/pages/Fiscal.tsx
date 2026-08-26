@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -17,7 +17,9 @@ import {
   Shield,
   ChevronRight,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Ban,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import NfeStatusBadge, { NfeStatus } from "../components/NfeStatusBadge";
@@ -25,6 +27,7 @@ import DanfeViewer from "../components/DanfeViewer";
 import JSZip from "jszip";
 import { fiscalApi } from "../services/fiscalApi";
 import ExportButton from "../components/ExportButton";
+import { InutilizacaoModal } from "../components/Fiscal/InutilizacaoModal";
 
 import { Link } from "react-router-dom";
 
@@ -76,6 +79,7 @@ export default function Fiscal() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDanfeOpen, setIsDanfeOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isInutilizacaoOpen, setIsInutilizacaoOpen] = useState(false);
   const [emailInvoice, setEmailInvoice] = useState<any>(null);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -198,10 +202,62 @@ export default function Fiscal() {
     enabled: !!(currentCompanyId || canManage)
   });
 
+  const { data: company } = useQuery({
+    queryKey: ["company", currentCompanyId],
+    queryFn: () => api.get("companies", currentCompanyId),
+    enabled: !!currentCompanyId
+  });
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients", currentCompanyId],
+    queryFn: () => api.get("clients"),
+    enabled: !!currentCompanyId
+  });
+
   const filteredInvoices = invoices.filter((i: any) => 
     (i.number?.toString() || "").includes(searchTerm) ||
     (i.client_name?.toLowerCase() || "").includes(searchTerm.toLowerCase())
   );
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const emittedThisMonth = invoices.filter((i: any) => {
+      const isEmitted = i.status === "Emitida" || i.status === "Autorizada";
+      if (!isEmitted) return false;
+      const dStr = i.created_at || i.emission_date || i.issue_date;
+      if (!dStr) return false;
+      const d = new Date(dStr);
+      return !isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    }).length;
+
+    const pending = invoices.filter((i: any) => 
+      i.status === "Pendente" || i.status === "Aguardando" || i.status === "Processando"
+    ).length;
+
+    const rejected = invoices.filter((i: any) => 
+      i.status === "Erro" || i.status === "Rejeitada" || i.status === "Cancelada"
+    ).length;
+
+    return { emittedThisMonth, pending, rejected };
+  }, [invoices]);
+
+  const certStatus = useMemo(() => {
+    const certExpiration = company?.fiscal_certificate_expiration || company?.certificate_expiration;
+    if (!certExpiration) return null;
+    const expDate = new Date(certExpiration);
+    if (isNaN(expDate.getTime())) return null;
+    const diffTime = expDate.getTime() - new Date().getTime();
+    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      expirationDate: expDate,
+      daysRemaining,
+      isExpired: daysRemaining <= 0,
+      isExpiringSoon: daysRemaining > 0 && daysRemaining <= 30
+    };
+  }, [company]);
 
   const invoiceExportHeaders = {
     number: "Número",
@@ -246,18 +302,6 @@ export default function Fiscal() {
     onError: (error: any) => {
       toast.error(`Erro ao cancelar: ${error.message}`);
     }
-  });
-
-  const { data: company } = useQuery({
-    queryKey: ["company", currentCompanyId],
-    queryFn: () => api.get("companies", currentCompanyId),
-    enabled: !!currentCompanyId
-  });
-
-  const { data: clients = [] } = useQuery({
-    queryKey: ["clients", currentCompanyId],
-    queryFn: () => api.get("clients"),
-    enabled: !!currentCompanyId
   });
 
   const emitMutation = useMutation({
@@ -500,6 +544,15 @@ if (!canManage) {
             <span className="truncate">{isSyncingPending ? "Sincronizando..." : "Sincronizar"}</span>
           </button>
 
+          <button
+            onClick={() => setIsInutilizacaoOpen(true)}
+            className="bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 text-rose-800 rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold transition-all text-xs sm:text-sm min-h-[48px] w-full h-full cursor-pointer"
+            title="Inutilizar faixa de numeração que não será utilizada perante a SEFAZ"
+          >
+            <Ban size={18} className="text-rose-600 shrink-0" />
+            <span className="truncate">Inutilizar</span>
+          </button>
+
           <Link 
             to="/Certificado"
             className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold transition-all text-xs sm:text-sm min-h-[48px] w-full h-full"
@@ -518,12 +571,51 @@ if (!canManage) {
         </div>
       </div>
 
+      {/* Certificate Expiration Warning Banner */}
+      {certStatus && (certStatus.isExpired || certStatus.isExpiringSoon) && (
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs ${
+          certStatus.isExpired 
+            ? "bg-rose-50 border-rose-200 text-rose-900" 
+            : "bg-amber-50 border-amber-200 text-amber-900"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl shrink-0 ${
+              certStatus.isExpired ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-600"
+            }`}>
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-sm">
+                {certStatus.isExpired 
+                  ? "Certificado Digital Expirado!" 
+                  : `Certificado Digital expira em ${certStatus.daysRemaining} dia(s)!`}
+              </p>
+              <p className="text-xs opacity-80 mt-0.5">
+                {certStatus.isExpired
+                  ? "As emissões de NF-e e NFC-e estão bloqueadas na SEFAZ até a renovação do certificado A1."
+                  : `Vencimento em ${formatBR(certStatus.expirationDate, "dd/MM/yyyy")}. Renove seu arquivo A1 para evitar interrupções no PDV.`}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/Certificado"
+            className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-colors shadow-2xs ${
+              certStatus.isExpired
+                ? "bg-rose-600 hover:bg-rose-700 text-white"
+                : "bg-amber-600 hover:bg-amber-700 text-white"
+            }`}
+          >
+            Atualizar Certificado A1
+          </Link>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Emitidas (Mês)", value: "124", color: "text-blue-600", bg: "bg-blue-50", icon: CheckCircle2 },
-          { label: "Aguardando", value: "12", color: "text-orange-600", bg: "bg-orange-50", icon: Clock },
-          { label: "Rejeitadas", value: "2", color: "text-red-600", bg: "bg-red-50", icon: AlertCircle },
+          { label: "Emitidas (Mês)", value: stats.emittedThisMonth, color: "text-blue-600", bg: "bg-blue-50", icon: CheckCircle2 },
+          { label: "Aguardando / Pendentes", value: stats.pending, color: "text-orange-600", bg: "bg-orange-50", icon: Clock },
+          { label: "Rejeitadas / Canceladas", value: stats.rejected, color: "text-red-600", bg: "bg-red-50", icon: AlertCircle },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
             <div className={`p-3 rounded-2xl ${stat.bg} ${stat.color}`}>
@@ -754,6 +846,13 @@ if (!canManage) {
           </div>
         </div>
       )}
+
+      <InutilizacaoModal
+        isOpen={isInutilizacaoOpen}
+        onClose={() => setIsInutilizacaoOpen(false)}
+        company={company}
+        currentCompanyId={currentCompanyId || ""}
+      />
     </div>
   );
 }

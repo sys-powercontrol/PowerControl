@@ -1,109 +1,114 @@
-# Relatório de Diagnóstico Estrutural e Arquitetural: Otimização Extrema de Leituras (Reads) no Firebase Firestore
-
-**Data e Hora de Geração:** 21/08/2026 07:35:00 (Horário de Brasília - UTC-3)
-
----
-
-## 1. Sumário Executivo & Objetivos
-O objetivo deste relatório é diagnosticar todas as origens de consumo excessivo de leituras (*reads*) no Firebase Firestore dentro do ecossistema do sistema (Power Control ERP/PDV) e definir as medidas técnicas necessárias para **reduzir em até 90-95% o volume total de leituras diárias**, mantendo:
-1. **Consistência e Integridade Transacional:** Nenhuma operação financeira ou de estoque pode ficar defasada ou inconsistente.
-2. **Experiência do Usuário (UX):** Respostas instantâneas na interface, navegação ágil, suporte offline contínuo e sem telas travadas.
-3. **Segurança e Isolamento Multi-tenant:** Conformidade rigorosa com as regras de isolamento por `company_id` e permissões de perfil (RBAC).
+# Relatório de Diagnóstico e Finalizações do Sistema
+**Data e Hora de Geração:** 26/08/2026 às 10:10:51 (Horário de Brasília - UTC-3)  
+**Diretriz Estrita:** Análise diagnóstica exclusivamente das implementações existentes que demandam finalização, alinhamento ou estabilização. Proibida a inclusão ou criação de novas ferramentas, novas telas ou arquiteturas adicionais não existentes.
 
 ---
 
-## 2. Diagnóstico Atual: Principais Gargalos de Consumo de Leituras (Reads)
+## 1. Sumário Executivo
 
-### 2.1 Ausência de Janela Temporal e Paginação em Coleções Transacionais (Over-fetching Crítico)
-* **Páginas Afetadas:** `src/pages/Dashboard.tsx`, `src/pages/SalesHistory.tsx`, `src/pages/AccountsPayable.tsx`, `src/pages/AccountsReceivable.tsx`, `src/pages/AuditLogs.tsx`, `src/pages/CashFlowReport.tsx`, `src/pages/ProfitabilityReport.tsx`, `src/pages/InventoryTurnoverReport.tsx`, `src/pages/PurchaseHistory.tsx`.
-* **Cenário Atual:**
-  - Em `Dashboard.tsx`, as chamadas `api.get("sales")`, `api.get("products")`, `api.get("cashiers")`, `api.get("accountsPayable")`, `api.get("accountsReceivable")`, `api.get("purchases")` e `api.get("clients")` baixam **todas** as entidades da empresa desde o início dos tempos, para só depois filtrar por data em memória via JavaScript (`useMemo`).
-  - Em uma empresa com 5.000 vendas e 2.000 títulos a pagar, cada acesso ao Dashboard consome **mais de 7.000 leituras de uma única vez**.
-  - Em `SalesHistory.tsx`, `api.get("sales", { _orderBy: "sale_date", _orderDir: "desc" })` carrega a base completa de vendas, mesmo que o filtro visual padrão seja "Hoje" (`day`).
-  - Em `AuditLogs.tsx`, `api.get("audit_logs", { _all: true })` busca o histórico ilimitado de auditoria de todo o sistema.
+O sistema **PowerControl ERP** apresenta uma arquitetura robusta e completa para gestão empresarial integrada, incluindo:
+* **Estoque e Armazenagem Física:** Cadastro multinível de localização (Sala, Armário/Estante, Prateleira), Kardex e Mapa Visual de Estoque.
+* **Vendas e PDV:** Frente de caixa com suporte a múltiplos métodos de pagamento (inclusive pagamento misto/split), controle de expedição e emissão de comprovantes/orçamentos.
+* **Emissão de Etiquetas:** Geração de layouts térmicos (80x40) e folhas A4 (Pimenta 6180, Avery 5160) com código de barras e QR Code.
+* **Compras e XML:** Importação automatizada de NF-e via XML com leitura de itens e duplicatas financeiras.
+* **Financeiro e Caixa:** Contas a Pagar/Receber, conciliação de extratos bancários OFX e abertura/fechamento com auditoria de turnos de operadores de caixa.
+* **Fiscal e Certificados:** Emissão de NF-e/NFC-e, gestão de certificado digital A1, controle de inutilização de numeração e contingência.
+* **Operação Offline e PWA:** Armazenamento local no IndexedDB com fila de sincronização em segundo plano.
 
-### 2.2 Dashboard Global (Admin Master) com Busca Irrestrita Multi-empresa
-* **Página Afetada:** `src/pages/GlobalDashboard.tsx`.
-* **Cenário Atual:**
-  - O painel Master executa consultas com parâmetro `{ _all: true }` para `sales`, `products`, `users`, `accountsPayable`, `accountsReceivable` e `companies`.
-  - Isso faz com que todo o banco de dados de todas as empresas cadastradas seja transferido para a memória do navegador, gerando picos massivos de dezenas/centenas de milhares de leituras a cada refresh.
-
-### 2.3 Ausência de Agregações Nativas do Firestore (`count()`, `sum()`, `average()`)
-* **Arquivos Afetados:** `src/lib/api.ts`, `src/pages/Dashboard.tsx`, `src/pages/GlobalDashboard.tsx`, `src/pages/CashFlowReport.tsx`, `src/pages/ProfitabilityReport.tsx`.
-* **Cenário Atual:**
-  - O sistema lê todos os documentos de vendas e contas para somar `total_price` ou contar registros (`sales.length`, `accounts.length`).
-  - O Firestore possui APIs nativas de agregação no servidor (`getCountFromServer` e `getAggregateFromServer` com `sum` e `average`), as quais cobram apenas **1 leitura para cada 1.000 entradas de índice examinadas** (ou 1 leitura por requisição de agregação), em vez de 1 leitura por documento.
-
-### 2.4 Inicialização Padrão do SDK sem Cache Persistente em IndexedDB Multi-aba
-* **Arquivo Afetado:** `src/lib/firebase.ts`.
-* **Cenário Atual:**
-  - A inicialização do Firestore ocorre com `getFirestore(app, databaseId)` usando a memória volátil padrão do SDK.
-  - Ao recarregar a página (F5) ou abrir uma nova aba, o SDK do Firebase não reutiliza o cache estruturado em disco (IndexedDB) nativo do Firestore, forçando uma nova rodada de leituras ao servidor.
-
-### 2.5 Invalidação Agressiva de Cache no TanStack React Query sem Atualização Otimista
-* **Arquivos Afetados:** `src/lib/queryClient.ts`, `src/lib/api.ts`, mutações em páginas de Vendas, PDV e Financeiro.
-* **Cenário Atual:**
-  - Após criar uma venda ou pagar uma conta, invoca-se `queryClient.invalidateQueries({ queryKey: ["sales"] })`, o que descarta o cache e reexecuta a query completa baixando novamente milhares de documentos.
-  - A ausência de `queryClient.setQueryData` (atualização otimista/local imediata) desperdiça leituras para refletir 1 única linha alterada.
-
-### 2.6 Ausência de Documentos Consolidadores de Resumo (Rollups Diários/Mensais)
-* **Arquivos Relevantes:** `src/lib/inventory.ts`, `src/lib/finance.ts`, `src/pages/Sales.tsx`, `src/pages/Dashboard.tsx`.
-* **Cenário Atual:**
-  - Para exibir gráficos de tendência de 30 dias ou relatórios de DRE mensal, são lidos individualmente milhares de documentos de itens e vendas.
-  - A manutenção de um único documento consolidado diário/mensal (`companies/{id}/analytics_daily/{YYYY-MM-DD}`) permitiria ler **apenas 30 documentos para montar o gráfico de um mês inteiro** (redução de 99%).
-
-### 2.7 Dados Mestres Estáticos Baixados Repetidamente
-* **Páginas Afetadas:** Categorias, Contas Bancárias, Configurações Fiscais, Cargos, Permissões.
-* **Cenário Atual:**
-  - Coleções que raramente sofrem alterações são consultadas com frequência ao navegar entre rotas, sem aproveitar tempos longos de `staleTime` (ex.: 1 hora a 24 horas) ou checagem por versão/timestamp de controle.
+O objetivo deste relatório é registrar todas as amarrações pontuais, validações de consistência e detalhes de UX/integração que concluem o ciclo de vida de cada um dos módulos existentes, sem implementar novos módulos.
 
 ---
 
-## 3. Diretrizes Técnicas para Redução Máxima de Leituras
-
-### Diretriz 1: Ativação do Cache Persistente Nativo do Firestore (IndexedDB Multi-Tab)
-* Substituir a inicialização padrão em `src/lib/firebase.ts` por `initializeFirestore` com `persistentLocalCache` e `persistentMultipleTabManager`.
-* **Impacto:** Consultas idênticas e navegação entre telas aproveitam o cache local indexado sem consumir leituras do servidor Firestore.
-
-### Diretriz 2: Implementação de Paginação por Cursor (`limit` + `startAfter`)
-* Adicionar suporte no `api.ts` e nas páginas de listagem (`SalesHistory`, `AccountsPayable`, `AccountsReceivable`, `Products`, `Clients`, `Purchases`, `AuditLogs`) para paginação em lotes de 25 a 50 registros via `limit(50)` e ponteiro `startAfter(lastDocSnapshot)`.
-* **Impacto:** O carregamento inicial de qualquer lista cai de N (milhares) para estritamente 25 ou 50 leituras.
-
-### Diretriz 3: Filtro Temporal Obrigatório no Servidor Firestore (Server-side Date Range)
-* No `api.ts` e em todos os relatórios/dashboards, aplicar os limites `where("sale_date", ">=", start)`, `where("sale_date", "<=", end)` diretamente na query do Firestore, evitando baixar documentos fora do intervalo selecionado.
-* **Impacto:** Elimina 100% das leituras de dados históricos não solicitados na visualização corrente.
-
-### Diretriz 4: Utilização de Server Aggregations (`count()`, `sum()`) para KPIs e Contadores
-* Integrar `getCountFromServer` e `getAggregateFromServer` no `api.ts` (`api.count()`, `api.aggregate()`).
-* Substituir os contadores de cards de Dashboard e Totais de DRE por agregações diretas no servidor.
-* **Impacto:** Um cálculo de total de faturamento sobre 10.000 vendas consome **apenas 1 leitura** em vez de 10.000 leituras.
-
-### Diretriz 5: Arquitetura de Rollup Documents (Resumos Diários e Mensais)
-* Ao concluir vendas ou liquidar despesas via transação/batch, atualizar um documento agregado de data: `companies/{companyId}/daily_summaries/{YYYY-MM-DD}` contendo:
-  - `total_sales_amount`, `sales_count`, `cost_amount`, `payment_methods_totals`, `cancelled_amount`.
-* Os Dashboards e DRE passam a ler esses documentos de resumo diário/mensal (máximo 30 reads por mês).
-* **Impacto:** Redução drástica nas telas mais acessadas do sistema.
-
-### Diretriz 6: Estratégia de Cache por Níveis (Tiered Stale Times) no TanStack React Query
-* **Nível 1 (Estático - 1 hora a 24 horas):** `categories`, `bankAccounts`, `taxSettings`, `companyProfile`, `permissions`.
-* **Nível 2 (Cadastrais - 15 minutos):** `products`, `clients`, `suppliers`, `sellers`, `employees`.
-* **Nível 3 (Transacionais Paginados - 2 a 5 minutos):** `sales` (janela ativa), `accountsPayable`, `accountsReceivable`, `cashiers`.
-* **Nível 4 (Mutações):** Uso obrigatório de `queryClient.setQueryData` para aplicar inclusões/edições no cache local sem disparar `invalidateQueries` indiscriminado.
+## 2. Diagnóstico Detalhado por Módulo
 
 ---
 
-## 4. Comparativo de Consumo de Leituras (Antes vs. Depois)
-
-| Módulo / Operação | Consumo Atual Estimado (Base: 5k vendas, 1k títulos) | Consumo Otimizado Previsto | Redução Percentual |
-| :--- | :--- | :--- | :--- |
-| **Abertura do Dashboard Principal** | ~7.500 leituras (todas as coleções) | ~30 a 50 leituras (Rollup + Aggregations) | **-99.3%** |
-| **Acesso ao Histórico de Vendas (Hoje)** | ~5.000 leituras (todas as vendas) | 25 a 50 leituras (limit + date filter) | **-99.0%** |
-| **Relatório DRE / Fluxo de Caixa Mensal** | ~6.000 leituras (vendas + compras + contas) | 30 a 60 leituras (daily summaries) | **-99.0%** |
-| **Dashboard Global (Master)** | ~25.000+ leituras (todas as empresas) | ~50 a 100 leituras (Metadata + Aggregation) | **-99.6%** |
-| **Troca de Abas / Navegação Interna** | ~2.000 a 5.000 leituras/minuto | 0 leituras (Cache TanStack + IndexedDB) | **-100%** |
-| **Criação / Baixa de Registro** | Re-fetch completo da lista (~1.000 reads) | 1 write + 0 reads (Optimistic Update) | **-100% em reads** |
+### 2.1. Módulo de Produtos, Estoque e Armazenagem Física
+* **Arquivos do Módulo:** `src/pages/Products.tsx`, `src/pages/InventoryAdjustments.tsx`, `src/pages/InventoryHistory.tsx`, `src/components/Inventory/StockMapPowerBI.tsx`
+* **Situação Atual:**
+  * Estrutura de endereçamento físico (`storage_room`, `storage_rack`, `storage_shelf` e `storage_location`) consolidada no cadastro e modal de detalhes.
+  * Mapa de estoque e relatórios de giro implementados.
+* **Pontos de Finalização Existentes:**
+  1. **Busca e Filtro em Produtos (`Products.tsx`):** A busca unificada por texto deve cobrir tanto nome/SKU/código de barras quanto todos os campos de localização física (`storage_location`, `storage_room`, `storage_rack`, `storage_shelf`), além de permitir filtrar por "Com Localização" ou "Sem Localização" e ordenar alfabeticamente por endereço físico nas visualizações em grade e tabela.
+  2. **Conferência Física nos Ajustes (`InventoryAdjustments.tsx`):** Ao selecionar um item para ajuste manual ou transferência, disponibilizar o card de conferência física com a localização do produto. Ao acionar o atalho a partir do mapa visual (`StockMapPowerBI.tsx`), transicionar diretamente com o item pré-carregado.
+  3. **Kardex e Rastreabilidade (`InventoryHistory.tsx`):** As tabelas de movimentações e os relatórios exportados (PDF/Excel) devem exibir a coluna de endereço físico do item.
 
 ---
 
-## 5. Conclusão da Análise
-A implementação das técnicas mapeadas acima não exige refatorações no modelo de negócio ou nas regras de permissão, atuando exclusivamente nas camadas de transporte de dados (`api.ts`), inicialização do SDK Firebase (`firebase.ts`), parametrização de queries com filtros no servidor e estratégia de caching no cliente. A redução de leituras estimada ultrapassa **95%**, proporcionando custo operacional mínimo, escalabilidade ilimitada e velocidade de carregamento instantânea para o usuário final.
+### 2.2. Módulo de Vendas, Checkout e PDV
+* **Arquivos do Módulo:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/lib/utils/print.ts`, `src/pages/CommissionPayouts.tsx`
+* **Situação Atual:**
+  * Frente de caixa ágil com catálogo, carrinho, seleção de cliente/vendedor e suporte a pagamento misto (Split).
+  * Impressão de cupom térmico e orçamentos em formato A4.
+* **Pontos de Finalização Existentes:**
+  1. **Picking e Separação no PDV (`Sales.tsx` e `print.ts`):** Exibição da identificação de localização física nos itens do carrinho e na emissão impressa do Orçamento A4 (`printA4Quote`), auxiliando a expedição no momento da separação.
+  2. **Liquidação Multimeios (Split):** Garantir a baixa correta das frações de pagamento misto, roteando dinheiro para o caixa ativo e cartões/PIX para a conta bancária selecionada.
+  3. **Estorno de Comissões (`SalesHistory.tsx`):** Ao realizar o cancelamento de uma venda no histórico, cancelar ou estornar automaticamente as comissões pendentes do vendedor correspondente.
+
+---
+
+### 2.3. Módulo de Impressão de Etiquetas
+* **Arquivos do Módulo:** `src/components/LabelPrinter.tsx`
+* **Situação Atual:**
+  * Gerador de etiquetas em PDF com múltiplos padrões de layout (Pimenta 6180, Avery 5160 e Térmica 80x40).
+* **Pontos de Finalização Existentes:**
+  1. **Endereço Físico nas Etiquetas:** Opção configurável para incluir o código de localização (`storage_location`) no corpo das etiquetas impressas.
+  2. **Ordenação por Corredor/Estante:** Ordenação da lista de etiquetas selecionadas de acordo com a sequência física de armazenagem antes da renderização do PDF.
+
+---
+
+### 2.4. Módulo de Compras e Importação de XML NF-e
+* **Arquivos do Módulo:** `src/pages/Purchases.tsx`, `src/components/Purchases/NFeXMLImporter.tsx`, `src/pages/AccountsPayable.tsx`
+* **Situação Atual:**
+  * Importador de XML realiza o parse completo de dados de cabeçalho, fornecedor, itens e duplicatas.
+* **Pontos de Finalização Existentes:**
+  1. **Vínculo e Atribuição de Endereço:** Preservar a localização física cadastrada de produtos já existentes e permitir definir o endereço de estoque inicial de produtos novos criados a partir do XML.
+  2. **Geração Automática do Contas a Pagar:** Conectar a leitura das duplicatas (`<dup>`) da NF-e para gerar os lançamentos financeiros no `AccountsPayable.tsx` com as respectivas datas de vencimento e valores.
+
+---
+
+### 2.5. Módulo Financeiro, Caixa e Conciliação Bancária
+* **Arquivos do Módulo:** `src/pages/BankReconciliation.tsx`, `src/pages/Cashiers.tsx`, `src/components/Financial/OFXImporter.tsx`
+* **Situação Atual:**
+  * Módulo financeiro com gestão de contas a pagar/receber, caixas de operadores e extratos bancários com leitor OFX.
+* **Pontos de Finalização Existentes:**
+  1. **Conciliação Inteligente OFX (`OFXImporter.tsx`):** Cruzamento automático de lançamentos bancários com títulos a pagar e a receber com valores e datas coincidentes, permitindo conciliação e baixa em 1 clique.
+  2. **Auditoria de Fechamento de Caixa (`Cashiers.tsx`):** Comparação entre o saldo esperado em sistema e o valor físico informado pelo operador na contagem de fechamento, registrando eventuais sobras ou faltas com notas explicativas de auditoria.
+
+---
+
+### 2.6. Módulo Fiscal e Certificados Digitais
+* **Arquivos do Módulo:** `src/pages/Fiscal.tsx`, `src/pages/CertificateManager.tsx`, `src/components/Fiscal/InutilizacaoModal.tsx`
+* **Situação Atual:**
+  * Emissão, cancelamento e monitoramento de notas fiscais (NF-e/NFC-e), envio de XMLs e gestão do Certificado A1.
+* **Pontos de Finalização Existentes:**
+  1. **Alerta de Validade de Certificado:** Exibição de banner proativo de aviso quando a validade do certificado digital estiver com menos de 30 dias de expiração ou expirado.
+  2. **Inutilização de Numeração SEFAZ (`InutilizacaoModal.tsx`):** Validação de justificativa com no mínimo 15 caracteres (exigência técnica da SEFAZ) e persistência do histórico de homologação.
+  3. **Reenvio de Documentos Fiscais:** Acionamento do reenvio de DANFE/XML por e-mail diretamente a partir da lista de notas fiscais autorizadas.
+
+---
+
+### 2.7. Sincronização Offline e PWA
+* **Arquivos do Módulo:** `src/lib/offlineStore.ts`, `src/components/OfflineSyncStatusBar.tsx`, `src/sw.ts`
+* **Situação Atual:**
+  * Estrutura de IndexedDB para contingência offline de vendas, clientes e movimentações de estoque.
+* **Pontos de Finalização Existentes:**
+  1. **Drenagem Resiliente da Fila Offline:** Processamento ordenado da fila de operações com tratamento de falhas, retries e atualização de estoque/financeiro ao reestabelecer conexão.
+  2. **Monitoramento em Tempo Real:** Atualização dinâmica da barra de status (`OfflineSyncStatusBar.tsx`) refletindo a quantidade de transações pendentes de sincronização.
+
+---
+
+## 3. Matriz de Priorização para Execução
+
+| ID | Módulo / Área | Escopo de Finalização | Criticidade |
+| :---: | :--- | :--- | :---: |
+| **FIN-01** | Estoque & Armazenagem | Busca unificada por endereço, card de conferência no ajuste e coluna no Kardex | Alta |
+| **FIN-02** | Vendas & PDV | Picking no carrinho/orçamento, split payment e estorno de comissão | Alta |
+| **FIN-03** | Impressão de Etiquetas | Localização nas etiquetas e ordenação prévia por corredor | Média |
+| **FIN-04** | Compras & XML | Vínculo de estoque e geração de títulos a pagar das duplicatas | Alta |
+| **FIN-05** | Financeiro & Caixa | Conciliação inteligente OFX e conferência física no fechamento de caixa | Alta |
+| **FIN-06** | Fiscal & Certificados | Alerta de expiração do A1, validação de inutilização e reenvio de XML | Alta |
+| **FIN-07** | Offline & Resiliência | Drenagem automática da fila e indicador visual de conectividade | Média |
+
+---
+*Relatório de diagnóstico gerado com foco estrito na finalização e consistência dos módulos do sistema.*

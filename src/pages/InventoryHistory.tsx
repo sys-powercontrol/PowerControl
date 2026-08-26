@@ -13,12 +13,23 @@ import {
   Package,
   ChevronRight,
   FileSpreadsheet,
-  FileText
+  FileText,
+  Warehouse
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
-
-
 import ExportButton from "../components/ExportButton";
+
+const getProductLocation = (p: any): string => {
+  if (!p) return "";
+  if (p.storage_location) return p.storage_location;
+  if (p.storage_code) return p.storage_code;
+  const parts = [p.storage_room, p.storage_rack, p.storage_shelf].filter(Boolean);
+  if (parts.length > 0) {
+    if (p.storage_room && p.storage_rack && p.storage_shelf) return `${p.storage_room}-${p.storage_rack}/${p.storage_shelf}`;
+    return parts.join("-");
+  }
+  return "";
+};
 
 export default function InventoryHistory() {
   const { user } = useAuth();
@@ -34,16 +45,43 @@ export default function InventoryHistory() {
     enabled: !!user
   });
 
-  
+  const { data: products = [] } = useQuery({
+    queryKey: ["products", currentCompanyId],
+    queryFn: () => api.get("products"),
+    enabled: !!user
+  });
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, any>();
+    products.forEach((p: any) => {
+      if (p.id) map.set(p.id, p);
+    });
+    return map;
+  }, [products]);
+
+  const enrichedMovements = useMemo(() => {
+    return movements.map((m: any) => {
+      const prod = productMap.get(m.product_id);
+      const loc = m.storage_location || getProductLocation(prod) || "Sem endereço";
+      return {
+        ...m,
+        storage_location: loc,
+        sku: prod?.sku || "N/A"
+      };
+    });
+  }, [movements, productMap]);
 
   const filteredMovements = useMemo(() => {
-    let result = [...movements];
+    let result = [...enrichedMovements];
 
     if (searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
       result = result.filter((m: any) => 
-        m.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.reference_id?.toLowerCase().includes(searchTerm.toLowerCase())
+        (m.product_name || '').toLowerCase().includes(term) ||
+        (m.user_name || '').toLowerCase().includes(term) ||
+        (m.reference_id || '').toLowerCase().includes(term) ||
+        (m.storage_location || '').toLowerCase().includes(term) ||
+        (m.sku || '').toLowerCase().includes(term)
       );
     }
 
@@ -56,7 +94,7 @@ export default function InventoryHistory() {
     }
 
     return result;
-  }, [movements, searchTerm, filterType, filterReason]);
+  }, [enrichedMovements, searchTerm, filterType, filterReason]);
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "---";
@@ -69,17 +107,18 @@ export default function InventoryHistory() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Kardex (Histórico de Estoque)</h1>
-          <p className="text-gray-500">Rastreabilidade completa de todas as movimentações de produtos.</p>
+          <p className="text-gray-500">Rastreabilidade completa de todas as movimentações de produtos com endereço físico de armazenagem.</p>
         </div>
         <div className="grid grid-cols-2 gap-3 w-full sm:w-auto min-w-0 items-stretch">
           <ExportButton 
             data={filteredMovements} 
-            filename="historico-estoque" 
+            filename="kardex-estoque-enderecado" 
             format="xlsx" 
-            title="Histórico de Movimentações de Estoque"
+            title="Kardex - Histórico de Movimentações de Estoque"
             headers={{
               timestamp: 'Data/Hora',
               product_name: 'Produto',
+              storage_location: 'Endereço Físico',
               type: 'Tipo',
               reason: 'Motivo',
               quantity: 'Quantidade',
@@ -95,7 +134,7 @@ export default function InventoryHistory() {
               </div>
               <div className="text-left truncate">
                 <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
-                <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel</p>
+                <p className="text-xs sm:text-sm font-bold text-emerald-700 leading-tight truncate">Excel (Kardex)</p>
               </div>
             </div>
             <ChevronRight size={16} className="text-emerald-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
@@ -103,12 +142,13 @@ export default function InventoryHistory() {
 
           <ExportButton 
             data={filteredMovements} 
-            filename="historico-estoque" 
+            filename="kardex-estoque-enderecado" 
             format="pdf" 
-            title="Histórico de Movimentações de Estoque"
+            title="Kardex - Histórico de Movimentações de Estoque"
             headers={{
               timestamp: 'Data/Hora',
               product_name: 'Produto',
+              storage_location: 'Endereço Físico',
               type: 'Tipo',
               reason: 'Motivo',
               quantity: 'Quantidade',
@@ -124,7 +164,7 @@ export default function InventoryHistory() {
               </div>
               <div className="text-left truncate">
                 <p className="text-[10px] font-semibold text-slate-500 leading-tight">Exportar</p>
-                <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF</p>
+                <p className="text-xs sm:text-sm font-bold text-rose-700 leading-tight truncate">PDF (Kardex)</p>
               </div>
             </div>
             <ChevronRight size={16} className="text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
@@ -138,8 +178,8 @@ export default function InventoryHistory() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input 
               type="text" 
-              placeholder="Buscar por produto, usuário ou referência..." 
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Buscar por produto, endereço, usuário ou referência..." 
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -148,7 +188,7 @@ export default function InventoryHistory() {
           <div className="relative">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <select 
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none text-sm"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
             >
@@ -164,7 +204,7 @@ export default function InventoryHistory() {
           <div className="relative">
             <Settings className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <select 
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none text-sm"
               value={filterReason}
               onChange={(e) => setFilterReason(e.target.value)}
             >
@@ -185,6 +225,7 @@ export default function InventoryHistory() {
               <tr className="text-xs text-gray-400 uppercase tracking-wider border-b border-gray-50">
                 <th className="pb-4 font-bold">Data/Hora</th>
                 <th className="pb-4 font-bold">Produto</th>
+                <th className="pb-4 font-bold">Endereço de Estoque</th>
                 <th className="pb-4 font-bold">Tipo</th>
                 <th className="pb-4 font-bold">Motivo / Obs</th>
                 <th className="pb-4 font-bold text-center">Qtd</th>
@@ -196,81 +237,94 @@ export default function InventoryHistory() {
             <tbody className="divide-y divide-gray-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray-500">Carregando movimentações...</td>
+                  <td colSpan={9} className="py-8 text-center text-gray-500">Carregando movimentações...</td>
                 </tr>
               ) : filteredMovements.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
+                  <td colSpan={9} className="py-12 text-center text-gray-400">
                     <History size={48} className="mx-auto mb-4 opacity-20" />
                     <p>Nenhuma movimentação encontrada.</p>
                   </td>
                 </tr>
-              ) : filteredMovements.map((m: any) => (
-                <tr key={m.id} className="text-sm group hover:bg-gray-50 transition-colors">
-                  <td className="py-4 text-gray-500 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-gray-400" />
-                      {formatDate(m.timestamp)}
-                    </div>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-100 rounded-lg text-gray-500">
-                        <Package size={16} />
+              ) : filteredMovements.map((m: any) => {
+                const hasLoc = m.storage_location && m.storage_location !== "Sem endereço";
+                return (
+                  <tr key={m.id} className="text-sm group hover:bg-gray-50 transition-colors">
+                    <td className="py-4 text-gray-500 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-gray-400" />
+                        {formatDate(m.timestamp)}
                       </div>
-                      <div>
-                        <p className="font-bold text-gray-900">{m.product_name}</p>
-                        <p className="text-[10px] text-gray-400 font-mono">ID: {m.product_id.substr(0, 8)}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex items-center gap-2">
-                      {m.type === 'IN' || m.type === 'TRANSFER_IN' ? (
-                        <div className="flex items-center gap-1 text-green-600 font-bold">
-                          <ArrowUpCircle size={16} />
-                          <span>{m.type === 'TRANSFER_IN' ? 'Transf. Entrada' : 'Entrada'}</span>
+                    </td>
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-100 rounded-lg text-gray-500">
+                          <Package size={16} />
                         </div>
-                      ) : m.type === 'OUT' || m.type === 'TRANSFER_OUT' ? (
-                        <div className="flex items-center gap-1 text-red-600 font-bold">
-                          <ArrowDownCircle size={16} />
-                          <span>{m.type === 'TRANSFER_OUT' ? 'Transf. Saída' : 'Saída'}</span>
+                        <div>
+                          <p className="font-bold text-gray-900">{m.product_name}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">SKU: {m.sku || m.product_id?.substr(0, 8)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 whitespace-nowrap">
+                      {hasLoc ? (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-lg text-xs font-bold font-mono">
+                          <Warehouse size={12} className="text-emerald-600 shrink-0" />
+                          <span>{m.storage_location}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 text-blue-600 font-bold">
-                          <Settings size={16} />
-                          <span>Ajuste</span>
-                        </div>
+                        <span className="text-xs text-gray-400 italic">Sem endereço</span>
                       )}
-                    </div>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-[10px] font-bold uppercase w-fit">
-                        {m.reason}
-                      </span>
-                      {m.observation && (
-                        <span className="text-[10px] text-gray-500 italic max-w-[150px] truncate" title={m.observation}>
-                          {m.observation}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4 text-center font-bold text-gray-900">
-                    {m.type === 'OUT' || m.type === 'TRANSFER_OUT' ? '-' : (m.type === 'IN' || m.type === 'TRANSFER_IN') ? '+' : ''}{m.quantity}
-                  </td>
-                  <td className="py-4 text-center text-gray-500">{m.previous_stock}</td>
-                  <td className="py-4 text-center font-bold text-gray-900">{m.current_stock}</td>
-                  <td className="py-4 text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold">
-                        {m.user_name?.charAt(0)}
+                    </td>
+                    <td className="py-4">
+                      <div className="flex items-center gap-2">
+                        {m.type === 'IN' || m.type === 'TRANSFER_IN' ? (
+                          <div className="flex items-center gap-1 text-green-600 font-bold">
+                            <ArrowUpCircle size={16} />
+                            <span>{m.type === 'TRANSFER_IN' ? 'Transf. Entrada' : 'Entrada'}</span>
+                          </div>
+                        ) : m.type === 'OUT' || m.type === 'TRANSFER_OUT' ? (
+                          <div className="flex items-center gap-1 text-red-600 font-bold">
+                            <ArrowDownCircle size={16} />
+                            <span>{m.type === 'TRANSFER_OUT' ? 'Transf. Saída' : 'Saída'}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-blue-600 font-bold">
+                            <Settings size={16} />
+                            <span>Ajuste</span>
+                          </div>
+                        )}
                       </div>
-                      <span className="truncate max-w-[100px]">{m.user_name}</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-[10px] font-bold uppercase w-fit">
+                          {m.reason}
+                        </span>
+                        {m.observation && (
+                          <span className="text-[10px] text-gray-500 italic max-w-[150px] truncate" title={m.observation}>
+                            {m.observation}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 text-center font-bold text-gray-900">
+                      {m.type === 'OUT' || m.type === 'TRANSFER_OUT' ? '-' : (m.type === 'IN' || m.type === 'TRANSFER_IN') ? '+' : ''}{m.quantity}
+                    </td>
+                    <td className="py-4 text-center text-gray-500">{m.previous_stock}</td>
+                    <td className="py-4 text-center font-bold text-gray-900">{m.current_stock}</td>
+                    <td className="py-4 text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold">
+                          {m.user_name?.charAt(0)}
+                        </div>
+                        <span className="truncate max-w-[100px]">{m.user_name}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -278,3 +332,4 @@ export default function InventoryHistory() {
     </div>
   );
 }
+

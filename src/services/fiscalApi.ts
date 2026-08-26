@@ -104,6 +104,26 @@ export const fiscalApi = {
     throw new Error("Provedor fiscal não suportado");
   },
 
+  inutilizarNumeracao: async (
+    config: FiscalConfig,
+    data: {
+      model: "55" | "65";
+      series: string;
+      startNumber: number;
+      endNumber: number;
+      justification: string;
+      company: any;
+    }
+  ) => {
+    if (config.provider === "FocusNFe") {
+      return inutilizarFocusNFe(config, data);
+    }
+    if (config.provider === "WebmaniaBR") {
+      return inutilizarWebmaniaBR(config, data);
+    }
+    throw new Error("Provedor fiscal não suportado");
+  },
+
   saveXmlToStorage: async (companyId: string, accessKey: string, xmlUrl: string) => {
     try {
       // 1. Fetch XML content
@@ -413,5 +433,93 @@ async function cancelFocusNFe(config: FiscalConfig, reference: string, reason: s
       throw new Error(err.response?.data?.mensagem || "Erro ao cancelar nota", { cause: err });
     }
     throw new Error("Erro desconhecido ao cancelar nota", { cause: err });
+  }
+}
+
+async function inutilizarFocusNFe(
+  config: FiscalConfig,
+  data: {
+    model: "55" | "65";
+    series: string;
+    startNumber: number;
+    endNumber: number;
+    justification: string;
+    company: any;
+  }
+) {
+  const baseUrl = FOCUSNFE_URLS[config.environment];
+  const endpoint = data.model === "55" ? "/nfe/inutilizacao" : "/nfce/inutilizacao";
+
+  const payload = {
+    cnpj: data.company?.cnpj?.replace(/\D/g, "") || "",
+    serie: data.series,
+    numero_inicial: data.startNumber,
+    numero_final: data.endNumber,
+    justificativa: data.justification
+  };
+
+  try {
+    const response = await axios.post(`${baseUrl}${endpoint}`, payload, {
+      auth: {
+        username: config.token,
+        password: ""
+      }
+    });
+
+    return {
+      status: response.data.status || "autorizado",
+      protocol: response.data.protocolo || `INUT-${Date.now()}`,
+      message: response.data.mensagem || "Inutilização homologada pela SEFAZ"
+    };
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("FocusNFe Inutilização Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.mensagem || "Erro ao inutilizar numeração na SEFAZ", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao inutilizar numeração", { cause: err });
+  }
+}
+
+async function inutilizarWebmaniaBR(
+  config: FiscalConfig,
+  data: {
+    model: "55" | "65";
+    series: string;
+    startNumber: number;
+    endNumber: number;
+    justification: string;
+    company: any;
+  }
+) {
+  const baseUrl = WEBMANIABR_URLS[config.environment];
+  const [ck, cs, at, ats] = config.token.split(":");
+
+  try {
+    const response = await axios.post(`${baseUrl}/inutilizar/`, {
+      serie: data.series,
+      numero_inicial: data.startNumber,
+      numero_final: data.endNumber,
+      motivo: data.justification,
+      modelo: data.model
+    }, {
+      headers: {
+        "X-Consumer-Key": ck,
+        "X-Consumer-Secret": cs,
+        "X-AccessToken": at,
+        "X-AccessToken-Secret": ats
+      }
+    });
+
+    return {
+      status: response.data.status === "success" ? "autorizado" : "erro",
+      protocol: response.data.protocolo || `INUT-${Date.now()}`,
+      message: response.data.motivo || response.data.mensagem || "Inutilização concluída"
+    };
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("WebmaniaBR Inutilização Error:", err.response?.data || err.message);
+      throw new Error(err.response?.data?.error || "Erro ao inutilizar numeração na WebmaniaBR", { cause: err });
+    }
+    throw new Error("Erro desconhecido ao inutilizar numeração", { cause: err });
   }
 }

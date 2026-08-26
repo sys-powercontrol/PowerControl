@@ -35,21 +35,49 @@ const formatDueDate = (dueDate: any, saleDate?: any): string => {
   return '';
 };
 
-export const printReceipt = (sale: any, company: any) => {
+export const printReceipt = (sale: any, company: any, paperWidth: '80mm' | '58mm' = '80mm') => {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert('Por favor, permita popups para imprimir o recibo.');
     return;
   }
 
-  const itemsHtml = sale.items.map((item: any) => `
+  const is58mm = paperWidth === '58mm';
+  const widthCss = is58mm ? '58mm' : '80mm';
+  const fontSize = is58mm ? '10px' : '12px';
+
+  const itemsHtml = sale.items.map((item: any) => {
+    const loc = item.resolvedLocation || item.storage_location || (
+      [item.storage_room, item.storage_rack, item.storage_shelf].filter(Boolean).length > 0 
+        ? [item.storage_room, item.storage_rack, item.storage_shelf].filter(Boolean).join('-')
+        : ''
+    );
+    return `
     <tr>
-      <td style="padding: 4px 0;">${escapeHtml(item.name)}</td>
-      <td style="text-align: center; padding: 4px 0;">${escapeHtml(item.quantity)}</td>
-      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.price)}</td>
-      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.price * item.quantity)}</td>
+      <td style="padding: 3px 0; word-break: break-word;">
+        ${escapeHtml(item.name)}
+        ${loc ? `<div style="font-size: ${is58mm ? '8px' : '9px'}; color: #333;">[Loc: ${escapeHtml(loc)}]</div>` : ''}
+      </td>
+      <td style="text-align: center; padding: 3px 0;">${escapeHtml(item.quantity)}</td>
+      <td style="text-align: right; padding: 3px 0;">${formatCurrency(item.price)}</td>
+      <td style="text-align: right; padding: 3px 0;">${formatCurrency(item.price * item.quantity)}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
+
+  const paymentsHtml = Array.isArray(sale.payments) && sale.payments.length > 0
+    ? `
+      <div style="margin-top: 6px; border-top: 1px dashed #000; padding-top: 4px;">
+        <div style="font-weight: bold; margin-bottom: 2px;">FORMAS DE PAGAMENTO:</div>
+        ${sale.payments.map((p: any) => `
+          <div style="display: flex; justify-content: space-between; font-size: ${is58mm ? '9px' : '11px'};">
+            <span>${escapeHtml(p.method)}:</span>
+            <span>${formatCurrency(p.amount)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `
+    : `<div style="margin-top: 4px;">PAGAMENTO: ${escapeHtml(sale.payment_method)}</div>`;
 
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -57,27 +85,27 @@ export const printReceipt = (sale: any, company: any) => {
       <head>
         <title>Recibo de Venda - ${escapeHtml(sale.id)}</title>
         <style>
-          @page { size: 80mm auto; margin: 0; }
+          @page { size: ${widthCss} auto; margin: 0; }
           body { 
             font-family: 'Courier New', Courier, monospace; 
-            font-size: 12px; 
-            width: 80mm; 
+            font-size: ${fontSize}; 
+            width: ${widthCss}; 
             box-sizing: border-box;
             margin: 0 auto; 
-            padding: 10mm 5mm;
+            padding: 5mm 3mm;
             color: #000;
           }
-          .header { text-align: center; margin-bottom: 15px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-          .company-name { font-size: 14px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; }
-          .details { margin-bottom: 15px; font-size: 11px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
+          .header { text-align: center; margin-bottom: 12px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+          .company-name { font-size: ${is58mm ? '12px' : '14px'}; font-weight: bold; margin-bottom: 3px; text-transform: uppercase; }
+          .details { margin-bottom: 12px; font-size: ${is58mm ? '9px' : '11px'}; line-height: 1.3; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 12px; table-layout: fixed; }
           th, td { word-wrap: break-word; }
-          th { border-bottom: 1px solid #000; padding: 4px 0; text-align: left; font-size: 11px; }
-          .totals { text-align: right; border-top: 1px dashed #000; padding-top: 10px; line-height: 1.4; }
-          .total-row { font-size: 14px; font-weight: bold; margin-top: 4px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
+          th { border-bottom: 1px solid #000; padding: 3px 0; text-align: left; font-size: ${is58mm ? '9px' : '11px'}; }
+          .totals { text-align: right; border-top: 1px dashed #000; padding-top: 8px; line-height: 1.4; }
+          .total-row { font-size: ${is58mm ? '12px' : '14px'}; font-weight: bold; margin-top: 3px; }
+          .footer { text-align: center; margin-top: 15px; font-size: ${is58mm ? '8px' : '10px'}; border-top: 1px dashed #000; padding-top: 8px; }
           @media print {
-            body { padding: 10mm 5mm; }
+            body { padding: 4mm 2mm; width: 100%; }
           }
         </style>
       </head>
@@ -101,9 +129,9 @@ export const printReceipt = (sale: any, company: any) => {
           <thead>
             <tr>
               <th>ITEM</th>
-              <th style="text-align: center;">QTD</th>
-              <th style="text-align: right;">PREÇO</th>
-              <th style="text-align: right;">TOTAL</th>
+              <th style="text-align: center; width: 25px;">QTD</th>
+              <th style="text-align: right; width: 45px;">UNIT</th>
+              <th style="text-align: right; width: 50px;">TOTAL</th>
             </tr>
           </thead>
           <tbody>
@@ -112,11 +140,12 @@ export const printReceipt = (sale: any, company: any) => {
         </table>
         <div class="totals">
           <div>Subtotal: ${formatCurrency(sale.subtotal)}</div>
-          <div>Desconto: - ${formatCurrency(sale.discount)}</div>
+          ${sale.discount > 0 ? `<div>Desconto: - ${formatCurrency(sale.discount)}</div>` : ''}
           <div class="total-row">TOTAL: ${formatCurrency(sale.total)}</div>
-          <div style="margin-top: 4px;">PAGAMENTO: ${escapeHtml(sale.payment_method)}</div>
+          ${paymentsHtml}
         </div>
         <div class="footer">
+          DOCUMENTO NÃO FISCAL<br/>
           Obrigado pela preferência!<br/>
           www.powercontrol.com.br
         </div>
@@ -141,14 +170,24 @@ export const printA4Quote = (sale: any, company: any) => {
     return;
   }
 
-  const itemsHtml = sale.items.map((item: any) => `
+  const itemsHtml = sale.items.map((item: any) => {
+    const loc = item.resolvedLocation || item.storage_location || (
+      [item.storage_room, item.storage_rack, item.storage_shelf].filter(Boolean).length > 0 
+        ? [item.storage_room, item.storage_rack, item.storage_shelf].filter(Boolean).join('-')
+        : ''
+    );
+    return `
     <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.name)}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
+        <div style="font-weight: 500;">${escapeHtml(item.name)}</div>
+        ${loc ? `<div style="font-size: 11px; color: #059669; font-family: monospace; font-weight: bold; margin-top: 2px;">📍 Endereço Estoque: ${escapeHtml(loc)}</div>` : ''}
+      </td>
       <td style="text-align: center; padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.quantity)}</td>
       <td style="text-align: right; padding: 8px; border-bottom: 1px solid #e5e7eb;">${formatCurrency(item.price)}</td>
       <td style="text-align: right; padding: 8px; border-bottom: 1px solid #e5e7eb;">${formatCurrency(item.price * item.quantity)}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   printWindow.document.write(`
     <!DOCTYPE html>

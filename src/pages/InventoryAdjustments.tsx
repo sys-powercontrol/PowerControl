@@ -12,10 +12,23 @@ import {
   Plus,
   Minus,
   Info,
-  Warehouse
+  Warehouse,
+  HelpCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import StockMapPowerBI from "../components/Inventory/StockMapPowerBI";
+
+const getProductLocation = (p: any): string => {
+  if (!p) return "";
+  if (p.storage_location) return p.storage_location;
+  if (p.storage_code) return p.storage_code;
+  const parts = [p.storage_room, p.storage_rack, p.storage_shelf].filter(Boolean);
+  if (parts.length > 0) {
+    if (p.storage_room && p.storage_rack && p.storage_shelf) return `${p.storage_room}-${p.storage_rack}/${p.storage_shelf}`;
+    return parts.join("-");
+  }
+  return "";
+};
 
 export default function InventoryAdjustments() {
   const { user } = useAuth();
@@ -44,10 +57,16 @@ export default function InventoryAdjustments() {
     enabled: user?.role === 'master' || user?.role === 'admin',
   });
 
-  const filteredProducts = products.filter((p: any) => 
-    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter((p: any) => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return true;
+    const loc = getProductLocation(p).toLowerCase();
+    return (
+      (p.name || '').toLowerCase().includes(term) ||
+      (p.sku || '').toLowerCase().includes(term) ||
+      loc.includes(term)
+    );
+  });
 
   const selectedProduct = products.find((p: any) => p.id === selectedProductId);
 
@@ -225,31 +244,46 @@ export default function InventoryAdjustments() {
                 />
               </div>
               
-              <div className="max-h-48 overflow-y-auto border border-gray-50 rounded-xl divide-y divide-gray-50">
+              <div className="max-h-56 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100 bg-white">
                 {isLoadingProducts ? (
                   <div className="p-4 text-center text-gray-500">Carregando produtos...</div>
                 ) : filteredProducts.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">Nenhum produto encontrado.</div>
-                ) : filteredProducts.map((p: any) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedProductId(p.id);
-                      setSearchTerm(p.name);
-                    }}
-                    className={`w-full text-left p-4 hover:bg-blue-50 transition-colors flex items-center justify-between ${selectedProductId === p.id ? 'bg-blue-50 border-blue-200' : ''}`}
-                  >
-                    <div>
-                      <p className="font-bold text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-500">SKU: {p.sku || "N/A"}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">{p.stock_quantity} un</p>
-                      <p className="text-[10px] text-gray-400 uppercase">Em estoque</p>
-                    </div>
-                  </button>
-                ))}
+                ) : filteredProducts.map((p: any) => {
+                  const loc = getProductLocation(p);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductId(p.id);
+                        setSearchTerm(p.name);
+                      }}
+                      className={`w-full text-left p-3.5 hover:bg-blue-50/80 transition-colors flex items-center justify-between cursor-pointer ${
+                        selectedProductId === p.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                      }`}
+                    >
+                      <div className="min-w-0 pr-3">
+                        <p className="font-bold text-gray-900 text-sm truncate">{p.name}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="text-[11px] text-gray-500 font-mono">SKU: {p.sku || "N/A"}</span>
+                          {loc ? (
+                            <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/60 rounded text-[10px] font-bold flex items-center gap-1">
+                              <Warehouse size={10} className="text-emerald-600" />
+                              {loc}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 italic">Sem endereço</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-black text-gray-900">{p.stock_quantity} un</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-semibold">Em estoque</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -385,6 +419,51 @@ export default function InventoryAdjustments() {
         </div>
 
         <div className="space-y-6">
+          {/* Storage Location Card */}
+          {selectedProduct && (
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+              <h3 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                <Warehouse size={16} className="text-emerald-600" />
+                Localização Física no Estoque
+              </h3>
+              {getProductLocation(selectedProduct) ? (
+                <div className="space-y-2.5">
+                  <div className="p-3 bg-emerald-50/70 border border-emerald-200/60 rounded-2xl">
+                    <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Endereço Consolidado</p>
+                    <p className="text-base font-black text-emerald-900 font-mono mt-0.5">
+                      {getProductLocation(selectedProduct)}
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Sala / Setor</p>
+                      <p className="font-bold text-gray-800 truncate mt-0.5">{selectedProduct.storage_room || "—"}</p>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Armário / Estante</p>
+                      <p className="font-bold text-gray-800 truncate mt-0.5">{selectedProduct.storage_rack || "—"}</p>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">Gaveta / Prateleira</p>
+                      <p className="font-bold text-gray-800 truncate mt-0.5">{selectedProduct.storage_shelf || "—"}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200/60 rounded-2xl flex items-start gap-2.5">
+                  <HelpCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-amber-900">Sem endereço de estoque</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                      Cadastre sala, armário ou gaveta no catálogo de produtos para mapeamento físico.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="bg-blue-600 p-6 rounded-3xl text-white shadow-lg shadow-blue-200">
             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
               <Info size={20} />

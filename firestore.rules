@@ -20,6 +20,14 @@ service cloud.firestore {
           : ''
       );
     }
+
+    function getUserCompanyIds() {
+      return request.auth.token.get('company_ids', 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('company_ids', [])
+          : []
+      );
+    }
     
     function getUserRole() {
       return request.auth.token.get('role', 
@@ -67,11 +75,10 @@ service cloud.firestore {
     }
 
     function belongsToCompany(companyId) {
-      return isAuthenticated() && isActive() && (
+      return isAuthenticated() && isActive() && companyId is string && companyId != '' && (
         isMaster() || 
         getUserCompanyId() == companyId || 
-        getUserCompanyId() == '' || 
-        companyId == ''
+        getUserCompanyIds().hasAny([companyId])
       );
     }
 
@@ -82,31 +89,28 @@ service cloud.firestore {
         (resource.data.get('email', '') == request.auth.token.email) ||
         (hasPermission('employees.view') && (
           resource.data.get('company_id', '') == getUserCompanyId() || 
-          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
-          getUserCompanyId() == ''
+          getUserCompanyIds().hasAny([resource.data.get('company_id', '')])
         )) ||
         (isAdmin() && (
           resource.data.get('company_id', '') == getUserCompanyId() || 
-          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
-          getUserCompanyId() == ''
+          getUserCompanyIds().hasAny([resource.data.get('company_id', '')])
         ))
       );
-      allow create: if isAuthenticated() && (isOwner(userId) || isMaster() || isAdmin() || hasPermission('employees.manage'));
+      allow create: if isAuthenticated() && (
+        (isMaster() && (request.resource.data.get('role', '') != 'master' || request.auth.token.email == "sys.powercontrol@gmail.com")) ||
+        (isOwner(userId) && request.resource.data.get('role', '') != 'master') ||
+        ((isAdmin() || hasPermission('employees.manage')) && request.resource.data.get('role', '') != 'master')
+      );
       allow update: if isAuthenticated() && (
-        isOwner(userId) || 
-        isMaster() || 
-        (isAdmin() && (
-          resource.data.get('company_id', '') == getUserCompanyId() || 
-          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
-          getUserCompanyId() == ''
-        )) ||
-        (hasPermission('employees.manage') && (
-          resource.data.get('company_id', '') == getUserCompanyId() || 
-          resource.data.get('company_ids', []).hasAny([getUserCompanyId()]) || 
-          getUserCompanyId() == ''
-        ))
+        (isMaster() && (request.resource.data.get('role', '') != 'master' || request.auth.token.email == "sys.powercontrol@gmail.com")) || 
+        (isOwner(userId) && request.resource.data.get('role', '') == resource.data.get('role', '') && request.resource.data.get('is_active', true) == resource.data.get('is_active', true)) ||
+        ((isAdmin() || hasPermission('employees.manage')) && 
+          request.resource.data.get('role', '') != 'master' &&
+          resource.data.get('role', '') != 'master' &&
+          (resource.data.get('company_id', '') == getUserCompanyId() || getUserCompanyIds().hasAny([resource.data.get('company_id', '')]))
+        )
       );
-      allow delete: if isAuthenticated() && (isMaster() || isAdmin() || hasPermission('employees.manage') || isOwner(userId));
+      allow delete: if isAuthenticated() && (isMaster() || (isAdmin() && resource.data.get('role', '') != 'master'));
     }
 
     match /employees/{id} {
@@ -115,9 +119,16 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (isMaster() || (isAdmin() && (getUserCompanyId() == companyId || getUserCompanyId() == '')));
+      allow read: if isAuthenticated() && isActive() && (
+        isMaster() || 
+        getUserCompanyId() == companyId || 
+        getUserCompanyIds().hasAny([companyId])
+      );
+      allow create: if isAuthenticated() && isActive() && (isMaster() || isAdmin());
+      allow update: if isAuthenticated() && isActive() && (
+        isMaster() || 
+        (isAdmin() && (getUserCompanyId() == companyId || getUserCompanyIds().hasAny([companyId])))
+      );
       allow delete: if isAuthenticated() && isMaster();
 
       match /daily_summaries/{summaryId} {
@@ -130,6 +141,12 @@ service cloud.firestore {
     match /daily_summaries/{id} {
       allow read: if belongsToCompany(resource.data.get('company_id', ''));
       allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('sales.create') || hasPermission('finance.manage') || hasPermission('inventory.manage') || isAdmin() || isMaster());
+      allow delete: if isMaster();
+    }
+
+    match /dailyRollups/{id} {
+      allow read: if belongsToCompany(resource.data.get('company_id', ''));
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('sales.create') || hasPermission('sales.view') || isAdmin() || isMaster());
       allow delete: if isMaster();
     }
 
@@ -180,11 +197,6 @@ service cloud.firestore {
       allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('sellers.manage');
     }
 
-    match /employees/{id} {
-      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('employees.manage');
-      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('employees.manage');
-    }
-
     match /invoices/{id} {
       allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('fiscal.manage') || hasPermission('sales.view'));
       allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('fiscal.manage') || hasPermission('sales.create'));
@@ -196,6 +208,11 @@ service cloud.firestore {
     }
 
     match /certificates/{id} {
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('fiscal.manage');
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('fiscal.manage');
+    }
+
+    match /fiscal_inutilizacoes/{id} {
       allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('fiscal.manage');
       allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('fiscal.manage');
     }
@@ -260,12 +277,12 @@ service cloud.firestore {
     }
 
     match /api_configurations/{id} {
-      allow read: if true;
+      allow read: if isAuthenticated() && isMaster();
       allow write: if isAuthenticated() && isMaster();
     }
 
     match /system_settings/{id} {
-      allow read: if true;
+      allow read: if isAuthenticated() && isMaster();
       allow write: if isAuthenticated() && isMaster();
     }
 

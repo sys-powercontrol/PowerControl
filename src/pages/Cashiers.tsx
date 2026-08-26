@@ -95,10 +95,14 @@ export default function Cashiers() {
 
   const [closingCashier, setClosingCashier] = useState<any>(null);
   const [closingSummary, setClosingSummary] = useState<{ salesCount: number; salesTotal: number; movementsCount: number } | null>(null);
+  const [countedBalance, setCountedBalance] = useState<number | string>("");
+  const [closingNotes, setClosingNotes] = useState<string>("");
   const [isClosingLoading, setIsClosingLoading] = useState(false);
 
   const handleInitiateClose = async (cashier: any) => {
     setClosingCashier(cashier);
+    setCountedBalance(cashier.balance !== undefined ? cashier.balance : "");
+    setClosingNotes("");
     setIsClosingLoading(true);
     try {
       const sales: any[] = await api.get("sales", { cashier_id: cashier.id });
@@ -123,9 +127,11 @@ export default function Cashiers() {
   };
 
   const closeCashierMutation = useMutation({
-    mutationFn: async (cashier: any) => {
+    mutationFn: async ({ cashier, counted, notes }: { cashier: any; counted: number; notes: string }) => {
       const now = new Date().toISOString();
       const closedBy = user?.full_name || "Sistema";
+      const expected = Number(cashier.balance) || 0;
+      const difference = Number((counted - expected).toFixed(2));
 
       // 1. Fetch and link unclosed sales and movements
       try {
@@ -151,21 +157,26 @@ export default function Cashiers() {
         console.warn("Aviso ao vincular lançamentos ao fechamento do caixa:", err);
       }
 
-      // 2. Close cashier
+      // 2. Close cashier with audited expected vs counted amounts
       return api.put("cashiers", cashier.id, {
         status: "Fechado",
         closed_at: now,
         closed_by: closedBy,
-        closing_balance: cashier.balance || 0
+        closing_balance: expected,
+        counted_balance: counted,
+        difference_balance: difference,
+        closing_notes: notes || undefined
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["sales"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
-      toast.success("Caixa fechado e lançamentos vinculados com sucesso!");
+      toast.success("Caixa fechado e auditoria de turno concluída com sucesso!");
       setClosingCashier(null);
       setClosingSummary(null);
+      setCountedBalance("");
+      setClosingNotes("");
     }
   });
 
@@ -486,13 +497,73 @@ if (!canView) {
                     <span className="font-bold text-blue-600">{closingSummary?.movementsCount || 0} registro(s)</span>
                   </div>
                   <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
-                    <span className="text-sm font-bold text-gray-800">Saldo Final de Fechamento</span>
+                    <span className="text-sm font-bold text-gray-800">Saldo Esperado em Caixa</span>
                     <span className="text-lg font-bold text-gray-900">{formatCurrency(closingCashier.balance || 0)}</span>
                   </div>
                 </div>
 
+                {/* Valor Contado (Auditoria Física) */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase">
+                    Valor Físico em Gaveta / Contado (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={countedBalance}
+                    onChange={(e) => setCountedBalance(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-900 text-lg outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+
+                  {countedBalance !== "" && !isNaN(Number(countedBalance)) && (
+                    (() => {
+                      const expected = Number(closingCashier.balance) || 0;
+                      const counted = Number(countedBalance) || 0;
+                      const diff = Number((counted - expected).toFixed(2));
+                      if (diff === 0) {
+                        return (
+                          <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-between">
+                            <span>Conferência Perfeita</span>
+                            <span>R$ 0,00 de diferença</span>
+                          </div>
+                        );
+                      }
+                      if (diff > 0) {
+                        return (
+                          <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-xs font-bold flex items-center justify-between">
+                            <span>Sobra de Caixa</span>
+                            <span>+{formatCurrency(diff)}</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold flex items-center justify-between">
+                          <span>Falta de Caixa (Divergência)</span>
+                          <span>{formatCurrency(diff)}</span>
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+
+                {/* Observações de Encerramento */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700 uppercase">
+                    Observações da Auditoria (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Justificativa de sangria ou conferência física..."
+                    value={closingNotes}
+                    onChange={(e) => setClosingNotes(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
                 <p className="text-xs text-gray-500 text-center">
-                  Todos os lançamentos acima serão atrelados a este ciclo com horário de encerramento e ID do ciclo para auditoria.
+                  Todos os lançamentos do turno serão consolidados e vinculados a este operador.
                 </p>
 
                 <div className="flex gap-3 pt-2">
@@ -505,7 +576,16 @@ if (!canView) {
                   </button>
                   <button 
                     type="button" 
-                    onClick={() => closeCashierMutation.mutate(closingCashier)} 
+                    onClick={() => {
+                      const counted = countedBalance === "" || isNaN(Number(countedBalance)) 
+                        ? (Number(closingCashier.balance) || 0) 
+                        : Number(countedBalance);
+                      closeCashierMutation.mutate({
+                        cashier: closingCashier,
+                        counted,
+                        notes: closingNotes
+                      });
+                    }} 
                     disabled={closeCashierMutation.isPending} 
                     className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100 disabled:opacity-50"
                   >

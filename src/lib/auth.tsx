@@ -99,6 +99,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 userData.permissions = DEFAULT_ROLE_PERMISSIONS.master;
               }
 
+              // Invalidate session immediately if user is deactivated
+              if (!isMasterEmail && (userData.is_active === false || (userData as any).active === false)) {
+                console.warn("User account is inactive. Revoking session...");
+                try {
+                  localStorage.removeItem(cacheKey);
+                } catch (err) {
+                  void err;
+                }
+                setUser(null);
+                api.updateCurrentUserData(null);
+                await signOut(auth);
+                setIsLoading(false);
+                return;
+              }
+
               applyUserData(userData);
               return;
             } else {
@@ -117,6 +132,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.warn("Could not query legacy user document:", e);
               }
 
+              const isAccountActive = isMasterEmail ? true : (legacyData?.is_active !== false && legacyData?.active !== false);
+              if (!isMasterEmail && !isAccountActive) {
+                console.warn("Legacy user account is inactive. Revoking session...");
+                try {
+                  localStorage.removeItem(cacheKey);
+                } catch (err) {
+                  void err;
+                }
+                setUser(null);
+                api.updateCurrentUserData(null);
+                await signOut(auth);
+                setIsLoading(false);
+                return;
+              }
+
               const newUser: ExtendedUser = {
                 id: firebaseUser.uid,
                 email: userEmail,
@@ -126,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 company_ids: legacyData?.company_ids || (legacyData?.company_id ? [legacyData.company_id] : []),
                 permissions: legacyData?.permissions || (isMasterEmail ? DEFAULT_ROLE_PERMISSIONS.master : (legacyData?.role === 'admin' ? DEFAULT_ROLE_PERMISSIONS.admin : DEFAULT_ROLE_PERMISSIONS.user)),
                 created_at: legacyData?.created_at || serverTimestamp() as any,
-                is_active: isMasterEmail ? true : (legacyData?.is_active !== false),
+                is_active: isAccountActive,
                 avatar: legacyData?.avatar || firebaseUser.photoURL || null
               };
 
@@ -205,34 +235,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       console.warn("Firebase Auth sign in failed with code:", err.code);
 
-      // If user does not exist in Firebase Auth yet, try auto-provisioning via createUserWithEmailAndPassword
       if (
         err.code === "auth/user-not-found" || 
         err.code === "auth/invalid-credential" || 
-        err.code === "auth/invalid-login-credentials"
+        err.code === "auth/invalid-login-credentials" ||
+        err.code === "auth/wrong-password"
       ) {
-        if (password && password.length >= 6) {
-          try {
-            await createUserWithEmailAndPassword(auth, cleanEmail, password);
-            return;
-          } catch (createErr: any) {
-            console.warn("Account fallback creation code:", createErr.code);
-            if (createErr.code === "auth/email-already-in-use") {
-              throw new Error("Senha incorreta. Verifique sua senha.", { cause: createErr });
-            } else if (createErr.code === "auth/weak-password") {
-              throw new Error("A senha deve conter no mínimo 6 caracteres.", { cause: createErr });
-            } else if (createErr.code === "auth/invalid-email") {
-              throw new Error("E-mail em formato inválido.", { cause: createErr });
-            }
-          }
-        }
         throw new Error("E-mail ou senha incorretos. Verifique suas credenciais.", { cause: err });
-      } else if (err.code === "auth/wrong-password") {
-        throw new Error("Senha incorreta. Verifique suas credenciais.", { cause: err });
       } else if (err.code === "auth/too-many-requests") {
         throw new Error("Muitas tentativas incorretas. Aguarde alguns instantes e tente novamente.", { cause: err });
       } else if (err.code === "auth/user-disabled") {
         throw new Error("Esta conta foi desativada pelo administrador.", { cause: err });
+      } else if (err.code === "auth/invalid-email") {
+        throw new Error("Formato de e-mail inválido.", { cause: err });
       } else {
         throw new Error(err.message || "E-mail ou senha incorretos.", { cause: err });
       }
