@@ -1,5 +1,5 @@
 # Relatório de Diagnóstico e Finalizações do Sistema
-**Data e Hora de Geração:** 26/08/2026 às 10:10:51 (Horário de Brasília - UTC-3)  
+**Data e Hora de Geração:** 27/08/2026 às 11:10:45 (Horário de Brasília - UTC-3)  
 **Diretriz Estrita:** Análise diagnóstica exclusivamente das implementações existentes que demandam finalização, alinhamento ou estabilização. Proibida a inclusão ou criação de novas ferramentas, novas telas ou arquiteturas adicionais não existentes.
 
 ---
@@ -98,17 +98,14 @@ O objetivo deste relatório é registrar todas as amarrações pontuais, valida�
 
 ---
 
-## 3. Matriz de Priorização para Execução
+## 3. Matriz de Prioridade para Finalização
 
-| ID | Módulo / Área | Escopo de Finalização | Criticidade |
-| :---: | :--- | :--- | :---: |
-| **FIN-01** | Estoque & Armazenagem | Busca unificada por endereço, card de conferência no ajuste e coluna no Kardex | Alta |
-| **FIN-02** | Vendas & PDV | Picking no carrinho/orçamento, split payment e estorno de comissão | Alta |
-| **FIN-03** | Impressão de Etiquetas | Localização nas etiquetas e ordenação prévia por corredor | Média |
-| **FIN-04** | Compras & XML | Vínculo de estoque e geração de títulos a pagar das duplicatas | Alta |
-| **FIN-05** | Financeiro & Caixa | Conciliação inteligente OFX e conferência física no fechamento de caixa | Alta |
-| **FIN-06** | Fiscal & Certificados | Alerta de expiração do A1, validação de inutilização e reenvio de XML | Alta |
-| **FIN-07** | Offline & Resiliência | Drenagem automática da fila e indicador visual de conectividade | Média |
-
----
-*Relatório de diagnóstico gerado com foco estrito na finalização e consistência dos módulos do sistema.*
+| Prioridade | Módulo | Itens a Finalizar | Complexidade |
+| :--- | :--- | :--- | :--- |
+| **Alta** | Vendas & PDV | Picking no Cupom/Orçamento A4, Liquidação Split e Estorno de Comissões | Baixa |
+| **Alta** | Compras & XML | Vínculo de Endereço Físico e Geração de Contas a Pagar via Duplicatas XML | Média |
+| **Média** | Financeiro & Caixa | Conciliação Inteligente OFX e Auditoria de Fechamento de Caixa | Média |
+| **Média** | Estoque & Produtos | Busca unificada por endereço físico, card de conferência no ajuste e Kardex | Baixa |
+| **Média** | Fiscal & Certificados | Alerta de expiração do A1, validação de justificativa na inutilização e reenvio de DANFE/XML | Baixa |
+| **Baixa** | Etiquetas & Picking | Inclusão de endereço físico na etiqueta e ordenação por corredor | Baixa |
+| **Baixa** | Offline & PWA | Drenagem resiliente da fila offline e barra de status reativa | Média |

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -34,10 +35,12 @@ export default function InventoryAdjustments() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const currentCompanyId = api.getCompanyId();
+  const [searchParams] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<'SIMPLE' | 'TRANSFER' | 'MAP'>('SIMPLE');
 
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const paramProductId = searchParams.get("productId") || "";
+  const [selectedProductId, setSelectedProductId] = useState(paramProductId);
   const [type, setType] = useState<'IN' | 'OUT'>('IN');
   const [quantity, setQuantity] = useState<number>(0);
   const [reason, setReason] = useState('MANUAL');
@@ -50,6 +53,11 @@ export default function InventoryAdjustments() {
     queryKey: ["products", currentCompanyId],
     queryFn: () => api.get("products"),
   });
+
+  const selectedProduct = useMemo(() => {
+    const targetId = selectedProductId || paramProductId;
+    return products.find((p: any) => p.id === targetId);
+  }, [products, selectedProductId, paramProductId]);
   
   const { data: companies = [] } = useQuery({
     queryKey: ["companies"],
@@ -67,8 +75,6 @@ export default function InventoryAdjustments() {
       loc.includes(term)
     );
   });
-
-  const selectedProduct = products.find((p: any) => p.id === selectedProductId);
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {

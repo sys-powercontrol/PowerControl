@@ -70,19 +70,19 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle, progress }: any) 
   const theme = getTheme(color);
 
   return (
-    <div className={`p-6 rounded-[24px] relative overflow-hidden transition-all duration-300 hover:shadow-md ${theme.cardBg}`}>
-      <div className="flex items-center gap-4 z-10 relative">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${theme.iconBg}`}>
-          <Icon size={24} />
+    <div className={`p-3.5 sm:p-6 rounded-[20px] sm:rounded-[24px] relative overflow-hidden transition-all duration-300 hover:shadow-md ${theme.cardBg}`}>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 sm:gap-4 z-10 relative">
+        <div className={`w-9 h-9 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 ${theme.iconBg}`}>
+          <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
         </div>
-        <div className="flex-1 min-w-0 text-left">
-          <h3 className="text-sm font-semibold text-gray-500 tracking-tight leading-none">{title}</h3>
-          <p className={`text-2xl font-extrabold mt-1 tracking-tight leading-none ${theme.valueColor}`}>{value}</p>
+        <div className="flex-1 min-w-0 text-left w-full">
+          <h3 className="text-xs sm:text-sm font-semibold text-gray-500 tracking-tight leading-none truncate">{title}</h3>
+          <p className={`text-base sm:text-2xl font-extrabold mt-1 tracking-tight leading-none truncate ${theme.valueColor}`}>{value}</p>
           
           {progress !== undefined ? (
-            <div className="mt-3 space-y-1">
+            <div className="mt-2 sm:mt-3 space-y-1">
               <div className="flex justify-between text-[10px] font-bold text-gray-500">
-                <span>Progresso da Meta</span>
+                <span>Progresso</span>
                 <span className={theme.valueColor}>{Math.min(100, Math.round(progress))}%</span>
               </div>
               <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -93,7 +93,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle, progress }: any) 
               </div>
             </div>
           ) : (
-            <p className="text-xs text-gray-400 mt-1.5 leading-none font-medium">{subtitle}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-1.5 leading-none font-medium truncate">{subtitle}</p>
           )}
         </div>
       </div>
@@ -232,7 +232,7 @@ export default function SellerDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         <StatCard 
           title="Vendas Hoje" 
           value={formatCurrency(metrics.totalToday)} 

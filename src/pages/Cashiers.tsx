@@ -580,6 +580,14 @@ if (!canView) {
                       const counted = countedBalance === "" || isNaN(Number(countedBalance)) 
                         ? (Number(closingCashier.balance) || 0) 
                         : Number(countedBalance);
+                      const expected = Number(closingCashier.balance) || 0;
+                      const diff = Number((counted - expected).toFixed(2));
+                      
+                      if (diff !== 0 && !closingNotes.trim()) {
+                        toast.error("Por favor, preencha a justificativa da divergência/quebra de caixa antes de confirmar.");
+                        return;
+                      }
+
                       closeCashierMutation.mutate({
                         cashier: closingCashier,
                         counted,

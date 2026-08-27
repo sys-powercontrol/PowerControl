@@ -983,7 +983,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                       )}
                     </div>
                   )}
-                  <div className="absolute top-2 right-2 flex gap-1.5 z-10 mt-[60px] pl-[1px]">
+                  <div className="absolute top-2 right-2 flex gap-1.5 z-10 mt-0">
                     <button 
                       id={`btn-view-product-${p.id}`}
                       onClick={() => setViewingProduct(p)}
@@ -1669,6 +1669,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
         product={viewingProduct}
         onClose={() => setViewingProduct(null)}
         canEdit={canManage}
+        disableProductImages={disableProductImages}
         onEdit={(p) => {
           setEditingProduct(p); 
           setImageBase64(p.image_url || null); 

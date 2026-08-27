@@ -1,108 +1,138 @@
-# Especificação Técnica de Finalizações do Sistema (Spec)
-**Data e Hora de Geração:** 26/08/2026 às 10:10:51 (Horário de Brasília - UTC-3)  
-**Base de Referência:** `analytics/report.md`  
-**Escopo:** Especificação técnica detalhada por Página, Componente e Comportamento exclusivamente para os itens de finalização identificados no diagnóstico, sem adicionar novas ferramentas.
+# Especificação Técnica de Finalizações do Sistema (/spec)
+**Data e Hora de Geração:** 27/08/2026 às 11:10:45 (Horário de Brasília - UTC-3)  
+**Diretriz Estrita:** Especificação técnica focada exclusivamente nas finalizações pendentes mapeadas no `analytics/report.md`. Proibida a especificação ou implementação de funcionalidades novas ou fora do escopo pré-existente.
 
 ---
 
-## 1. Módulo de Estoque e Armazenagem Física
+## 1. Módulo de Produtos, Estoque e Armazenagem Física
 
-### 1.1. Catálogo e Listagem de Produtos
-* **Página:** `src/pages/Products.tsx`
-* **Componentes:** Barra de Filtros, Tabela de Produtos, Grade de Cards e `ProductDetailsModal.tsx`
-* **Comportamentos:**
-  * **Busca Abrangente por Localização:** O filtro textual deve verificar `name`, `sku`, `barcode`, `storage_location`, `storage_room`, `storage_rack` e `storage_shelf`.
-  * **Filtro de Status de Endereçamento:** Adicionar opções no dropdown de filtros para:
-    * `all`: Todos os produtos;
-    * `hasLocation`: Somente produtos com localização cadastrada (`storage_location` preenchido);
-    * `noLocation`: Somente produtos sem endereço cadastrado.
-  * **Ordenação por Endereço Físico:** Incluir no seletor de ordenação a opção `"Endereço Físico (A-Z)"`, ordenando os registros alfabeticamente pela localização tanto no modo Tabela quanto no modo Grade.
+### 1.1. Busca e Filtro Unificado por Endereçamento Físico
+* **Page / View:** `src/pages/Products.tsx`
+* **Components Afetados:** Componente de busca (`SearchInput`), barra de filtros e seletor de ordenação.
+* **Comportamento Esperado (Behavior):**
+  * **Busca:** O termo digitado na barra de pesquisa deve verificar: `name`, `sku`, `barcode`, `storage_location`, `storage_room`, `storage_rack` e `storage_shelf`.
+  * **Filtros Rápidos:** Adicionar chip/filtro para selecionar "Com Localização Cadastrada" e "Sem Localização Cadastrada".
+  * **Ordenação:** Incluir opção no menu de ordenação: "Endereço de Estoque (A-Z)".
 
-### 1.2. Ajustes de Estoque e Transferências
-* **Página:** `src/pages/InventoryAdjustments.tsx`
-* **Componentes:** Formulário de Ajuste Simples, Modal de Transferência e `StockMapPowerBI.tsx`
-* **Comportamentos:**
-  * **Card de Conferência Física:** Ao selecionar um produto para ajuste manual ou transferência, exibir um card de contexto contendo:
-    * Nome, SKU e Código de Barras;
-    * Estoque Atual e Estoque Mínimo;
-    * Endereço físico consolidado (`storage_location`) com destaque visual.
-  * **Integração com o Mapa de Estoque:** Ao clicar no botão de ajuste rápido a partir de uma posição no `StockMapPowerBI.tsx`, navegar automaticamente para a aba de ajuste com o produto já selecionado.
+### 1.2. Conferência de Localização nos Ajustes de Estoque
+* **Page / View:** `src/pages/InventoryAdjustments.tsx`
+* **Components Afetados:** Formulário de ajuste simples, transferência entre empresas e integração com `StockMapPowerBI.tsx`.
+* **Comportamento Esperado (Behavior):**
+  * Ao selecionar o produto no `<select>` ou via busca, renderizar um card de conferência de picking exibindo: `Sala`, `Armário/Estante`, `Gaveta/Prateleira` e `Código Composto`.
+  * Ao navegar do mapa (`StockMapPowerBI.tsx`) para a tela de ajustes via atalho, a URL deve receber o parâmetro `?productId=...` e pré-selecionar o produto automaticamente.
 
-### 1.3. Kardex e Histórico de Movimentações
-* **Página:** `src/pages/InventoryHistory.tsx`
-* **Componentes:** Tabela de Histórico e `ExportButton.tsx`
-* **Comportamentos:**
-  * **Exibição da Localização:** Incluir a coluna "Localização" nas tabelas de movimentações de estoque (entradas, saídas, ajustes e transferências).
-  * **Exportação Completa:** Garantir que as exportações em PDF e Excel geradas pelo `ExportButton.tsx` incluam a coluna de localização física.
+### 1.3. Localização Física no Histórico e Relatórios Kardex
+* **Page / View:** `src/pages/InventoryHistory.tsx`
+* **Components Afetados:** Tabela de movimentações de estoque e botões de exportação (`ExportButton`).
+* **Comportamento Esperado (Behavior):**
+  * Exibir a coluna `Localização` na tabela de movimentações de estoque.
+  * Incluir o campo `storage_location` no cabeçalho dos arquivos exportados em XLSX e PDF.
 
 ---
 
 ## 2. Módulo de Vendas, Checkout e PDV
 
-### 2.1. Frente de Caixa (PDV) e Expedição
-* **Página:** `src/pages/Sales.tsx`
-* **Componentes:** Catálogo de Produtos, Lista do Carrinho e Utilitários de Impressão (`src/lib/utils/print.ts`)
-* **Comportamentos:**
-  * **Badge de Localização no Carrinho:** Cada item adicionado ao carrinho de vendas deve exibir um badge discreto com sua localização física para apoiar o operador na conferência.
-  * **Orçamento A4 com Localização:** O layout de impressão do Orçamento A4 (`printA4Quote`) deve conter a coluna de localização do produto para agilizar o picking de expedição.
-  * **Baixa de Pagamento Misto (Split):** Garantir a baixa correta das frações do pagamento misto, lançando valores em dinheiro no caixa ativo (`cashier_id`) e valores em cartão/PIX na conta bancária selecionada (`bank_account_id`).
+### 2.1. Exibição de Localização Física para Picking no Orçamento A4
+* **Page / View:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`
+* **Components / Utilities Afetados:** `src/lib/utils/print.ts` (`printA4Quote`), modal de recibo/orçamento.
+* **Comportamento Esperado (Behavior):**
+  * Na impressão do Orçamento / Pedido de Separação em formato A4 (`printA4Quote`), incluir uma coluna ou badge abaixo do nome do produto com o endereço físico (`Localização: A1-E02/P03`).
 
-### 2.2. Histórico de Vendas e Estorno de Comissões
-* **Página:** `src/pages/SalesHistory.tsx` e `src/pages/CommissionPayouts.tsx`
-* **Componentes:** Ação de Cancelamento de Venda e Gestão de Comissões
-* **Comportamentos:**
-  * **Cancelamento com Estorno de Comissão:** Ao cancelar uma venda que possua comissão vinculada a um vendedor, atualizar o status da comissão para cancelada/estornada, recalculando o saldo a pagar do vendedor.
+### 2.2. Liquidação Segregada em Pagamentos Mistos (Split)
+* **Page / View:** `src/pages/Sales.tsx`
+* **Components Afetados:** Modal de finalização de venda e mutação de registro no financeiro.
+* **Comportamento Esperado (Behavior):**
+  * Quando a venda utilizar múltiplos métodos de pagamento (ex: R$ 50 em Dinheiro e R$ 100 no Cartão de Crédito):
+    * O valor em dinheiro deve ser lançado como entrada no Caixa físico ativo do operador (`cashiers`).
+    * O valor em cartão/PIX deve ser registrado diretamente na Conta Bancária configurada (`bankAccounts`) e/ou gerado título a receber correspondente.
 
----
-
-## 3. Módulo de Impressão de Etiquetas
-
-### 3.1. Emissor de Etiquetas de Código de Barras e Gôndola
-* **Componente/Página:** `src/components/LabelPrinter.tsx`
-* **Comportamentos:**
-  * **Opção de Exibição de Localização:** Incluir checkbox para alternar a exibição da linha de localização física (`storage_location`) nos modelos de etiquetas (Térmica 80x40, Pimenta 6180 e Avery 5160).
-  * **Ordenação Pré-Impressão por Corredor:** Permitir ordenar os produtos da fila de impressão pelo código de armazenagem antes de compilar o arquivo PDF.
+### 2.3. Estorno Automático de Comissões no Cancelamento de Vendas
+* **Page / View:** `src/pages/SalesHistory.tsx`
+* **Components Afetados:** Ação de cancelamento de venda (`handleCancelSale`) e integração com `CommissionPayouts.tsx`.
+* **Comportamento Esperado (Behavior):**
+  * Ao cancelar uma venda que possua comissão com status `pending`, o status da comissão deve ser atualizado para `canceled`.
+  * Registrar evento de auditoria (`audit_logs`) informando o cancelamento da venda e o estorno da comissão do vendedor.
 
 ---
 
-## 4. Módulo de Compras e Importação de XML
+## 3. Módulo de Compras e Importação de XML NF-e
 
-### 4.1. Importador de NF-e
-* **Página:** `src/pages/Purchases.tsx`
-* **Componentes:** `src/components/Purchases/NFeXMLImporter.tsx` e `src/pages/AccountsPayable.tsx`
-* **Comportamentos:**
-  * **Preservação e Atribuição de Endereço:** Ao processar os itens da NF-e, se o produto já existir no cadastro, exibir sua localização atual; se for cadastrado como novo, permitir definir a localização inicial de armazenagem.
-  * **Geração Automática de Contas a Pagar:** Extrair as tags de duplicatas (`<dup>`) da NF-e e gerar automaticamente os títulos correspondentes no `accounts_payable`, com seus respectivos números, parcelas, datas de vencimento e valores.
+### 3.1. Vínculo de Endereço Físico na Entrada de Produtos
+* **Page / View:** `src/pages/Purchases.tsx`, `src/components/Purchases/NFeXMLImporter.tsx`
+* **Components Afetados:** Modal de importação e mapeamento de itens do XML.
+* **Comportamento Esperado (Behavior):**
+  * Para itens associados a produtos existentes, manter o endereço atual do estoque.
+  * Para itens novos que serão cadastrados pelo XML, permitir preencher o endereço físico inicial (`storage_location` ou Sala/Armário/Gaveta) no grid de conferência do XML antes de salvar.
 
----
-
-## 5. Módulo Financeiro, Caixa e Conciliação
-
-### 5.1. Conciliador OFX e Fechamento de Turno de Caixa
-* **Páginas:** `src/pages/BankReconciliation.tsx` e `src/pages/Cashiers.tsx`
-* **Componentes:** `src/components/Financial/OFXImporter.tsx` e Modal de Fechamento de Caixa
-* **Comportamentos:**
-  * **Conciliação Automática OFX:** Ao importar arquivo `.ofx`, efetuar o cruzamento automático dos lançamentos com os títulos em aberto de `accounts_payable` e `accounts_receivable` por valor e data aproximada, oferecendo botão de conciliação rápida em 1 clique.
-  * **Auditoria de Fechamento de Caixa:** No encerramento do caixa em `Cashiers.tsx`, calcular e comparar o saldo esperado com o valor físico em gaveta informado pelo operador, registrando sobras, faltas e justificativas de auditoria.
+### 3.2. Integração Automática de Duplicatas com o Contas a Pagar
+* **Page / View:** `src/components/Purchases/NFeXMLImporter.tsx`, `src/pages/AccountsPayable.tsx`
+* **Components Afetados:** Processamento das tags `<cobr><dup>` do XML.
+* **Comportamento Esperado (Behavior):**
+  * Ao confirmar a importação do XML que contenha cobrança/duplicatas, criar automaticamente as parcelas correspondentes na coleção `accountsPayable`, preenchendo fornecedor, número da fatura/duplicata, data de vencimento e valor.
 
 ---
 
-## 6. Módulo Fiscal e Certificados
+## 4. Módulo Financeiro, Caixa e Conciliação Bancária
 
-### 6.1. Monitoramento Fiscal e Inutilização
-* **Páginas:** `src/pages/Fiscal.tsx` e `src/pages/CertificateManager.tsx`
-* **Componentes:** Banner de Alerta Fiscal, `src/components/Fiscal/InutilizacaoModal.tsx` e Ações da Tabela Fiscal
-* **Comportamentos:**
-  * **Alerta de Expiração de Certificado:** Exibir banner de advertência no painel fiscal quando o certificado digital A1 estiver expirado ou a menos de 30 dias do vencimento, com atalho direto para atualização.
-  * **Validação de Inutilização SEFAZ:** Exigir justificativa com no mínimo 15 caracteres no `InutilizacaoModal.tsx` antes do envio da solicitação à SEFAZ.
-  * **Reenvio de DANFE/XML:** Conectar o botão de reenvio de e-mail na listagem fiscal para acionar a rota de envio com o destinatário informado.
+### 4.1. Conciliação Automática de Títulos via Extrato OFX
+* **Page / View:** `src/pages/BankReconciliation.tsx`, `src/components/Financial/OFXImporter.tsx`
+* **Components Afetados:** Modal do leitor OFX e listagem de correspondências sugeridas.
+* **Comportamento Esperado (Behavior):**
+  * O parser OFX deve comparar os débitos/créditos do extrato bancário com as contas a pagar/receber em aberto da empresa.
+  * Lançamentos com valor exato e vencimento dentro de uma janela de ±3 dias devem ser marcados com sugestão verde de match.
+  * O botão "Conciliar Selecionados" deve efetuar a baixa das contas com a data e conta bancária do extrato.
+
+### 4.2. Auditoria e Conferência no Fechamento de Caixa
+* **Page / View:** `src/pages/Cashiers.tsx`
+* **Components Afetados:** Modal de encerramento/fechamento de turno de caixa.
+* **Comportamento Esperado (Behavior):**
+  * No fechamento de caixa, o operador digita os valores físicos contados por forma de pagamento (Dinheiro, Cartão, PIX, etc.).
+  * O sistema calcula a diferença (`Diferença = Valor Informado - Saldo Calculado do Sistema`).
+  * Em caso de quebra ou sobra de caixa, exigir preenchimento de campo de justificativa e salvar os metadados de conferência no documento do caixa.
 
 ---
 
-## 7. Módulo Offline e Resiliência PWA
+## 5. Módulo Fiscal e Certificados Digitais
 
-### 7.1. Sincronização e Fila Local
-* **Componentes/Services:** `src/lib/offlineStore.ts`, `src/components/OfflineSyncStatusBar.tsx` e `src/sw.ts`
-* **Comportamentos:**
-  * **Drenagem Resiliente da Fila:** Garantir o envio automático em lote e a limpeza das operações pendentes do IndexedDB quando a conexão for restabelecida.
-  * **Barra de Conectividade:** Atualizar em tempo real o contador de registros pendentes na `OfflineSyncStatusBar.tsx`.
+### 5.1. Banner de Alerta de Expiração de Certificado Digital A1
+* **Page / View:** `src/pages/CertificateManager.tsx`, `src/pages/Fiscal.tsx`
+* **Components Afetados:** Header / Top Banner das páginas fiscais.
+* **Comportamento Esperado (Behavior):**
+  * Se o certificado ativo estiver a 30 dias ou menos do vencimento, exibir banner de aviso com contagem regressiva em dias e botão direto para renovação/upload.
+  * Se o certificado já estiver expirado, exibir alerta crítico vermelho impedindo tentativas de transmissão à SEFAZ.
+
+### 5.2. Validação Estrita de Justificativa na Inutilização de Faixa
+* **Page / View:** `src/components/Fiscal/InutilizacaoModal.tsx`
+* **Components Afetados:** Formulário de inutilização de numeração SEFAZ.
+* **Comportamento Esperado (Behavior):**
+  * Validar em tempo real se o campo "Motivo da Inutilização" possui no mínimo 15 caracteres (conforme Manual de Orientação do Contribuinte da SEFAZ).
+  * Exibir contador de caracteres `(X/15)` e bloquear o botão de envio caso o limite mínimo não seja atingido.
+
+### 5.3. Reenvio de DANFE / XML por E-mail
+* **Page / View:** `src/pages/Fiscal.tsx`
+* **Components Afetados:** Menu de ações de cada nota fiscal autorizada.
+* **Comportamento Esperado (Behavior):**
+  * Adicionar ação "Reenviar por E-mail" na linha da NF-e autorizada.
+  * Ao clicar, abrir modal simples confirmando o e-mail do destinatário e disparar o envio com anexo do XML e DANFE PDF.
+
+---
+
+## 6. Módulo de Impressão de Etiquetas Térmicas e A4
+
+### 6.1. Exibição de Endereço Físico e Ordenação na Emissão de Etiquetas
+* **Page / View:** `src/components/LabelPrinter.tsx`
+* **Components Afetados:** Opções de customização da etiqueta e motor de renderização do PDF.
+* **Comportamento Esperado (Behavior):**
+  * Adicionar checkbox "Incluir Endereço de Estoque na Etiqueta" nas opções de configuração do layout.
+  * Permitir ordenar a fila de impressão selecionada por "Endereço de Estoque (Ordem Física de Separação)".
+
+---
+
+## 7. Módulo de Sincronização Offline e PWA
+
+### 7.1. Drenagem Resiliente da Fila Offline e Atualização de Status
+* **Page / View:** `src/lib/offlineStore.ts`, `src/components/OfflineSyncStatusBar.tsx`
+* **Components Afetados:** Gerenciador de eventos online/offline e componente de barra de status fixo.
+* **Comportamento Esperado (Behavior):**
+  * Ao detectar a reconexão (`window.addEventListener('online')`), iniciar a sincronização sequencial das operações pendentes do IndexedDB.
+  * Em caso de falha de conexão no meio da drenagem, manter a transação não sincronizada na fila e exibir notificação amigável com botão "Tentar Sincronizar Agora".

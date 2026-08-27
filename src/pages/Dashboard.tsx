@@ -98,26 +98,26 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle, badge, trend }: a
   const theme = getTheme(color);
 
   return (
-    <div className={`p-5 rounded-2xl relative overflow-hidden transition-all duration-300 hover:shadow-lg ${theme.cardBg}`}>
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${theme.iconBg}`}>
-          <Icon size={22} />
+    <div className={`p-3.5 sm:p-5 rounded-2xl relative overflow-hidden transition-all duration-300 hover:shadow-lg ${theme.cardBg}`}>
+      <div className="flex items-start justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
+        <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${theme.iconBg}`}>
+          <Icon className="w-4 h-4 sm:w-[22px] sm:h-[22px]" />
         </div>
         {badge && (
-          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${theme.accentBg}`}>
+          <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold border truncate max-w-[95px] sm:max-w-none ${theme.accentBg}`}>
             {badge}
           </span>
         )}
       </div>
 
       <div>
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</h3>
-        <p className={`text-2xl font-black mt-1 tracking-tight ${theme.valueColor}`}>{value}</p>
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100/60">
-          <p className="text-xs text-gray-500 font-medium truncate">{subtitle}</p>
+        <h3 className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider line-clamp-1">{title}</h3>
+        <p className={`text-base sm:text-2xl font-black mt-0.5 sm:mt-1 tracking-tight truncate ${theme.valueColor}`}>{value}</p>
+        <div className="flex items-center justify-between mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-gray-100/60">
+          <p className="text-[10px] sm:text-xs text-gray-500 font-medium truncate">{subtitle}</p>
           {trend !== undefined && (
-            <span className={`flex items-center gap-0.5 text-xs font-bold ${trend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {trend >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+            <span className={`flex items-center gap-0.5 text-[10px] sm:text-xs font-bold shrink-0 ${trend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {trend >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownLeft size={13} />}
               {Math.abs(trend)}%
             </span>
           )}
@@ -519,7 +519,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard 
           title="Faturamento do Período" 
           value={formatCurrency(periodMetrics.periodRevenue)} 

@@ -420,6 +420,20 @@ export default function SalesHistory() {
 
         // We then set status to "Cancelada" and update commission_status
         await api.put("sales", id, commissionUpdates);
+
+        // Record audit log
+        await api.log({
+          action: 'UPDATE',
+          entity: 'sales',
+          entity_id: id,
+          description: `Cancelou venda #${id.substr(0, 8).toUpperCase()}${dbSale.commission_amount > 0 ? ' e estornou comissão' : ''}`,
+          metadata: { 
+            total: dbSale.total, 
+            client_name: dbSale.client_name, 
+            commission_amount: dbSale.commission_amount,
+            commission_status: commissionUpdates.commission_status
+          }
+        });
       }
     },
     onSuccess: () => {

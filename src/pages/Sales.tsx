@@ -23,9 +23,11 @@ import {
   FileText,
   ReceiptText,
   Menu,
-  Warehouse
+  Warehouse,
+  Eye
 } from "lucide-react";
 import { toast } from "sonner";
+import ProductDetailsModal from "../components/ProductDetailsModal";
 
 import { useAuth } from "../lib/auth";
 import { formatBR, getNowBR, getTodayBR } from "../lib/dateUtils";
@@ -72,6 +74,20 @@ export default function Sales() {
   const [activeTab, setActiveTab] = useState<"items" | "cart">("items");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hasPending, setHasPending] = useState(false);
+  const [inspectingProduct, setInspectingProduct] = useState<any | null>(null);
+
+  const handleOpenItemDetails = (item: any) => {
+    if (!item) return;
+    const itemId = item.product_id || item.service_id || item.id;
+    const fullFound = [...products, ...services].find((p: any) => p.id === itemId) || {};
+    const resolvedLoc = item.resolvedLocation || getProductLocation(fullFound) || fullFound.storage_location || item.storage_location;
+    
+    setInspectingProduct({
+      ...fullFound,
+      ...item,
+      resolvedLocation: resolvedLoc
+    });
+  };
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isEmittingNfce, setIsEmittingNfce] = useState(false);
@@ -877,12 +893,19 @@ if (!canCreate) {
                         : "border-gray-100 hover:border-blue-200 hover:bg-blue-50/30"
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
-                    <div className={`p-2 rounded-lg shrink-0 ${p.type === 'service' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+                  <div 
+                    onClick={() => handleOpenItemDetails(p)}
+                    className="flex items-center gap-3 min-w-0 pr-2 cursor-pointer flex-1 group/item-info"
+                    title="Clique para ver a ficha completa com estoque, preços e localização"
+                  >
+                    <div className={`p-2 rounded-lg shrink-0 ${p.type === 'service' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'} group-hover/item-info:scale-105 transition-transform`}>
                       {p.type === 'service' ? <Tag size={16} /> : <Package size={16} />}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-gray-900 truncate text-sm sm:text-base">{p.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold text-gray-900 truncate text-sm sm:text-base group-hover/item-info:text-blue-600 transition-colors">{p.name}</p>
+                        <Eye size={13} className="text-gray-400 opacity-0 group-hover/item-info:opacity-100 shrink-0 transition-opacity" />
+                      </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                         <p className={`text-xs ${p.type === 'product' && p.stock_quantity <= p.min_stock ? "text-red-500 font-bold" : "text-gray-500"}`}>
                           {p.type === 'service' ? 'Serviço' : `Estoque: ${p.stock_quantity} ${p.unit || "un"}`}
@@ -969,13 +992,18 @@ if (!canCreate) {
               {cart.map((item) => {
                 const loc = item.resolvedLocation || getProductLocation(item);
                 return (
-                  <div key={item.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0 pr-2">
+                  <div key={item.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3 group/cart-row hover:bg-slate-50/70 p-2 rounded-xl transition-colors">
+                    <div 
+                      onClick={() => handleOpenItemDetails(item)}
+                      className="flex-1 min-w-0 pr-2 cursor-pointer"
+                      title="Clique para ver ficha detalhada do item"
+                    >
                       <div className="flex items-center gap-2">
                         <span className={`p-1 rounded text-[10px] font-bold ${item.type === 'service' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                           {item.type === 'service' ? 'Serviço' : 'Produto'}
                         </span>
-                        <p className="font-bold text-gray-900 truncate text-sm">{item.name}</p>
+                        <p className="font-bold text-gray-900 truncate text-sm hover:text-blue-600 transition-colors">{item.name}</p>
+                        <Eye size={13} className="text-gray-400 opacity-0 group-hover/cart-row:opacity-100 shrink-0 transition-opacity" />
                       </div>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {item.type === 'product' && loc && (
@@ -995,6 +1023,7 @@ if (!canCreate) {
                                 const newPrice = parseFloat(e.target.value) || 0;
                                 setCart(prev => prev.map(i => i.id === item.id ? { ...i, price: newPrice } : i));
                               }}
+                              onClick={(e) => e.stopPropagation()}
                               className="w-20 px-1 py-0.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded outline-none focus:ring-1 focus:ring-blue-500"
                             />
                             <span className="text-xs text-gray-400">/ {item.unit || "un"}</span>
@@ -1076,14 +1105,19 @@ if (!canCreate) {
               {cart.map((item) => {
                 const loc = item.resolvedLocation || getProductLocation(item);
                 return (
-                  <div key={item.id} className="pt-3 first:pt-0 flex flex-col space-y-2">
+                  <div key={item.id} className="pt-3 first:pt-0 flex flex-col space-y-2 group/cart-row hover:bg-slate-50/70 p-2 rounded-xl transition-colors">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
+                      <div 
+                        onClick={() => handleOpenItemDetails(item)}
+                        className="flex-1 min-w-0 cursor-pointer"
+                        title="Clique para ver ficha detalhada do item"
+                      >
                         <div className="flex items-center gap-1.5">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.type === 'service' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                             {item.type === 'service' ? 'Serviço' : 'Produto'}
                           </span>
-                          <p className="font-bold text-sm text-gray-900 truncate">{item.name}</p>
+                          <p className="font-bold text-sm text-gray-900 truncate hover:text-blue-600 transition-colors">{item.name}</p>
+                          <Eye size={13} className="text-gray-400 shrink-0" />
                         </div>
                         
                         {item.type === 'product' && loc && (
@@ -1677,6 +1711,13 @@ if (!canCreate) {
           </div>
         </div>
       )}
+
+      {/* Janela Flutuante com Detalhes Completos do Produto ou Serviço */}
+      <ProductDetailsModal
+        isOpen={!!inspectingProduct}
+        product={inspectingProduct}
+        onClose={() => setInspectingProduct(null)}
+      />
     </div>
   );
 }
