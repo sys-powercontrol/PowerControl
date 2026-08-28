@@ -14,6 +14,7 @@ import {
   Copy, 
   Check, 
   Edit2, 
+  Trash2,
   Image as ImageIcon,
   AlertTriangle,
   Info,
@@ -35,6 +36,8 @@ interface ProductDetailsModalProps {
   onClose: () => void;
   onEdit?: (product: any) => void;
   canEdit?: boolean;
+  onDelete?: (product: any) => void;
+  canDelete?: boolean;
   disableProductImages?: boolean;
 }
 
@@ -44,6 +47,8 @@ export default function ProductDetailsModal({
   onClose,
   onEdit,
   canEdit = false,
+  onDelete,
+  canDelete = false,
   disableProductImages
 }: ProductDetailsModalProps) {
   const { user } = useAuth();
@@ -614,6 +619,20 @@ MARCA: ${product.brand_name || product.brand || "Geral"}`;
             </div>
 
             <div className="flex items-center gap-2.5">
+              {canDelete && onDelete && (
+                <button
+                  type="button"
+                  id="btn-delete-from-details-modal-footer"
+                  onClick={() => {
+                    onClose();
+                    onDelete(product);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 font-bold text-xs transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} />
+                  <span>Excluir</span>
+                </button>
+              )}
               <button
                 type="button"
                 id="btn-close-product-details-modal-footer"

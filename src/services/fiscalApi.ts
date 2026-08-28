@@ -186,24 +186,28 @@ async function emitFocusNFe(config: FiscalConfig, data: FiscalInvoiceData) {
 
     items: data.items.map((item, index) => ({
       numero_item: index + 1,
-      codigo_produto: item.id,
+      codigo_produto: item.sku || item.id,
       descricao: item.name,
       ncm: item.ncm || "00000000",
       cfop: item.cfop || "5102",
-      unidade_comercial: "UN",
+      cest: item.cest || undefined,
+      unidade_comercial: item.unit || "UN",
       quantidade_comercial: item.quantity,
       valor_unitario_comercial: item.sale_price,
       valor_bruto: item.sale_price * item.quantity,
       icms_situacao_tributaria: item.csosn || item.cst || "102",
-      icms_origem: 0,
-      pis_situacao_tributaria: "07",
-      cofins_situacao_tributaria: "07",
-      ipi_aliquota: item.ipi_rate,
+      icms_origem: item.origin !== undefined ? item.origin : 0,
+      icms_aliquota: item.icms_rate || undefined,
+      pis_situacao_tributaria: item.pis_cst || "07",
+      pis_aliquota_porcentual: item.pis_rate || undefined,
+      cofins_situacao_tributaria: item.cofins_cst || "07",
+      cofins_aliquota_porcentual: item.cofins_rate || undefined,
+      ipi_aliquota: item.ipi_rate || undefined,
       icms_st_aliquota: item.mva_rate ? (item.aliquota_interna_destino || 18) : undefined,
-      icms_st_mva: item.mva_rate,
-      icms_st_base_calculo: item.taxes?.base_st,
-      icms_st_valor: item.taxes?.icms_st,
-      icms_valor_total_difal: item.taxes?.difal
+      icms_st_mva: item.mva_rate || undefined,
+      icms_st_base_calculo: item.taxes?.base_st || undefined,
+      icms_st_valor: item.taxes?.icms_st || undefined,
+      icms_valor_total_difal: item.taxes?.difal || undefined
     })),
 
     valor_total_bruto: data.total,
@@ -266,13 +270,19 @@ async function emitWebmaniaBR(config: FiscalConfig, data: FiscalInvoiceData) {
       nome: item.name,
       codigo: item.sku || item.id,
       ncm: item.ncm || "00000000",
-      cest: item.cest,
+      cest: item.cest || undefined,
       quantidade: item.quantity,
-      unidade: "UN",
-      origem: 0,
+      unidade: item.unit || "UN",
+      origem: item.origin !== undefined ? item.origin : 0,
       subtotal: item.sale_price,
       total: item.sale_price * item.quantity,
-      classe_imposto: item.tax_class || "REF1234" // Placeholder or mapped from product
+      classe_imposto: item.tax_class || item.tax_rule_id || (item.csosn ? `CSOSN_${item.csosn}` : "REF1234"),
+      tributos: {
+        icms: item.icms_rate ? { aliquota: item.icms_rate } : undefined,
+        pis: item.pis_rate ? { aliquota: item.pis_rate, cst: item.pis_cst || "07" } : undefined,
+        cofins: item.cofins_rate ? { aliquota: item.cofins_rate, cst: item.cofins_cst || "07" } : undefined,
+        ipi: item.ipi_rate ? { aliquota: item.ipi_rate } : undefined
+      }
     })),
     pedido: {
       pagamento: 0, // 0 = Pagamento à vista

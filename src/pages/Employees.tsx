@@ -252,6 +252,20 @@ export default function Employees() {
         company_ids: newCompanyIds,
         company_id: newPrimaryCompanyId
       });
+
+      await api.log({
+        action: 'DELETE',
+        entity: 'employees',
+        entity_id: employeeToUnlink,
+        description: `Desvinculou colaborador ${targetEmployee?.full_name || targetEmployee?.email || employeeToUnlink} da empresa`,
+        metadata: {
+          employee_id: employeeToUnlink,
+          employee_name: targetEmployee?.full_name,
+          employee_email: targetEmployee?.email,
+          previous_companies: existingCompanyIds,
+          updated_companies: newCompanyIds
+        }
+      });
       queryClient.invalidateQueries({ queryKey: ["employees", currentCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["users"] });
       toast.success("Funcionário desvinculado desta empresa com sucesso!");

@@ -296,6 +296,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       is_active: inviteData ? true : (isSystemAdmin ? true : false),
       company_id: inviteData ? inviteData.company_id : null,
       company_ids: inviteData ? [inviteData.company_id] : [],
+      terms_accepted: true,
+      terms_accepted_at: data.terms_accepted_at || new Date().toISOString(),
       created_at: serverTimestamp()
     };
 
@@ -343,6 +345,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           company_id: null,
           company_ids: [],
           avatar: googleUser.photoURL || null,
+          terms_accepted: true,
+          terms_accepted_at: new Date().toISOString(),
           created_at: serverTimestamp()
         };
         const userData: Record<string, any> = {};

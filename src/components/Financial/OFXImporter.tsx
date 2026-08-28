@@ -337,7 +337,8 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
             reconciled: true,
             reconciliation_date: new Date().toISOString(),
             [isExpense ? "payment_date" : "receipt_date"]: t.date,
-            bank_account_id: bankAccountId
+            bank_account_id: bankAccountId,
+            ofx_fitid: t.fitid || t.id
           });
         } else {
           // Check for rule to pre-fill metadata
@@ -361,6 +362,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
             reconciled: true,
             reconciliation_date: new Date().toISOString(),
             bank_account_id: bankAccountId,
+            ofx_fitid: t.fitid || t.id,
             category_id: matchingRule?.category_id || null,
             supplier_id: matchingRule?.supplier_id || null,
             client_id: matchingRule?.client_id || null,
@@ -385,6 +387,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
       toast.success("Importação e conciliação concluídas!");
       onClose();
     }
@@ -421,7 +424,18 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
     }
   };
 
+  const isTxAlreadyReconciled = (t: OFXTransaction) => {
+    const tId = t.fitid || t.id;
+    return payables.some((p: any) => p.ofx_fitid === tId || (p.ofx_fitid && (p.ofx_fitid === t.fitid || p.ofx_fitid === t.id))) ||
+           receivables.some((r: any) => r.ofx_fitid === tId || (r.ofx_fitid && (r.ofx_fitid === t.fitid || r.ofx_fitid === t.id)));
+  };
+
   const toggleTransaction = (id: string) => {
+    const targetTx = transactions.find(t => t.id === id);
+    if (targetTx && isTxAlreadyReconciled(targetTx)) {
+      toast.info("Esta transação já foi conciliada anteriormente.");
+      return;
+    }
     const newSelected = new Set(selectedTransactions);
     if (newSelected.has(id)) {
       newSelected.delete(id);
@@ -432,10 +446,11 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
   };
 
   const toggleAll = () => {
-    if (selectedTransactions.size === transactions.length) {
+    const importableTransactions = transactions.filter(t => !isTxAlreadyReconciled(t));
+    if (selectedTransactions.size === importableTransactions.length && importableTransactions.length > 0) {
       setSelectedTransactions(new Set());
     } else {
-      setSelectedTransactions(new Set(transactions.map(t => t.id)));
+      setSelectedTransactions(new Set(importableTransactions.map(t => t.id)));
     }
   };
 
@@ -475,6 +490,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
         reconciled: true,
         reconciliation_date: new Date().toISOString(),
         bank_account_id: bankAccountId,
+        ofx_fitid: quickLaunchTx.fitid || quickLaunchTx.id,
         category_id: quickLaunchData.category_id || null,
         supplier_id: isExpense ? (quickLaunchData.supplier_id || null) : null,
         client_id: !isExpense ? (quickLaunchData.client_id || null) : null,
@@ -517,6 +533,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
   const handleAutoReconcileHighConfidence = () => {
     const highConfidenceIds: string[] = [];
     transactions.forEach((t) => {
+      if (isTxAlreadyReconciled(t)) return;
       const isExpense = t.type === "DEBIT";
       const existing = isExpense ? payables : receivables;
       const manual = manualMatches[t.id];
@@ -531,7 +548,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
     });
 
     if (highConfidenceIds.length === 0) {
-      toast.info("Nenhuma transação com correspondência de alta certeza (≥ 90%) encontrada.");
+      toast.info("Nenhuma transação com correspondência de alta certeza (≥ 90%) pendente de conciliação.");
       return;
     }
 
@@ -646,6 +663,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                 {transactions.map((t) => {
                   const isExpense = t.type === "DEBIT";
                   const existing = isExpense ? payables : receivables;
+                  const alreadyReconciled = isTxAlreadyReconciled(t);
                   
                   // Check manual match first
                   const manualMatch = manualMatches[t.id];
@@ -662,30 +680,38 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                     <div 
                       key={t.id} 
                       className={`p-4 rounded-2xl border transition-all flex items-center gap-4 ${
-                        selectedTransactions.has(t.id) 
-                          ? "border-blue-200 bg-blue-50/30" 
-                          : "border-gray-100 hover:border-gray-200"
+                        alreadyReconciled
+                          ? "border-emerald-200 bg-emerald-50/20 opacity-80"
+                          : selectedTransactions.has(t.id) 
+                            ? "border-blue-200 bg-blue-50/30" 
+                            : "border-gray-100 hover:border-gray-200"
                       }`}
                     >
                       <div 
-                        onClick={() => toggleTransaction(t.id)}
-                        className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors cursor-pointer ${
-                          selectedTransactions.has(t.id) 
-                            ? "bg-blue-600 border-blue-600 text-white" 
-                            : "border-gray-200"
+                        onClick={() => !alreadyReconciled && toggleTransaction(t.id)}
+                        className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${
+                          alreadyReconciled
+                            ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                            : selectedTransactions.has(t.id) 
+                              ? "bg-blue-600 border-blue-600 text-white cursor-pointer" 
+                              : "border-gray-200 cursor-pointer"
                         }`}
                       >
-                        {selectedTransactions.has(t.id) && <Check size={14} />}
+                        {(selectedTransactions.has(t.id) || alreadyReconciled) && <Check size={14} />}
                       </div>
 
-                      <div className={`p-3 rounded-xl ${isExpense ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
+                      <div className={`p-3 rounded-xl ${alreadyReconciled ? "bg-emerald-100 text-emerald-700" : isExpense ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>
                         {isExpense ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-gray-900 truncate">{t.memo}</h4>
-                          {matchResult && (
+                          {alreadyReconciled ? (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <CheckCircle2 size={10} /> Já Conciliado
+                            </span>
+                          ) : matchResult && (
                             <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                               manualMatch 
                                 ? "bg-blue-100 text-blue-700 border border-blue-200" 
@@ -710,12 +736,17 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                           <span>{formatBR(t.date)}</span>
                           <span>•</span>
                           <span>ID: {t.fitid}</span>
-                          {matchResult && !manualMatch && (
+                          {alreadyReconciled ? (
+                            <>
+                              <span>•</span>
+                              <span className="text-emerald-600 font-medium">Processado no ERP</span>
+                            </>
+                          ) : matchResult && !manualMatch ? (
                             <>
                               <span>•</span>
                               <span className="text-blue-600 font-medium">{matchResult.reason}</span>
                             </>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 
@@ -732,7 +763,9 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
                         </div>
                         
                         <div className="flex flex-col gap-1 items-end">
-                          {match ? (
+                          {alreadyReconciled ? (
+                            <span className="text-[10px] font-bold text-gray-400">Importação Bloqueada</span>
+                          ) : match ? (
                             <button 
                               onClick={() => setManualMatches(prev => {
                                 const next = { ...prev };

@@ -27,10 +27,13 @@ import {
   X,
   Keyboard,
   Info,
-  Edit
+  Edit,
+  Upload,
+  Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatBR } from "../lib/dateUtils";
+import { FooterConfig, DEFAULT_FOOTER_CONFIG } from "../types/footer";
 
 interface SupportChannelsConfig {
   email_title: string;
@@ -108,6 +111,44 @@ export default function Support() {
   const selectedTicket = selectedTicketId ? tickets.find(t => t.id === selectedTicketId) : null;
   const [replyText, setReplyText] = useState("");
 
+  // Active Company Data
+  const activeCompanyId = api.getCompanyId() || user?.company_id;
+  const { data: companyData } = useQuery({
+    queryKey: ["company", activeCompanyId],
+    queryFn: () => api.get(`companies/${activeCompanyId}`),
+    enabled: !!activeCompanyId,
+  });
+
+  // Footer Settings (Firestore system_settings/footer configured in Admin Master -> Rodapé)
+  const { data: footerConfig = DEFAULT_FOOTER_CONFIG } = useQuery({
+    queryKey: ["system_settings", "footer"],
+    queryFn: async () => {
+      try {
+        const docRef = doc(db, "system_settings", "footer");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = { ...DEFAULT_FOOTER_CONFIG, ...docSnap.data() } as FooterConfig;
+          try {
+            localStorage.setItem("system_settings_footer", JSON.stringify(data));
+          } catch {
+            // ignore
+          }
+          return data;
+        }
+      } catch (err) {
+        console.warn("Notice loading footer config (using fallback):", err);
+      }
+      try {
+        const cached = localStorage.getItem("system_settings_footer");
+        if (cached) return JSON.parse(cached);
+      } catch {
+        // ignore
+      }
+      return DEFAULT_FOOTER_CONFIG;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
   // Support Channels Config (Firestore system_settings/support_channels)
   const { data: channelsConfig = DEFAULT_SUPPORT_CHANNELS, refetch: refetchChannels } = useQuery({
     queryKey: ["system_settings", "support_channels"],
@@ -137,6 +178,39 @@ export default function Support() {
     }
   });
 
+  // Effective WhatsApp phone synchronized with Admin Master 'Rodapé' -> 'Telefone / Whats'
+  const effectiveWhatsAppNumber = useMemo(() => {
+    return footerConfig?.support_phone || footerConfig?.whatsapp_number || channelsConfig?.whatsapp_number || "(11) 99999-8888";
+  }, [footerConfig?.support_phone, footerConfig?.whatsapp_number, channelsConfig?.whatsapp_number]);
+
+  const cleanWhatsAppDigits = useMemo(() => {
+    const raw = effectiveWhatsAppNumber || "";
+    let digits = raw.replace(/\D/g, "");
+    if (!digits) return "5511999998888";
+    if (digits.length === 10 || digits.length === 11) {
+      digits = `55${digits}`;
+    }
+    return digits;
+  }, [effectiveWhatsAppNumber]);
+
+  const supportWhatsAppMessage = useMemo(() => {
+    const userName = user?.full_name || user?.email || "Usuário";
+    const userEmail = user?.email ? ` (${user.email})` : "";
+    const companyName = companyData?.name || companyData?.trading_name || companyData?.trade_name || companyData?.corporate_name || "Empresa vinculada";
+    const companyDoc = (companyData?.document_number || companyData?.cnpj) ? ` - CNPJ/Doc: ${companyData.document_number || companyData.cnpj}` : "";
+
+    return `Olá! Gostaria de solicitar suporte técnico no PowerControl ERP.
+
+*Usuário Solicitante:* ${userName}${userEmail}
+*Empresa Ativa:* ${companyName}${companyDoc}
+
+Preciso de auxílio técnico com a plataforma.`;
+  }, [user, companyData]);
+
+  const supportWhatsAppUrl = useMemo(() => {
+    return `https://wa.me/${cleanWhatsAppDigits}?text=${encodeURIComponent(supportWhatsAppMessage)}`;
+  }, [cleanWhatsAppDigits, supportWhatsAppMessage]);
+
   const [isEditChannelsOpen, setIsEditChannelsOpen] = useState(false);
   const [channelsForm, setChannelsForm] = useState<SupportChannelsConfig>(DEFAULT_SUPPORT_CHANNELS);
 
@@ -148,6 +222,17 @@ export default function Support() {
         updated_at: new Date().toISOString()
       }, { merge: true });
 
+      // Also keep system_settings/footer support_phone synchronized if updated
+      try {
+        const footerRef = doc(db, "system_settings", "footer");
+        await setDoc(footerRef, {
+          support_phone: updatedConfig.whatsapp_number,
+          updated_at: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Could not sync footer support_phone:", e);
+      }
+
       await api.log({
         action: 'UPDATE',
         entity: 'system_settings',
@@ -158,6 +243,7 @@ export default function Support() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["system_settings", "support_channels"] });
+      queryClient.invalidateQueries({ queryKey: ["system_settings", "footer"] });
       refetchChannels();
       setIsEditChannelsOpen(false);
       toast.success("Canais de atendimento salvos com sucesso!");
@@ -366,7 +452,8 @@ export default function Support() {
 
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             <a
-              href="https://wa.me/5511999999999?text=Olá,%20preciso%20de%20suporte%20no%20PowerControl%20ERP"
+              id="btn-support-header-whatsapp"
+              href={supportWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="px-5 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
@@ -505,17 +592,68 @@ export default function Support() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
-                  <Paperclip size={14} className="text-gray-400" /> Link da Captura de Tela ou Anexo (Opcional)
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Paperclip size={14} className="text-gray-400" /> Captura de Tela ou Anexo (Opcional)
+                  </span>
+                  {attachmentUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setAttachmentUrl("")}
+                      className="text-[11px] text-rose-500 hover:underline flex items-center gap-1 font-bold"
+                    >
+                      <X size={12} /> Remover Anexo
+                    </button>
+                  )}
                 </label>
-                <input 
-                  type="url"
-                  value={attachmentUrl}
-                  onChange={(e) => setAttachmentUrl(e.target.value)}
-                  placeholder="https://imgur.com/... ou URL da imagem do erro"
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                />
+
+                {attachmentUrl && attachmentUrl.startsWith("data:image") ? (
+                  <div className="relative p-2 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-3">
+                    <img 
+                      src={attachmentUrl} 
+                      alt="Preview Anexo" 
+                      className="w-14 h-14 object-cover rounded-lg border border-gray-200"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800 truncate">Imagem anexada para o chamado</p>
+                      <p className="text-[10px] text-emerald-600 font-semibold">Pronta para envio junto ao chamado</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <label className="flex-1 px-4 py-2.5 bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300 rounded-xl text-xs text-gray-600 font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                      <Upload size={14} className="text-gray-500" />
+                      <span>Selecionar Imagem / Print</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 2 * 1024 * 1024) {
+                              toast.error("A imagem deve ter no máximo 2MB.");
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setAttachmentUrl(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                    <input 
+                      type="url"
+                      value={attachmentUrl}
+                      onChange={(e) => setAttachmentUrl(e.target.value)}
+                      placeholder="Ou cole a URL do anexo..."
+                      className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
@@ -675,8 +813,13 @@ export default function Support() {
               </h3>
               {user?.role === "master" && (
                 <button
+                  id="btn-edit-support-channels"
                   onClick={() => {
-                    setChannelsForm(channelsConfig);
+                    setChannelsForm({
+                      ...channelsConfig,
+                      whatsapp_number: effectiveWhatsAppNumber,
+                      whatsapp_link: supportWhatsAppUrl
+                    });
                     setIsEditChannelsOpen(true);
                   }}
                   className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg border border-blue-200 transition-all flex items-center gap-1.5 cursor-pointer"
@@ -713,19 +856,18 @@ export default function Support() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-gray-900">{channelsConfig.whatsapp_title || "WhatsApp Comercial"}</p>
-                    <p className="text-[11px] text-gray-500">{channelsConfig.whatsapp_number}{channelsConfig.whatsapp_hours ? ` • ${channelsConfig.whatsapp_hours}` : ""}</p>
+                    <p className="text-[11px] text-gray-500">{effectiveWhatsAppNumber}{channelsConfig.whatsapp_hours ? ` • ${channelsConfig.whatsapp_hours}` : ""}</p>
                   </div>
                 </div>
-                {channelsConfig.whatsapp_link && (
-                  <a 
-                    href={channelsConfig.whatsapp_link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors"
-                  >
-                    Conversar
-                  </a>
-                )}
+                <a 
+                  id="btn-support-channel-whatsapp-conversar"
+                  href={supportWhatsAppUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                >
+                  Conversar
+                </a>
               </div>
 
               <div className="p-3.5 bg-purple-50/70 rounded-2xl border border-purple-100 flex items-center justify-between">
@@ -914,16 +1056,38 @@ export default function Support() {
                 <div className="bg-white p-4 rounded-2xl rounded-tl-sm text-xs sm:text-sm text-gray-800 max-w-[88%] border border-gray-200 shadow-xs whitespace-pre-wrap leading-relaxed">
                   {selectedTicket.message}
                   {selectedTicket.attachment && (
-                    <div className="mt-3 pt-2 border-t border-gray-100 flex items-center gap-2">
-                      <Paperclip size={14} className="text-blue-600" />
-                      <a 
-                        href={selectedTicket.attachment} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold text-blue-600 hover:underline"
-                      >
-                        Ver Anexo Enviado
-                      </a>
+                    <div className="mt-3 pt-2 border-t border-gray-100">
+                      {selectedTicket.attachment.startsWith("data:image") || selectedTicket.attachment.match(/\.(jpeg|jpg|gif|png|webp)($|\?)/i) ? (
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-bold text-gray-500 flex items-center gap-1">
+                            <ImageIcon size={12} className="text-blue-600" /> Captura de Tela / Imagem:
+                          </p>
+                          <a 
+                            href={selectedTicket.attachment} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block rounded-xl overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity max-w-sm"
+                          >
+                            <img 
+                              src={selectedTicket.attachment} 
+                              alt="Anexo do Chamado" 
+                              className="max-h-48 w-auto object-contain rounded-lg bg-gray-50"
+                            />
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Paperclip size={14} className="text-blue-600" />
+                          <a 
+                            href={selectedTicket.attachment} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs font-bold text-blue-600 hover:underline"
+                          >
+                            Ver Anexo Enviado
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

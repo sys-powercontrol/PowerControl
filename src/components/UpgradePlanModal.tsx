@@ -94,8 +94,11 @@ export default function UpgradePlanModal({
   });
 
   const handleRequestUpgrade = () => {
-    const rawPhone = footerConfig?.whatsapp_number || DEFAULT_FOOTER_CONFIG.whatsapp_number || "";
-    const cleanPhone = rawPhone.replace(/\D/g, "");
+    const rawPhone = footerConfig?.support_phone || footerConfig?.whatsapp_number || DEFAULT_FOOTER_CONFIG.whatsapp_number || "";
+    let cleanPhone = rawPhone.replace(/\D/g, "");
+    if (cleanPhone.length === 10 || cleanPhone.length === 11) {
+      cleanPhone = `55${cleanPhone}`;
+    }
 
     const companyName = companyData?.name || "Minha Empresa";
     const userRef = user?.full_name ? ` (Solicitante: ${user.full_name})` : "";

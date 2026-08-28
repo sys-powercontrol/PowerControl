@@ -29,6 +29,8 @@ export interface User {
   cpf?: string;
   address?: string;
   avatar?: string;
+  terms_accepted?: boolean;
+  terms_accepted_at?: FirebaseTimestamp;
   created_at: FirebaseTimestamp;
 }
 

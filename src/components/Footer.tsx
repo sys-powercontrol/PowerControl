@@ -23,6 +23,7 @@ import {
 import { Link } from "react-router-dom";
 import { useGlobalKeyboardShortcuts } from "../hooks/useGlobalKeyboardShortcuts";
 import { useAuth } from "../lib/auth";
+import { api } from "../lib/api";
 import { FooterConfig, FooterLink, DEFAULT_FOOTER_CONFIG } from "../types/footer";
 
 export type { FooterConfig, FooterLink };
@@ -31,6 +32,13 @@ export { DEFAULT_FOOTER_CONFIG };
 export default function Footer() {
   const { openModal } = useGlobalKeyboardShortcuts();
   const { user } = useAuth();
+
+  const activeCompanyId = api.getCompanyId() || user?.company_id;
+  const { data: companyData } = useQuery({
+    queryKey: ["company", activeCompanyId],
+    queryFn: () => api.get(`companies/${activeCompanyId}`),
+    enabled: !!activeCompanyId,
+  });
 
   const { data: footerConfig = DEFAULT_FOOTER_CONFIG } = useQuery({
     queryKey: ["system_settings", "footer"],
@@ -231,18 +239,35 @@ export default function Footer() {
               Canais Oficiais
             </h4>
             <div className="flex flex-wrap gap-2 pt-1">
-              {footerConfig.whatsapp_number && (
-                <a
-                  href={`https://wa.me/${footerConfig.whatsapp_number.replace(/\D/g, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-all border border-emerald-200 flex items-center gap-2 text-xs font-semibold"
-                  title="WhatsApp"
-                >
-                  <MessageCircle size={15} />
-                  <span>WhatsApp</span>
-                </a>
-              )}
+              {(() => {
+                const rawPhone = footerConfig.support_phone || footerConfig.whatsapp_number || "";
+                let digits = rawPhone.replace(/\D/g, "");
+                if (!digits) return null;
+                if (digits.length === 10 || digits.length === 11) {
+                  digits = `55${digits}`;
+                }
+                const userName = user?.full_name || user?.email || "Usuário";
+                const userEmail = user?.email ? ` (${user.email})` : "";
+                const companyName = companyData?.name || companyData?.trading_name || companyData?.trade_name || companyData?.corporate_name || "Minha Empresa";
+                const companyDoc = (companyData?.document_number || companyData?.cnpj) ? ` - CNPJ/Doc: ${companyData.document_number || companyData.cnpj}` : "";
+
+                const message = user ? `Olá! Gostaria de solicitar suporte técnico no PowerControl ERP.\n\n*Usuário Solicitante:* ${userName}${userEmail}\n*Empresa Ativa:* ${companyName}${companyDoc}\n\nPreciso de auxílio com o sistema.` : `Olá! Gostaria de mais informações sobre o PowerControl ERP.`;
+                const whatsappUrl = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+
+                return (
+                  <a
+                    id="btn-footer-whatsapp"
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-all border border-emerald-200 flex items-center gap-2 text-xs font-semibold"
+                    title="WhatsApp"
+                  >
+                    <MessageCircle size={15} />
+                    <span>WhatsApp</span>
+                  </a>
+                );
+              })()}
               {footerConfig.website_url && (
                 <a
                   href={footerConfig.website_url}

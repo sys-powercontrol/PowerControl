@@ -301,8 +301,20 @@ export default function AdminMaster() {
       const docRef = doc(db, "system_settings", "footer");
       await setDoc(docRef, {
         ...data,
+        whatsapp_number: data.whatsapp_number || data.support_phone,
         updated_at: new Date().toISOString()
       }, { merge: true });
+
+      // Also ensure support_channels stays in sync with support_phone
+      try {
+        const channelsRef = doc(db, "system_settings", "support_channels");
+        await setDoc(channelsRef, {
+          whatsapp_number: data.support_phone || data.whatsapp_number,
+          updated_at: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.warn("Could not sync support_channels document:", err);
+      }
 
       await api.log({
         action: 'UPDATE',
@@ -314,6 +326,7 @@ export default function AdminMaster() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["system_settings", "footer"] });
+      queryClient.invalidateQueries({ queryKey: ["system_settings", "support_channels"] });
       refetchFooterConfig();
       toast.success("Configurações do rodapé salvas com sucesso!");
     },

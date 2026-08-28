@@ -271,32 +271,59 @@ export default function Fiscal() {
 
   const cancelMutation = useMutation({
     mutationFn: async (invoice: any) => {
-      if (!company?.fiscal_token || !invoice.reference) {
-        // Fallback for simulated notes or missing config
-        return api.put("invoices", invoice.id, { status: "Cancelada" });
-      }
-
-      const fiscalConfig = {
-        token: company.fiscal_token,
-        environment: company.fiscal_environment || "sandbox",
-        provider: company.fiscal_provider || "FocusNFe"
-      };
-
       const reason = window.prompt("Motivo do cancelamento (mínimo 15 caracteres):", "Erro na digitação dos dados da venda");
       if (!reason || reason.length < 15) {
         throw new Error("O motivo do cancelamento deve ter pelo menos 15 caracteres.");
       }
 
-      const result = await fiscalApi.cancel(fiscalConfig as any, invoice.reference, reason);
-      
-      if (result.status === "sucesso" || result.status === "cancelado") {
-        return api.put("invoices", invoice.id, { status: "Cancelada" });
-      } else {
-        throw new Error(result.message || "Erro ao cancelar nota no provedor");
+      let cancelProtocol = null;
+      if (company?.fiscal_token && invoice.reference) {
+        const fiscalConfig = {
+          token: company.fiscal_token,
+          environment: company.fiscal_environment || "sandbox",
+          provider: company.fiscal_provider || "FocusNFe"
+        };
+        const result = await fiscalApi.cancel(fiscalConfig as any, invoice.reference, reason);
+        if (result.status === "sucesso" || result.status === "cancelado") {
+          cancelProtocol = (result as any).protocol || null;
+        } else {
+          throw new Error(result.message || "Erro ao cancelar nota no provedor fiscal");
+        }
       }
+
+      await api.put("invoices", invoice.id, { 
+        status: "Cancelada", 
+        cancel_reason: reason, 
+        cancel_protocol: cancelProtocol, 
+        cancelled_at: new Date().toISOString() 
+      });
+
+      if (invoice.sale_id) {
+        await api.put("sales", invoice.sale_id, { 
+          nfe_status: "Cancelada",
+          nfe_cancel_reason: reason,
+          nfe_cancel_protocol: cancelProtocol
+        });
+      }
+
+      await api.log({
+        action: 'UPDATE',
+        entity: 'invoices',
+        entity_id: invoice.id,
+        description: `Cancelamento de Nota Fiscal #${invoice.number || invoice.id}`,
+        metadata: {
+          invoice_id: invoice.id,
+          number: invoice.number,
+          access_key: invoice.access_key,
+          sale_id: invoice.sale_id,
+          reason,
+          protocol: cancelProtocol
+        }
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
       toast.success("Nota Fiscal cancelada com sucesso!");
     },
     onError: (error: any) => {
@@ -306,6 +333,10 @@ export default function Fiscal() {
 
   const emitMutation = useMutation({
     mutationFn: async (data: any) => {
+      if (certStatus?.isExpired) {
+        throw new Error("O Certificado Digital A1 está expirado. Atualize o arquivo do certificado antes de emitir novas notas fiscais.");
+      }
+
       const sale = sales.find((s: any) => s.id === data.sale_id);
       if (!sale) throw new Error("Venda não encontrada");
 
@@ -330,23 +361,38 @@ export default function Fiscal() {
         company
       });
 
-      return api.post("invoices", {
+      const invoiceNumber = result.protocol ? parseInt(result.protocol.slice(-6)) : Math.floor(Math.random() * 90000);
+      const isEmitted = result.status === "autorizado" || result.status === "sucesso";
+
+      const createdInvoice = await api.post("invoices", {
         ...data,
         company_id: currentCompanyId,
-        number: result.protocol ? parseInt(result.protocol.slice(-6)) : Math.floor(Math.random() * 90000),
+        number: invoiceNumber,
         series: "001",
         client_name: sale.client_name,
         client_document: sale.client_document || "Consumidor Final",
         total: sale.total,
-        status: result.status === "processando" ? "Pendente" : "Emitida",
+        status: isEmitted ? "Emitida" : "Pendente",
         emission_date: new Date().toISOString(),
         reference: result.reference,
         protocol: result.protocol,
         access_key: result.access_key
       });
+
+      if (isEmitted && sale.id) {
+        await api.put("sales", sale.id, {
+          nfe_status: "Emitida",
+          nfe_number: invoiceNumber,
+          nfe_access_key: result.access_key,
+          nfe_protocol: result.protocol
+        });
+      }
+
+      return createdInvoice;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
       toast.success("Nota Fiscal enviada para processamento!");
       setIsModalOpen(false);
     },
@@ -385,10 +431,25 @@ export default function Fiscal() {
             console.error("Failed to persist XML:", e);
           }
         }
+
+        if (invoice.sale_id) {
+          await api.put("sales", invoice.sale_id, {
+            nfe_status: "Emitida",
+            nfe_access_key: result.access_key || invoice.access_key,
+            nfe_number: invoice.number
+          });
+        }
       }
       
       if (result.status === "erro_autorizacao") newStatus = "Erro";
-      if (result.status === "cancelado") newStatus = "Cancelada";
+      if (result.status === "cancelado") {
+        newStatus = "Cancelada";
+        if (invoice.sale_id) {
+          await api.put("sales", invoice.sale_id, {
+            nfe_status: "Cancelada"
+          });
+        }
+      }
 
       return api.put("invoices", invoice.id, {
         status: newStatus,
@@ -402,6 +463,7 @@ export default function Fiscal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
       toast.success("Status da nota atualizado!");
     },
     onError: (error: any) => {

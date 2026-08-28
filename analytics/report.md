@@ -1,111 +1,86 @@
-# Relatório de Diagnóstico e Finalizações do Sistema
-**Data e Hora de Geração:** 27/08/2026 às 11:10:45 (Horário de Brasília - UTC-3)  
-**Diretriz Estrita:** Análise diagnóstica exclusivamente das implementações existentes que demandam finalização, alinhamento ou estabilização. Proibida a inclusão ou criação de novas ferramentas, novas telas ou arquiteturas adicionais não existentes.
+# Relatório de Análise Geral do Sistema - Implementações Pendentes de Finalização
+
+**Data e Hora de Geração:** 28 de Agosto de 2026 às 15:36:44 (Horário de Brasília - UTC-3)  
+**Status do Projeto:** Análise Concluída - Escopo Estrito de Finalização (Sem Implementação de Novas Funcionalidades)
 
 ---
 
-## 1. Sumário Executivo
+## 1. Visão Geral Executiva
 
-O sistema **PowerControl ERP** apresenta uma arquitetura robusta e completa para gestão empresarial integrada, incluindo:
-* **Estoque e Armazenagem Física:** Cadastro multinível de localização (Sala, Armário/Estante, Prateleira), Kardex e Mapa Visual de Estoque.
-* **Vendas e PDV:** Frente de caixa com suporte a múltiplos métodos de pagamento (inclusive pagamento misto/split), controle de expedição e emissão de comprovantes/orçamentos.
-* **Emissão de Etiquetas:** Geração de layouts térmicos (80x40) e folhas A4 (Pimenta 6180, Avery 5160) com código de barras e QR Code.
-* **Compras e XML:** Importação automatizada de NF-e via XML com leitura de itens e duplicatas financeiras.
-* **Financeiro e Caixa:** Contas a Pagar/Receber, conciliação de extratos bancários OFX e abertura/fechamento com auditoria de turnos de operadores de caixa.
-* **Fiscal e Certificados:** Emissão de NF-e/NFC-e, gestão de certificado digital A1, controle de inutilização de numeração e contingência.
-* **Operação Offline e PWA:** Armazenamento local no IndexedDB com fila de sincronização em segundo plano.
+Este relatório apresenta o diagnóstico técnico estruturado de todas as **rotinas, integrações, regras de negócio e fluxos operacionais já existentes no sistema PowerControl ERP que requerem finalização, amarração de ponta a ponta e garantia de integridade transacional**.
 
-O objetivo deste relatório é registrar todas as amarrações pontuais, validações de consistência e detalhes de UX/integração que concluem o ciclo de vida de cada um dos módulos existentes, sem implementar novos módulos.
+Seguindo estritamente a diretriz do projeto, **nenhuma nova funcionalidade ou módulo fora do escopo original foi adicionado**. O foco exclusivo é fechar ciclos pendentes, assegurar a consistência dos dados nas operações atômicas (Firestore transactions / batch writes) e garantir que os componentes já desenhados na interface cumpram seus comportamentos de ponta a ponta.
 
 ---
 
-## 2. Diagnóstico Detalhado por Módulo
+## 2. Diagnóstico Detalhado por Módulo do Sistema
+
+### 2.1. Módulo Fiscal e Documentos Eletrônicos (NFe / NFCe)
+* **Arquivos do Módulo:** `src/pages/Fiscal.tsx`, `src/pages/TaxSettings.tsx`, `src/pages/CertificateManager.tsx`, `src/components/Fiscal/*`, `src/lib/fiscal.ts`
+* **Status Atual:** Telas de emissão, listagem de notas, visualização de DANFE e painel de regras tributárias implementados na interface.
+* **Pontos de Finalização Pendentes:**
+  1. **Sincronização de Cancelamento e Inutilização com a Venda:** Assegurar que, ao receber o protocolo de cancelamento/inutilização da SEFAZ, o status seja atualizado tanto na coleção `invoices` (`Cancelada` / `Inutilizada`) quanto no documento da venda de origem em `sales` (`nfe_status = 'Cancelada'`), incluindo protocolo e justificativa da SEFAZ.
+  2. **Tratamento de Exportação de XMLs em Lote:** Tratar fallback nas rotinas de download de XMLs em lote (`.zip`) caso alguma nota da lista não possua o XML gravado no cache local, buscando o payload na API fiscal.
+  3. **Validação Preventiva de Certificado Digital A1:** Bloquear tentativas de transmissão quando o certificado A1 da empresa estiver ausente ou com data de validade expirada, disparando aviso contextual ao operador.
+  4. **Herança Dinâmica de Tributação por Item:** Assegurar a injeção dos tributos (ICMS, IPI, PIS, COFINS, CFOP, NCM e CST/CSOSN) configurados nas regras fiscais para os itens enviados na NFe.
 
 ---
 
-### 2.1. Módulo de Produtos, Estoque e Armazenagem Física
-* **Arquivos do Módulo:** `src/pages/Products.tsx`, `src/pages/InventoryAdjustments.tsx`, `src/pages/InventoryHistory.tsx`, `src/components/Inventory/StockMapPowerBI.tsx`
-* **Situação Atual:**
-  * Estrutura de endereçamento físico (`storage_room`, `storage_rack`, `storage_shelf` e `storage_location`) consolidada no cadastro e modal de detalhes.
-  * Mapa de estoque e relatórios de giro implementados.
-* **Pontos de Finalização Existentes:**
-  1. **Busca e Filtro em Produtos (`Products.tsx`):** A busca unificada por texto deve cobrir tanto nome/SKU/código de barras quanto todos os campos de localização física (`storage_location`, `storage_room`, `storage_rack`, `storage_shelf`), além de permitir filtrar por "Com Localização" ou "Sem Localização" e ordenar alfabeticamente por endereço físico nas visualizações em grade e tabela.
-  2. **Conferência Física nos Ajustes (`InventoryAdjustments.tsx`):** Ao selecionar um item para ajuste manual ou transferência, disponibilizar o card de conferência física com a localização do produto. Ao acionar o atalho a partir do mapa visual (`StockMapPowerBI.tsx`), transicionar diretamente com o item pré-carregado.
-  3. **Kardex e Rastreabilidade (`InventoryHistory.tsx`):** As tabelas de movimentações e os relatórios exportados (PDF/Excel) devem exibir a coluna de endereço físico do item.
+### 2.2. Módulo Financeiro, Fluxo de Caixa e Conciliação Bancária
+* **Arquivos do Módulo:** `src/pages/AccountsReceivable.tsx`, `src/pages/AccountsPayable.tsx`, `src/pages/BankReconciliation.tsx`, `src/pages/Cashiers.tsx`, `src/components/Financial/OFXImporter.tsx`, `src/lib/finance.ts`
+* **Status Atual:** Telas de Contas a Receber/Pagar, controle de sessões de caixa (PDV), extrato bancário e importação de arquivos OFX funcionais.
+* **Pontos de Finalização Pendentes:**
+  1. **Estorno Transacional Atômico de Títulos Baixados:** Ao estornar uma conta a receber ou a pagar já liquidada, reverter atomicamente o saldo da conta bancária (`bank_accounts`) e os totais da sessão de caixa (`cashiers`), registrando a movimentação no extrato.
+  2. **Bloqueio de Exclusão Direta de Títulos Liquidados:** Exigir formalmente o estorno prévio antes de permitir a exclusão de qualquer título com status `pago` / `recebido`.
+  3. **Identificador Unívoco (`fitid`) na Conciliação OFX:** Persistir a chave unívoca de cada transação do extrato OFX para impedir importações e conciliações duplicadas no mesmo período bancário.
 
 ---
 
-### 2.2. Módulo de Vendas, Checkout e PDV
-* **Arquivos do Módulo:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/lib/utils/print.ts`, `src/pages/CommissionPayouts.tsx`
-* **Situação Atual:**
-  * Frente de caixa ágil com catálogo, carrinho, seleção de cliente/vendedor e suporte a pagamento misto (Split).
-  * Impressão de cupom térmico e orçamentos em formato A4.
-* **Pontos de Finalização Existentes:**
-  1. **Picking e Separação no PDV (`Sales.tsx` e `print.ts`):** Exibição da identificação de localização física nos itens do carrinho e na emissão impressa do Orçamento A4 (`printA4Quote`), auxiliando a expedição no momento da separação.
-  2. **Liquidação Multimeios (Split):** Garantir a baixa correta das frações de pagamento misto, roteando dinheiro para o caixa ativo e cartões/PIX para a conta bancária selecionada.
-  3. **Estorno de Comissões (`SalesHistory.tsx`):** Ao realizar o cancelamento de uma venda no histórico, cancelar ou estornar automaticamente as comissões pendentes do vendedor correspondente.
+### 2.3. Módulo de Estoque, Movimentações e Fichas Técnicas (BOM)
+* **Arquivos do Módulo:** `src/pages/Products.tsx`, `src/pages/Transfers.tsx`, `src/pages/InventoryAdjustments.tsx`, `src/pages/InventoryHistory.tsx`, `src/components/BOMBuilder.tsx`, `src/lib/inventory.ts`
+* **Status Atual:** Cadastro de produtos com variações, montagem de fichas técnicas (BOM), transferências entre estoques e histórico de movimentações.
+* **Pontos de Finalização Pendentes:**
+  1. **Baixa e Estorno Automático de Insumos da BOM:** Ao confirmar a venda de um produto composto, deduzir automaticamente as quantidades proporcionais de cada insumo (`bom_items`) e, no cancelamento da venda, recompor o saldo desses insumos no estoque.
+  2. **Atomicidade em Transferências entre Filiais/Locais:** Garantir que a saída da origem e a entrada no destino ocorram em operação atômica indivisível, criando as respectivas entradas em `inventory_movements`.
+  3. **Controle de Bloqueio de Estoque Negativo:** Respeitar rigidamente a configuração `allow_negative_stock` da empresa no momento da emissão da venda e transferência.
 
 ---
 
-### 2.3. Módulo de Impressão de Etiquetas
-* **Arquivos do Módulo:** `src/components/LabelPrinter.tsx`
-* **Situação Atual:**
-  * Gerador de etiquetas em PDF com múltiplos padrões de layout (Pimenta 6180, Avery 5160 e Térmica 80x40).
-* **Pontos de Finalização Existentes:**
-  1. **Endereço Físico nas Etiquetas:** Opção configurável para incluir o código de localização (`storage_location`) no corpo das etiquetas impressas.
-  2. **Ordenação por Corredor/Estante:** Ordenação da lista de etiquetas selecionadas de acordo com a sequência física de armazenagem antes da renderização do PDF.
+### 2.4. Módulo de Vendas, PDV e Gateway de Pagamento
+* **Arquivos do Módulo:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/components/Sales/PaymentGateway.tsx`, `src/serverApp.ts`, `src/lib/offlineStore.ts`
+* **Status Atual:** Frente de caixa (PDV) com busca rápida, histórico de vendas, modal de pagamento PIX/Cartão e fila de contingência offline.
+* **Pontos de Finalização Pendentes:**
+  1. **Polling e Conclusão Automática de Pagamento PIX:** Finalizar e imprimir o comprovante/cupom no PDV imediatamente após a confirmação via webhook ou polling da transação PIX.
+  2. **Cancelamento Integral de Venda no Histórico:** Reverter em lote: devolução dos itens ao estoque (inclusive itens compostos), estorno dos títulos no Contas a Receber e anulação das comissões do vendedor.
+  3. **Limpeza e Confirmação da Fila Offline:** expurgar da base local IndexedDB/localStorage os pedidos offline sincronizados com sucesso com o Firestore para evitar reprocessamento.
 
 ---
 
-### 2.4. Módulo de Compras e Importação de XML NF-e
-* **Arquivos do Módulo:** `src/pages/Purchases.tsx`, `src/components/Purchases/NFeXMLImporter.tsx`, `src/pages/AccountsPayable.tsx`
-* **Situação Atual:**
-  * Importador de XML realiza o parse completo de dados de cabeçalho, fornecedor, itens e duplicatas.
-* **Pontos de Finalização Existentes:**
-  1. **Vínculo e Atribuição de Endereço:** Preservar a localização física cadastrada de produtos já existentes e permitir definir o endereço de estoque inicial de produtos novos criados a partir do XML.
-  2. **Geração Automática do Contas a Pagar:** Conectar a leitura das duplicatas (`<dup>`) da NF-e para gerar os lançamentos financeiros no `AccountsPayable.tsx` com as respectivas datas de vencimento e valores.
+### 2.5. Gestão de Usuários, Empresas e Restrições de Planos
+* **Arquivos do Módulo:** `src/pages/Employees.tsx`, `src/pages/Products.tsx`, `src/components/ProductDetailsModal.tsx`, `src/components/UpgradePlanModal.tsx`
+* **Status Atual:** Cadastro de colaboradores, gestão multiempresa e modal de upgrade para planos superiores.
+* **Pontos de Finalização Pendentes:**
+  1. **Desvinculação Segura de Usuário/Empresa:** Ao desativar ou desvincular um funcionário, atualizar atomicamente o array `company_ids` do usuário em `users` e o registro em `employees`.
+  2. **Bloqueio e Chamada do Modal de Upgrade (`disable_product_images`):** Garantir que planos sem suporte a fotos de produtos exibam o `UpgradePlanModal` com sobreposição adequada (`z-[999999]`) tanto no formulário quanto nos modais de visualização.
 
 ---
 
-### 2.5. Módulo Financeiro, Caixa e Conciliação Bancária
-* **Arquivos do Módulo:** `src/pages/BankReconciliation.tsx`, `src/pages/Cashiers.tsx`, `src/components/Financial/OFXImporter.tsx`
-* **Situação Atual:**
-  * Módulo financeiro com gestão de contas a pagar/receber, caixas de operadores e extratos bancários com leitor OFX.
-* **Pontos de Finalização Existentes:**
-  1. **Conciliação Inteligente OFX (`OFXImporter.tsx`):** Cruzamento automático de lançamentos bancários com títulos a pagar e a receber com valores e datas coincidentes, permitindo conciliação e baixa em 1 clique.
-  2. **Auditoria de Fechamento de Caixa (`Cashiers.tsx`):** Comparação entre o saldo esperado em sistema e o valor físico informado pelo operador na contagem de fechamento, registrando eventuais sobras ou faltas com notas explicativas de auditoria.
+### 2.6. Atendimento, Suporte e Auditoria Operacional
+* **Arquivos do Módulo:** `src/pages/Support.tsx`, `src/pages/AuditLogs.tsx`
+* **Status Atual:** Central de chamados com múltiplos canais e tela de visualização de logs de auditoria.
+* **Pontos de Finalização Pendentes:**
+  1. **Upload e Visualização de Anexos em Chamados:** Permitir inclusão de imagens nos tickets de suporte com visualização em modal/lightbox.
+  2. **Cobertura Completa de Logs Sensíveis (`audit_logs`):** Disparar logs estruturados para cancelamentos fiscais, estornos financeiros e exclusões de cadastros centrais.
 
 ---
 
-### 2.6. Módulo Fiscal e Certificados Digitais
-* **Arquivos do Módulo:** `src/pages/Fiscal.tsx`, `src/pages/CertificateManager.tsx`, `src/components/Fiscal/InutilizacaoModal.tsx`
-* **Situação Atual:**
-  * Emissão, cancelamento e monitoramento de notas fiscais (NF-e/NFC-e), envio de XMLs e gestão do Certificado A1.
-* **Pontos de Finalização Existentes:**
-  1. **Alerta de Validade de Certificado:** Exibição de banner proativo de aviso quando a validade do certificado digital estiver com menos de 30 dias de expiração ou expirado.
-  2. **Inutilização de Numeração SEFAZ (`InutilizacaoModal.tsx`):** Validação de justificativa com no mínimo 15 caracteres (exigência técnica da SEFAZ) e persistência do histórico de homologação.
-  3. **Reenvio de Documentos Fiscais:** Acionamento do reenvio de DANFE/XML por e-mail diretamente a partir da lista de notas fiscais autorizadas.
+## 3. Matriz de Priorização de Finalizações
 
----
-
-### 2.7. Sincronização Offline e PWA
-* **Arquivos do Módulo:** `src/lib/offlineStore.ts`, `src/components/OfflineSyncStatusBar.tsx`, `src/sw.ts`
-* **Situação Atual:**
-  * Estrutura de IndexedDB para contingência offline de vendas, clientes e movimentações de estoque.
-* **Pontos de Finalização Existentes:**
-  1. **Drenagem Resiliente da Fila Offline:** Processamento ordenado da fila de operações com tratamento de falhas, retries e atualização de estoque/financeiro ao reestabelecer conexão.
-  2. **Monitoramento em Tempo Real:** Atualização dinâmica da barra de status (`OfflineSyncStatusBar.tsx`) refletindo a quantidade de transações pendentes de sincronização.
-
----
-
-## 3. Matriz de Prioridade para Finalização
-
-| Prioridade | Módulo | Itens a Finalizar | Complexidade |
-| :--- | :--- | :--- | :--- |
-| **Alta** | Vendas & PDV | Picking no Cupom/Orçamento A4, Liquidação Split e Estorno de Comissões | Baixa |
-| **Alta** | Compras & XML | Vínculo de Endereço Físico e Geração de Contas a Pagar via Duplicatas XML | Média |
-| **Média** | Financeiro & Caixa | Conciliação Inteligente OFX e Auditoria de Fechamento de Caixa | Média |
-| **Média** | Estoque & Produtos | Busca unificada por endereço físico, card de conferência no ajuste e Kardex | Baixa |
-| **Média** | Fiscal & Certificados | Alerta de expiração do A1, validação de justificativa na inutilização e reenvio de DANFE/XML | Baixa |
-| **Baixa** | Etiquetas & Picking | Inclusão de endereço físico na etiqueta e ordenação por corredor | Baixa |
-| **Baixa** | Offline & PWA | Drenagem resiliente da fila offline e barra de status reativa | Média |
+| Identificador | Módulo | Escopo de Finalização | Criticidade |
+| :--- | :--- | :--- | :---: |
+| **ISSUE-01** | Fiscal & NFe | Cancelamento síncrono com venda, regras tributárias dinâmicas e validação A1 | Alta |
+| **ISSUE-02** | Financeiro | Estorno atômico de baixas, trava de exclusão de títulos e unicidade OFX | Alta |
+| **ISSUE-03** | Estoque & BOM | Baixa de insumos compostos, atomicidade em transferências e trava de saldo | Alta |
+| **ISSUE-04** | Vendas & PDV | Polling de pagamento PIX, cancelamento em cascata e limpeza da fila offline | Alta |
+| **ISSUE-05** | Usuários & Planos | Desvinculação atômica multiempresa e modal de upgrade para recursos restritos | Média |
+| **ISSUE-06** | Suporte & Logs | Anexos com lightbox em tickets e cobertura de auditoria em ações críticas | Média |

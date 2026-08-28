@@ -37,6 +37,7 @@ import BOMBuilder from "../components/BOMBuilder";
 import LabelPrinter from "../components/LabelPrinter";
 import ExportButton from "../components/ExportButton";
 import ProductDetailsModal from "../components/ProductDetailsModal";
+import UpgradePlanModal from "../components/UpgradePlanModal";
 
 interface ProductsProps {
   defaultTab?: string;
@@ -98,6 +99,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [editingBrand, setEditingBrand] = useState<any>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [confirmModal, setConfirmModal] = useState<{
@@ -113,7 +115,11 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
   });
 
   const currentCompanyId = api.getCompanyId();
-  const canManage = hasPermission('products.manage');
+  const userRole = (user?.role || "").toLowerCase();
+  const userEmail = (user?.email || "").toLowerCase();
+  const isAdminOrMaster = userRole === "admin" || userRole === "master" || userEmail === "sys.powercontrol@gmail.com";
+  const canManage = isAdminOrMaster || hasPermission('products.manage');
+  const canDelete = isAdminOrMaster || hasPermission('products.manage');
 
   const { data: productsData = [], isLoading: isLoadingProducts } = useQuery({ 
     queryKey: ["products", currentCompanyId], 
@@ -364,12 +370,45 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
       });
       return result;
     },
+    onMutate: async ({ entity, id }: { entity: string, id: string }) => {
+      await queryClient.cancelQueries({ queryKey: [entity] });
+      queryClient.setQueriesData({ queryKey: [entity] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.filter((item: any) => item?.id !== id);
+        }
+        return old;
+      });
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [variables.entity] });
       queryClient.invalidateQueries({ queryKey: ["audit_logs"] });
-      toast.success("Excluído com sucesso!");
+      toast.success(variables.entity === "products" ? "Produto excluído com sucesso do banco de dados!" : "Excluído com sucesso!");
+    },
+    onError: (err: any, variables) => {
+      toast.error(`Erro ao excluir: ${err?.message || "Falha na comunicação com o banco de dados"}`);
+      queryClient.invalidateQueries({ queryKey: [variables.entity] });
     }
   });
+
+  const handleDeleteProduct = (p: any) => {
+    if (!canDelete) {
+      toast.error("Apenas administradores ou usuários autorizados podem excluir produtos.");
+      return;
+    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir Produto",
+      message: `Deseja realmente excluir o produto "${p.name}"? Esta ação removerá o registro imediatamente do banco de dados e não pode ser desfeita.`,
+      onConfirm: () => {
+        deleteMutation.mutate({ entity: "products", id: p.id });
+        if (viewingProduct?.id === p.id) {
+          setViewingProduct(null);
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -940,24 +979,16 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                                     <Edit2 size={15} />
                                   </button>
 
-                                  <button
-                                    id={`btn-delete-product-row-${p.id}`}
-                                    onClick={() => {
-                                      setConfirmModal({
-                                        isOpen: true,
-                                        title: "Excluir Produto",
-                                        message: "Deseja realmente excluir este produto? Esta ação não pode ser desfeita.",
-                                        onConfirm: () => {
-                                          deleteMutation.mutate({ entity: "products", id: p.id });
-                                          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                                        }
-                                      });
-                                    }}
-                                    title="Excluir Produto"
-                                    className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-2xs border border-red-100/60"
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
+                                  {canDelete && (
+                                    <button
+                                      id={`btn-delete-product-row-${p.id}`}
+                                      onClick={() => handleDeleteProduct(p)}
+                                      title="Excluir Produto"
+                                      className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl transition-all cursor-pointer shadow-2xs border border-red-100/60"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -1011,24 +1042,16 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button 
-                          id={`btn-delete-product-${p.id}`}
-                          onClick={() => {
-                            setConfirmModal({
-                              isOpen: true,
-                              title: "Excluir Produto",
-                              message: "Deseja realmente excluir este produto? Esta ação não pode ser desfeita.",
-                              onConfirm: () => {
-                                deleteMutation.mutate({ entity: "products", id: p.id });
-                                setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                              }
-                            });
-                          }}
-                          title="Excluir Produto"
-                          className="p-2 bg-white/95 hover:bg-red-600 text-red-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {canDelete && (
+                          <button 
+                            id={`btn-delete-product-${p.id}`}
+                            onClick={() => handleDeleteProduct(p)}
+                            title="Excluir Produto"
+                            className="p-2 bg-white/95 hover:bg-red-600 text-red-600 hover:text-white border border-gray-200/90 rounded-xl shadow-md transition-all cursor-pointer"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -1204,7 +1227,7 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 overscroll-contain">
-              {!disableProductImages && (
+              {!disableProductImages ? (
                 <div className="flex flex-col items-center mb-6">
                   <div className="relative group">
                     <div className="w-32 h-32 bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-50 flex items-center justify-center">
@@ -1224,12 +1247,32 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
                     <button 
                       type="button" 
                       onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-2 -right-2 p-2 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-colors"
+                      className="absolute -bottom-2 -right-2 p-2 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-colors cursor-pointer"
                     >
                       <Plus size={16} />
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 mt-3">Tamanho máximo: 500KB</p>
+                </div>
+              ) : (
+                <div className="mb-6 p-4 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                      <ImageIcon size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-amber-900">Fotos de produtos desabilitadas</p>
+                      <p className="text-[11px] text-amber-700">Faça upgrade do plano para anexar imagens e catálogo visual aos seus itens.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Zap size={13} />
+                    <span>Habilitar Fotos</span>
+                  </button>
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1669,6 +1712,8 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
         product={viewingProduct}
         onClose={() => setViewingProduct(null)}
         canEdit={canManage}
+        canDelete={canDelete}
+        onDelete={(p) => handleDeleteProduct(p)}
         disableProductImages={disableProductImages}
         onEdit={(p) => {
           setEditingProduct(p); 
@@ -1680,6 +1725,13 @@ export default function Products({ defaultTab = "Produtos" }: ProductsProps) {
           setStorageLocation(p.storage_location || p.storage_code || "");
           setIsModalOpen(true);
         }}
+      />
+
+      <UpgradePlanModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Upgrade de Plano Necessário"
+        subtitle="Habilitar Inclusão de Fotos em Produtos e Catálogo Visual"
       />
     </div>
   );

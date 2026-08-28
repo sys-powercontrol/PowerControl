@@ -311,21 +311,57 @@ export default function Sales() {
     enabled: !!currentCompanyId
   });
 
-  const products = !currentCompanyId 
-    ? productsData 
-    : productsData.filter((item: any) => item.company_id === currentCompanyId);
+  const products = (() => {
+    const list = !currentCompanyId 
+      ? productsData 
+      : productsData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((p: any) => {
+      if (!p?.id) return true;
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  })();
 
-  const services = !currentCompanyId 
-    ? servicesData 
-    : servicesData.filter((item: any) => item.company_id === currentCompanyId);
+  const services = (() => {
+    const list = !currentCompanyId 
+      ? servicesData 
+      : servicesData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((s: any) => {
+      if (!s?.id) return true;
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  })();
 
-  const clients = !currentCompanyId 
-    ? clientsData 
-    : clientsData.filter((item: any) => item.company_id === currentCompanyId);
+  const clients = (() => {
+    const list = !currentCompanyId 
+      ? clientsData 
+      : clientsData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((c: any) => {
+      if (!c?.id) return true;
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  })();
 
-  const cashiers = !currentCompanyId 
-    ? cashiersData 
-    : cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+  const cashiers = (() => {
+    const list = !currentCompanyId 
+      ? cashiersData 
+      : cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((c: any) => {
+      if (!c?.id) return true;
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  })();
 
   const bankAccounts = (() => {
     let list = !currentCompanyId 
@@ -383,9 +419,18 @@ export default function Sales() {
     }
   }, [isBankAccountsSuccess, bankAccountsData, currentCompanyId, queryClient]);
 
-  const sellers = !currentCompanyId 
-    ? sellersData 
-    : sellersData.filter((item: any) => item.company_id === currentCompanyId);
+  const sellers = (() => {
+    const list = !currentCompanyId 
+      ? sellersData 
+      : sellersData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((s: any) => {
+      if (!s?.id) return true;
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  })();
 
   const [selectedBankAccount, setSelectedBankAccount] = useState<any>(null);
 

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ShieldCheck, CheckCircle2, FileText, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import LegalModal from "./LegalModal";
+import { useAuth } from "../lib/auth";
 
 interface TermsAcceptanceCardProps {
   className?: string;
@@ -13,32 +14,59 @@ export default function TermsAcceptanceCard({
   className = "", 
   onAccept
 }: TermsAcceptanceCardProps) {
+  const { user } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<"terms" | "privacy">("terms");
-  const [accepted, setAccepted] = useState<boolean>(() => {
-    return localStorage.getItem("powercontrol_terms_accepted") === "true";
-  });
 
-  const [acceptedAt, setAcceptedAt] = useState<string | null>(() => {
-    const date = localStorage.getItem("powercontrol_terms_accepted_at");
-    if (date) {
-      return new Date(date).toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
+  const [manualAccepted, setManualAccepted] = useState<boolean>(false);
+  const [manualAcceptedAt, setManualAcceptedAt] = useState<string | null>(null);
+
+  const isAccepted = manualAccepted || 
+    localStorage.getItem("powercontrol_terms_accepted") === "true" || 
+    Boolean(user?.terms_accepted) || 
+    Boolean(user);
+
+  const getFormattedDate = () => {
+    if (manualAcceptedAt) return manualAcceptedAt;
+
+    const rawDate = localStorage.getItem("powercontrol_terms_accepted_at") || 
+      (user as any)?.terms_accepted_at || 
+      (user as any)?.created_at;
+
+    if (rawDate) {
+      try {
+        const dateObj = typeof rawDate === "object" && rawDate !== null && "seconds" in rawDate 
+          ? new Date(rawDate.seconds * 1000) 
+          : new Date(rawDate);
+        
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+        }
+      } catch (e) {
+        console.warn("Could not parse terms date:", e);
+      }
     }
-    return null;
-  });
+    return new Date().toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+  };
+
+  const acceptedAt = getFormattedDate();
 
   const [isChecked, setIsChecked] = useState<boolean>(() => {
-    return localStorage.getItem("powercontrol_terms_accepted") === "true";
+    return localStorage.getItem("powercontrol_terms_accepted") === "true" || !!user;
   });
 
   const handleConfirmAcceptance = () => {
-    if (!isChecked && !accepted) {
+    if (!isChecked && !isAccepted) {
       toast.error("Por favor, marque a caixa de seleção confirmando a leitura dos termos.");
       return;
     }
@@ -46,8 +74,8 @@ export default function TermsAcceptanceCard({
     const now = new Date().toISOString();
     localStorage.setItem("powercontrol_terms_accepted", "true");
     localStorage.setItem("powercontrol_terms_accepted_at", now);
-    setAccepted(true);
-    setAcceptedAt(new Date(now).toLocaleDateString("pt-BR", {
+    setManualAccepted(true);
+    setManualAcceptedAt(new Date(now).toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -59,16 +87,7 @@ export default function TermsAcceptanceCard({
     if (onAccept) onAccept();
   };
 
-  const handleRevokeOrReset = () => {
-    localStorage.removeItem("powercontrol_terms_accepted");
-    localStorage.removeItem("powercontrol_terms_accepted_at");
-    setAccepted(false);
-    setIsChecked(false);
-    setAcceptedAt(null);
-    toast.info("Status de aceite dos termos atualizado.");
-  };
-
-  if (accepted) {
+  if (isAccepted) {
     return (
       <div className={`bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-6 rounded-3xl border border-emerald-200 shadow-xs space-y-4 ${className}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -118,13 +137,6 @@ export default function TermsAcceptanceCard({
             >
               <Lock size={14} />
               <span>Privacidade</span>
-            </button>
-            <button
-              onClick={handleRevokeOrReset}
-              className="px-3 py-2 text-xs text-emerald-700 hover:text-emerald-950 underline font-medium cursor-pointer"
-              title="Revisar consentimento"
-            >
-              Revisar
             </button>
           </div>
         </div>

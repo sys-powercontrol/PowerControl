@@ -76,22 +76,34 @@ export default function Purchases() {
   });
 
   const products = useMemo(() => {
-    if (!currentCompanyId) return productsData;
-    return productsData.filter((item: any) => item.company_id === currentCompanyId);
+    const list = !currentCompanyId ? productsData : productsData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((p: any) => {
+      if (!p?.id) return true;
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
   }, [productsData, currentCompanyId]);
 
   const suppliers = useMemo(() => {
-    if (!currentCompanyId) return suppliersData;
-    return suppliersData.filter((item: any) => item.company_id === currentCompanyId);
+    const list = !currentCompanyId ? suppliersData : suppliersData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((s: any) => {
+      if (!s?.id) return true;
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
   }, [suppliersData, currentCompanyId]);
 
   const bankAccounts = useMemo(() => {
     let list = !currentCompanyId ? bankAccountsData : bankAccountsData.filter((item: any) => item.company_id === currentCompanyId);
 
-    // Deduplicate the list by name, bank name and account number
+    // Deduplicate the list by ID and composite key
     const seen = new Set();
     list = list.filter((a: any) => {
-      const key = `${a?.name || ''}-${a?.bank_name || ''}-${a?.account_number || ''}`.toLowerCase().trim();
+      const key = a?.id ? `id-${a.id}` : `${a?.name || ''}-${a?.bank_name || ''}-${a?.account_number || ''}`.toLowerCase().trim();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -101,8 +113,14 @@ export default function Purchases() {
   }, [bankAccountsData, currentCompanyId]);
 
   const cashiers = useMemo(() => {
-    if (!currentCompanyId) return cashiersData;
-    return cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+    const list = !currentCompanyId ? cashiersData : cashiersData.filter((item: any) => item.company_id === currentCompanyId);
+    const seen = new Set();
+    return list.filter((c: any) => {
+      if (!c?.id) return true;
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
   }, [cashiersData, currentCompanyId]);
 
   const filteredProducts = useMemo(() => {
@@ -339,8 +357,8 @@ if (!canManage) {
             value={selectedSupplier?.id || ""}
           >
             <option value="">Selecione um fornecedor...</option>
-            {suppliers.map((s: any) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+            {suppliers.map((s: any, idx: number) => (
+              <option key={s.id || `supp-${idx}`} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>
@@ -360,11 +378,11 @@ if (!canManage) {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2">
-            {filteredProducts.map((p: any) => {
+            {filteredProducts.map((p: any, idx: number) => {
               const loc = getProductLocation(p);
               return (
                 <button
-                  key={p.id}
+                  key={p.id ? `prod-${p.id}` : `prod-idx-${idx}`}
                   onClick={() => addToCart(p)}
                   className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:border-orange-200 hover:bg-orange-50 transition-all text-left group"
                 >
@@ -400,10 +418,10 @@ if (!canManage) {
             </div>
           ) : (
             <div className="space-y-4">
-              {cart.map((item) => {
+              {cart.map((item, idx) => {
                 const loc = getProductLocation(item);
                 return (
-                  <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+                  <div key={item.id ? `cart-${item.id}-${idx}` : `cart-idx-${idx}`} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
                     <div className="flex-1 min-w-0 pr-2">
                       <p className="font-bold text-gray-900 truncate">{item.name}</p>
                       {loc && (
@@ -491,13 +509,13 @@ if (!canManage) {
                 >
                   <option value="">Selecione uma conta...</option>
                   <optgroup label="Contas Bancárias">
-                    {bankAccounts.map((a: any) => (
-                      <option key={a.id} value={`bank:${a.id}`}>{a.name}</option>
+                    {bankAccounts.map((a: any, idx: number) => (
+                      <option key={a.id ? `bank-${a.id}` : `bank-idx-${idx}`} value={`bank:${a.id}`}>{a.name}</option>
                     ))}
                   </optgroup>
                   <optgroup label="Caixas">
-                    {cashiers.filter((c: any) => c.status === "Aberto").map((c: any) => (
-                      <option key={c.id} value={`cashier:${c.id}`}>{c.name}</option>
+                    {cashiers.filter((c: any) => c.status === "Aberto").map((c: any, idx: number) => (
+                      <option key={c.id ? `cashier-${c.id}` : `cashier-idx-${idx}`} value={`cashier:${c.id}`}>{c.name}</option>
                     ))}
                   </optgroup>
                 </select>
