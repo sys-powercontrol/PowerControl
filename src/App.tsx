@@ -143,6 +143,7 @@ export default function App() {
               <Route path="ContasPagar" element={<AccountsPayable />} />
               <Route path="ContasReceber" element={<AccountsReceivable />} />
               <Route path="RelatorioDRE" element={<CashFlowReport />} />
+              <Route path="RelatorioFluxoCaixa" element={<Navigate to="/RelatorioDRE" replace />} />
               <Route path="ContasBancarias" element={<BankAccounts />} />
               <Route path="ConciliacaoBancaria" element={<BankReconciliation />} />
               <Route path="Transferencias" element={<Transfers />} />

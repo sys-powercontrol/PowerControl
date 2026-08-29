@@ -849,7 +849,7 @@ export default function Dashboard() {
                 <span className="text-[11px] text-blue-600">Importar extratos bancários</span>
               </Link>
 
-              <Link to="/RelatorioFluxoCaixa" className="p-4 bg-purple-50/70 hover:bg-purple-100/80 rounded-2xl border border-purple-100 flex flex-col gap-2 transition-all">
+              <Link to="/RelatorioDRE" className="p-4 bg-purple-50/70 hover:bg-purple-100/80 rounded-2xl border border-purple-100 flex flex-col gap-2 transition-all">
                 <div className="w-10 h-10 bg-purple-600 text-white rounded-xl flex items-center justify-center">
                   <BarChart3 size={20} />
                 </div>
