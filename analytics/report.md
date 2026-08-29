@@ -1,86 +1,109 @@
-# Relatório de Análise Geral do Sistema - Implementações Pendentes de Finalização
+# Relatório de Análise Geral do Sistema - Finalizações Pendentes
 
-**Data e Hora de Geração:** 28 de Agosto de 2026 às 15:36:44 (Horário de Brasília - UTC-3)  
-**Status do Projeto:** Análise Concluída - Escopo Estrito de Finalização (Sem Implementação de Novas Funcionalidades)
-
----
-
-## 1. Visão Geral Executiva
-
-Este relatório apresenta o diagnóstico técnico estruturado de todas as **rotinas, integrações, regras de negócio e fluxos operacionais já existentes no sistema PowerControl ERP que requerem finalização, amarração de ponta a ponta e garantia de integridade transacional**.
-
-Seguindo estritamente a diretriz do projeto, **nenhuma nova funcionalidade ou módulo fora do escopo original foi adicionado**. O foco exclusivo é fechar ciclos pendentes, assegurar a consistência dos dados nas operações atômicas (Firestore transactions / batch writes) e garantir que os componentes já desenhados na interface cumpram seus comportamentos de ponta a ponta.
+**Data e Hora de Geração:** 29 de Agosto de 2026 às 16:18:38 (Horário de Brasília - UTC-3)  
+**Escopo:** Mapeamento exclusivo de finalizações, amarrações de integridade e consistência de dados dos módulos existentes (SEM inclusão de novas funcionalidades ou escopos não solicitados).
 
 ---
 
-## 2. Diagnóstico Detalhado por Módulo do Sistema
+## 1. Visão Executiva e Diagnóstico Geral da Arquitetura
 
-### 2.1. Módulo Fiscal e Documentos Eletrônicos (NFe / NFCe)
-* **Arquivos do Módulo:** `src/pages/Fiscal.tsx`, `src/pages/TaxSettings.tsx`, `src/pages/CertificateManager.tsx`, `src/components/Fiscal/*`, `src/lib/fiscal.ts`
-* **Status Atual:** Telas de emissão, listagem de notas, visualização de DANFE e painel de regras tributárias implementados na interface.
-* **Pontos de Finalização Pendentes:**
-  1. **Sincronização de Cancelamento e Inutilização com a Venda:** Assegurar que, ao receber o protocolo de cancelamento/inutilização da SEFAZ, o status seja atualizado tanto na coleção `invoices` (`Cancelada` / `Inutilizada`) quanto no documento da venda de origem em `sales` (`nfe_status = 'Cancelada'`), incluindo protocolo e justificativa da SEFAZ.
-  2. **Tratamento de Exportação de XMLs em Lote:** Tratar fallback nas rotinas de download de XMLs em lote (`.zip`) caso alguma nota da lista não possua o XML gravado no cache local, buscando o payload na API fiscal.
-  3. **Validação Preventiva de Certificado Digital A1:** Bloquear tentativas de transmissão quando o certificado A1 da empresa estiver ausente ou com data de validade expirada, disparando aviso contextual ao operador.
-  4. **Herança Dinâmica de Tributação por Item:** Assegurar a injeção dos tributos (ICMS, IPI, PIS, COFINS, CFOP, NCM e CST/CSOSN) configurados nas regras fiscais para os itens enviados na NFe.
+O sistema **PowerControl ERP & PDV** apresenta uma base técnica com frontend em React 18+ (Vite, TypeScript, Tailwind CSS), backend Express/Node, banco de dados Cloud Firestore e contingência local PWA/IndexedDB (`idb`).
 
----
+A análise do código-fonte revelou que a arquitetura geral e as rotas estão estruturadas, porém existem pontos específicos onde fluxos transacionais, estornos em cascata, sincronizações de status e validações de integridade precisam ser finalizados para garantir estabilidade operacional e contábil.
 
-### 2.2. Módulo Financeiro, Fluxo de Caixa e Conciliação Bancária
-* **Arquivos do Módulo:** `src/pages/AccountsReceivable.tsx`, `src/pages/AccountsPayable.tsx`, `src/pages/BankReconciliation.tsx`, `src/pages/Cashiers.tsx`, `src/components/Financial/OFXImporter.tsx`, `src/lib/finance.ts`
-* **Status Atual:** Telas de Contas a Receber/Pagar, controle de sessões de caixa (PDV), extrato bancário e importação de arquivos OFX funcionais.
-* **Pontos de Finalização Pendentes:**
-  1. **Estorno Transacional Atômico de Títulos Baixados:** Ao estornar uma conta a receber ou a pagar já liquidada, reverter atomicamente o saldo da conta bancária (`bank_accounts`) e os totais da sessão de caixa (`cashiers`), registrando a movimentação no extrato.
-  2. **Bloqueio de Exclusão Direta de Títulos Liquidados:** Exigir formalmente o estorno prévio antes de permitir a exclusão de qualquer título com status `pago` / `recebido`.
-  3. **Identificador Unívoco (`fitid`) na Conciliação OFX:** Persistir a chave unívoca de cada transação do extrato OFX para impedir importações e conciliações duplicadas no mesmo período bancário.
-
----
-
-### 2.3. Módulo de Estoque, Movimentações e Fichas Técnicas (BOM)
-* **Arquivos do Módulo:** `src/pages/Products.tsx`, `src/pages/Transfers.tsx`, `src/pages/InventoryAdjustments.tsx`, `src/pages/InventoryHistory.tsx`, `src/components/BOMBuilder.tsx`, `src/lib/inventory.ts`
-* **Status Atual:** Cadastro de produtos com variações, montagem de fichas técnicas (BOM), transferências entre estoques e histórico de movimentações.
-* **Pontos de Finalização Pendentes:**
-  1. **Baixa e Estorno Automático de Insumos da BOM:** Ao confirmar a venda de um produto composto, deduzir automaticamente as quantidades proporcionais de cada insumo (`bom_items`) e, no cancelamento da venda, recompor o saldo desses insumos no estoque.
-  2. **Atomicidade em Transferências entre Filiais/Locais:** Garantir que a saída da origem e a entrada no destino ocorram em operação atômica indivisível, criando as respectivas entradas em `inventory_movements`.
-  3. **Controle de Bloqueio de Estoque Negativo:** Respeitar rigidamente a configuração `allow_negative_stock` da empresa no momento da emissão da venda e transferência.
-
----
-
-### 2.4. Módulo de Vendas, PDV e Gateway de Pagamento
-* **Arquivos do Módulo:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/components/Sales/PaymentGateway.tsx`, `src/serverApp.ts`, `src/lib/offlineStore.ts`
-* **Status Atual:** Frente de caixa (PDV) com busca rápida, histórico de vendas, modal de pagamento PIX/Cartão e fila de contingência offline.
-* **Pontos de Finalização Pendentes:**
-  1. **Polling e Conclusão Automática de Pagamento PIX:** Finalizar e imprimir o comprovante/cupom no PDV imediatamente após a confirmação via webhook ou polling da transação PIX.
-  2. **Cancelamento Integral de Venda no Histórico:** Reverter em lote: devolução dos itens ao estoque (inclusive itens compostos), estorno dos títulos no Contas a Receber e anulação das comissões do vendedor.
-  3. **Limpeza e Confirmação da Fila Offline:** expurgar da base local IndexedDB/localStorage os pedidos offline sincronizados com sucesso com o Firestore para evitar reprocessamento.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       MATRIZ DE FINALIZAÇÕES POR MÓDULO                     │
+├──────────────────────────┬──────────────────────────────────────────────────┤
+│ 1. Módulo Fiscal         │ • Cancelamento em cascata (SEFAZ/Invoice/Venda)  │
+│    (NFe / NFCe / Regras) │ • Exportação mensal ZIP com fallback remoto      │
+│                          │ • Alerta preventivo de validade do Certificado A1│
+│                          │ • Log de auditoria nas mutações de regras fiscais│
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ 2. Módulo Financeiro     │ • Estorno atômico de liquidações (Caixa/Banco)   │
+│    (Pagar / Receber / OFX│ • Bloqueio de exclusão em títulos baixados       │
+│                          │ • Deduplicação de lançamentos OFX via FITID      │
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ 3. Módulo de Estoque     │ • Dedução/devolução recursiva de insumos BOM     │
+│    (BOM / Transferência) │ • Transferência atômica entre filiais e depósitos│
+│                          │ • Enforcement da trava de estoque negativo       │
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ 4. Vendas e PDV          │ • Ciclo de polling e aprovação de PIX no Gateway │
+│    (Gateway / Histórico) │ • Cancelamento integrado de vendas e parcelas    │
+│                          │ • Purga e sincronização segura da fila offline   │
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ 5. Usuários & Empresas   │ • Desvinculação atômica de filiais (Employees)   │
+│    (Equipe / Planos)     │ • Camada prioritária e foco na UpgradePlanModal  │
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ 6. Suporte e Auditoria   │ • Modal Lightbox e download de anexos no Suporte │
+│    (Chamados / Logs)     │ • Rastreabilidade automática em api.delete()     │
+└──────────────────────────┴──────────────────────────────────────────────────┘
+```
 
 ---
 
-### 2.5. Gestão de Usuários, Empresas e Restrições de Planos
-* **Arquivos do Módulo:** `src/pages/Employees.tsx`, `src/pages/Products.tsx`, `src/components/ProductDetailsModal.tsx`, `src/components/UpgradePlanModal.tsx`
-* **Status Atual:** Cadastro de colaboradores, gestão multiempresa e modal de upgrade para planos superiores.
-* **Pontos de Finalização Pendentes:**
-  1. **Desvinculação Segura de Usuário/Empresa:** Ao desativar ou desvincular um funcionário, atualizar atomicamente o array `company_ids` do usuário em `users` e o registro em `employees`.
-  2. **Bloqueio e Chamada do Modal de Upgrade (`disable_product_images`):** Garantir que planos sem suporte a fotos de produtos exibam o `UpgradePlanModal` com sobreposição adequada (`z-[999999]`) tanto no formulário quanto nos modais de visualização.
+## 2. Levantamento Detalhado por Módulo
+
+### 2.1. Módulo Fiscal e Tributário (`src/pages/Fiscal.tsx`, `src/pages/TaxSettings.tsx`, `src/pages/CertificateManager.tsx`, `src/services/fiscalApi.ts`)
+1. **Cancelamento em Cascata da Nota Fiscal:**
+   - Ao executar o cancelamento de uma NF-e/NFC-e na SEFAZ via `fiscalApi.cancel()`, o sistema deve garantir que o status em `invoices/{id}` seja alterado para `"Cancelada"`, salvando a justificativa e o protocolo retornado.
+   - De forma síncrona, a venda atrelada (`sales/{sale_id}`) deve ter o status fiscal (`nfe_status`) atualizado para `"Cancelada"`.
+2. **Exportação Mensal de XMLs em Lote (.zip):**
+   - Na rotina de exportação mensal em `Fiscal.tsx`, quando uma nota emitida não possui `xml_content` em cache local, deve-se realizar a busca remota pelo status/URL e incluir o arquivo XML no pacote compactado (`JSZip`).
+3. **Alerta Preventivo de Vencimento do Certificado A1:**
+   - Em `CertificateManager.tsx` e no cabeçalho do `Fiscal.tsx`, validar a data de expiração (`expiration_date`). Se o certificado estiver vencido ou com menos de 15 dias de validade, exibir avisos visuais claros para prevenir rejeições na SEFAZ.
+4. **Auditoria de Regras Fiscais:**
+   - Em `TaxSettings.tsx`, registrar chamadas a `api.log()` nas operações de criação, edição e exclusão de regras tributárias por NCM.
 
 ---
 
-### 2.6. Atendimento, Suporte e Auditoria Operacional
-* **Arquivos do Módulo:** `src/pages/Support.tsx`, `src/pages/AuditLogs.tsx`
-* **Status Atual:** Central de chamados com múltiplos canais e tela de visualização de logs de auditoria.
-* **Pontos de Finalização Pendentes:**
-  1. **Upload e Visualização de Anexos em Chamados:** Permitir inclusão de imagens nos tickets de suporte com visualização em modal/lightbox.
-  2. **Cobertura Completa de Logs Sensíveis (`audit_logs`):** Disparar logs estruturados para cancelamentos fiscais, estornos financeiros e exclusões de cadastros centrais.
+### 2.2. Módulo Financeiro e Conciliação Bancária (`src/pages/AccountsPayable.tsx`, `src/pages/AccountsReceivable.tsx`, `src/components/Financial/OFXImporter.tsx`, `src/lib/finance.ts`)
+1. **Estorno Atômico de Baixas Financeiras:**
+   - No estorno de recebimentos ou pagamentos, executar `reverseAccountReceipt` e `reverseAccountPayment` de forma transacional, revertendo os saldos da conta bancária (`bankAccounts`) ou caixa físico (`cashiers`), gerando o movimento de estorno e restaurando o status para `"Pendente"`.
+2. **Bloqueio de Exclusão de Títulos Baixados:**
+   - Impedir a remoção direta de títulos com status `"Recebido"` ou `"Pago"`. O botão de exclusão deve ficar desabilitado ou interceptado com mensagem explicativa exigindo o estorno prévio do saldo.
+3. **Deduplicação de Extratos OFX por FITID:**
+   - No `OFXImporter.tsx`, cruzar o identificador único `<FITID>` de cada lançamento com os registros já gravados em `accountsPayable` e `accountsReceivable` (`ofx_fitid`), desmarcando automaticamente itens já importados.
 
 ---
 
-## 3. Matriz de Priorização de Finalizações
+### 2.3. Módulo de Estoque, Composição (BOM) e Transferências (`src/lib/inventory.ts`, `src/pages/Transfers.tsx`, `src/pages/InventoryAdjustments.tsx`)
+1. **Dedução e Devolução Recursiva de Ficha Técnica (BOM):**
+   - Nas vendas com produtos do tipo Kit/Composto (`bom_items`), garantir a baixa individual no estoque de cada insumo.
+   - No cancelamento de vendas (`reverseSaleStock`), devolver ao estoque todos os componentes que foram deduzidos.
+2. **Transferência Atômica Entre Filiais/Locais:**
+   - Em `inventory.processTransfer`, garantir execução via `runTransaction`, subtraindo o estoque da origem, somando no destino e gerando as movimentações `TRANSFER_OUT` e `TRANSFER_IN`.
+3. **Enforcement da Trava de Estoque Negativo:**
+   - Respeitar a configuração `allow_negative_stock` da empresa no PDV, ajustes manuais e transferências, impedindo transações com saldo insuficiente quando a trava estiver ativa.
 
-| Identificador | Módulo | Escopo de Finalização | Criticidade |
-| :--- | :--- | :--- | :---: |
-| **ISSUE-01** | Fiscal & NFe | Cancelamento síncrono com venda, regras tributárias dinâmicas e validação A1 | Alta |
-| **ISSUE-02** | Financeiro | Estorno atômico de baixas, trava de exclusão de títulos e unicidade OFX | Alta |
-| **ISSUE-03** | Estoque & BOM | Baixa de insumos compostos, atomicidade em transferências e trava de saldo | Alta |
-| **ISSUE-04** | Vendas & PDV | Polling de pagamento PIX, cancelamento em cascata e limpeza da fila offline | Alta |
-| **ISSUE-05** | Usuários & Planos | Desvinculação atômica multiempresa e modal de upgrade para recursos restritos | Média |
-| **ISSUE-06** | Suporte & Logs | Anexos com lightbox em tickets e cobertura de auditoria em ações críticas | Média |
+---
+
+### 2.4. Módulo de Vendas, PDV e Contingência Offline (`src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`, `src/components/Sales/PaymentGateway.tsx`, `src/lib/offlineStore.ts`)
+1. **Ciclo Completo do Gateway PIX:**
+   - Em `PaymentGateway.tsx`, manter o polling a cada 4 segundos em `/api/payments/status/:id`. Ao identificar confirmação (`CONFIRMED`, `APPROVED`, `PAID`), fechar a modal e acionar `onSuccess` para gravar a venda.
+2. **Cancelamento Integrado de Venda:**
+   - Em `SalesHistory.tsx`, a rotina de cancelamento deve: reverter o estoque (produtos simples e insumos BOM), cancelar títulos gerados em contas a receber, anular comissões do vendedor e registrar o log de auditoria.
+3. **Sincronização e Purga da Fila Offline:**
+   - Em `offlineStore.ts`, ao detectar reconexão e sincronizar as vendas com o Firestore, purgar imediatamente do IndexedDB cada registro concluído para eliminar duplicidades.
+
+---
+
+### 2.5. Usuários, Multi-Empresa e Limites de Planos (`src/pages/Employees.tsx`, `src/components/UpgradePlanModal.tsx`, `src/pages/Company.tsx`)
+1. **Desvinculação Segura de Filiais:**
+   - Em `Employees.tsx`, ao remover o vínculo de um funcionário com a empresa, atualizar o documento em `employees` e remover o `company_id` do array `company_ids` em `users/{userId}` via `writeBatch`.
+2. **Camada Prioritária da Modal de Upgrade:**
+   - Em `UpgradePlanModal.tsx`, assegurar que o container possua `z-[999999]` e bloqueio de scroll de fundo para exibição clara quando limites de plano forem atingidos.
+
+---
+
+### 2.6. Módulo de Suporte Técnico e Auditoria (`src/pages/Support.tsx`, `src/pages/AuditLogs.tsx`, `src/lib/api.ts`)
+1. **Lightbox de Anexos no Suporte:**
+   - Em `Support.tsx`, permitir a abertura em tela cheia (lightbox) e download direto de imagens ou capturas de tela anexadas aos chamados.
+2. **Rastreabilidade de Exclusões:**
+   - Em `src/lib/api.ts`, garantir que `api.delete()` registre automaticamente a ação `DELETE` na coleção `audit_logs`, preservando o histórico de exclusões.
+
+---
+
+## 3. Conclusão e Próximos Passos
+
+O diagnóstico confirma que não há necessidade de inclusão de novas páginas ou arquiteturas. O foco restringe-se estritamente à finalização dos fluxos e comportamentos listados, conforme detalhado no documento `analytics/Spec.md` e dividido nas issues de `/analytics/issues/`.

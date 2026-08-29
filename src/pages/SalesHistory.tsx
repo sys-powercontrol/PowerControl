@@ -389,6 +389,33 @@ export default function SalesHistory() {
           }
         }
 
+        // Cancel linked fiscal invoices if any
+        try {
+          const invoices = await api.get("invoices") as any[];
+          const linkedInvoices = invoices.filter((inv: any) => (inv.sale_id === id || inv.reference?.includes(id)) && inv.status !== "Cancelada");
+          for (const inv of linkedInvoices) {
+            if (company?.fiscal_token && inv.reference) {
+              try {
+                const fiscalConfig = {
+                  token: company.fiscal_token,
+                  environment: company.fiscal_environment || "sandbox",
+                  provider: company.fiscal_provider || "FocusNFe"
+                };
+                await fiscalApi.cancel(fiscalConfig as any, inv.reference, "Cancelamento de venda pelo operador");
+              } catch (fErr) {
+                console.warn("Erro ao cancelar nota na SEFAZ/provedor fiscal:", fErr);
+              }
+            }
+            await api.put("invoices", inv.id, { 
+              status: "Cancelada", 
+              cancel_reason: "Cancelamento da venda pelo operador",
+              cancelled_at: new Date().toISOString()
+            });
+          }
+        } catch (invErr) {
+          console.warn("Erro ao processar cancelamento de notas fiscais vinculadas:", invErr);
+        }
+
         // Return stock quantities to inventory
         await inventory.reverseSaleStock(dbSale);
 

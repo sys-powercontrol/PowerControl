@@ -95,6 +95,17 @@ export const inventory = {
       
       const productData = productDoc.data();
       const previous_stock = productData.stock_quantity || 0;
+
+      // Allow negative stock check
+      const companyId = data.company_id || user.company_id;
+      if (companyId && data.type === 'OUT') {
+        const companyRef = doc(db, "companies", companyId);
+        const companyDoc = await transaction.get(companyRef);
+        const allowNegativeStock = companyDoc.data()?.allow_negative_stock === "true" || companyDoc.data()?.allow_negative_stock === true;
+        if (!allowNegativeStock && previous_stock < data.quantity) {
+          throw new Error(`Estoque insuficiente. Saldo disponível: ${previous_stock}, saída solicitada: ${data.quantity}`);
+        }
+      }
       
       // 2. Calculate current stock
       let quantityChange = data.quantity;

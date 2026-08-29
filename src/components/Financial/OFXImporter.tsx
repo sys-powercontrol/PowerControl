@@ -413,9 +413,23 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
         return;
       }
       
+      const isReconciled = (t: OFXTransaction) => {
+        const tId = t.fitid || t.id;
+        return payables.some((p: any) => p.ofx_fitid === tId || (p.ofx_fitid && (p.ofx_fitid === t.fitid || p.ofx_fitid === t.id))) ||
+               receivables.some((r: any) => r.ofx_fitid === tId || (r.ofx_fitid && (r.ofx_fitid === t.fitid || r.ofx_fitid === t.id)));
+      };
+
       setTransactions(parsedTransactions);
-      setSelectedTransactions(new Set(parsedTransactions.map(t => t.id)));
-      toast.success(`${parsedTransactions.length} transações encontradas.`);
+      const availableToImport = parsedTransactions.filter(t => !isReconciled(t));
+      const alreadyReconciledCount = parsedTransactions.length - availableToImport.length;
+
+      setSelectedTransactions(new Set(availableToImport.map(t => t.id)));
+      
+      if (alreadyReconciledCount > 0) {
+        toast.info(`${parsedTransactions.length} transações lidas (${alreadyReconciledCount} já conciliadas anteriormente e desmarcadas).`);
+      } else {
+        toast.success(`${parsedTransactions.length} transações encontradas.`);
+      }
     } catch (error) {
       console.error("Error parsing OFX:", error);
       toast.error("Erro ao processar o arquivo OFX. Verifique se o formato está correto.");

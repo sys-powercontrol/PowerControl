@@ -1,133 +1,105 @@
-# Especificação Técnica de Finalização do Sistema - Spec.md
+# Especificação Técnica e Funcional - Finalizações do Sistema (Spec.md)
 
-**Data e Hora de Geração:** 28 de Agosto de 2026 às 15:36:44 (Horário de Brasília - UTC-3)  
-**Status da Especificação:** Aprovada - Escopo Estrito de Finalização (Sem Novas Funcionalidades)  
-**Documento Base:** `analytics/report.md`
-
----
-
-## 1. Introdução e Diretrizes
-
-Este documento de especificação técnica formaliza **exclusivamente os comportamentos, fluxos de dados, componentes e tratamentos que faltam ser finalizados** no PowerControl ERP. Todos os requisitos aqui descritos foram extraídos diretamente do diagnóstico estruturado em `analytics/report.md`.
+**Data e Hora de Geração:** 29 de Agosto de 2026 às 16:18:38 (Horário de Brasília - UTC-3)  
+**Documento de Referência:** `analytics/report.md`  
+**Escopo:** Especificação exclusiva dos comportamentos, páginas e componentes que demandam finalização e amarração de integridade (SEM adição de novas funcionalidades).
 
 ---
 
-## 2. Especificação Técnica por Módulo
+## 1. Módulo Fiscal e Tributário
 
-### 2.1. Módulo Fiscal e Documentos Eletrônicos (NFe / NFCe)
+### 1.1. Página: `src/pages/Fiscal.tsx`
+* **Behavior (Cancelamento em Cascata da Nota Fiscal):**
+  - Ao receber a confirmação de cancelamento via SEFAZ (`fiscalApi.cancel`), atualizar o documento `invoices/{invoiceId}` com `status: "Cancelada"`, `cancel_reason`, `cancel_protocol` e `cancelled_at`.
+  - Atualizar o documento correspondente em `sales/{saleId}` com `nfe_status: "Cancelada"` e `nfe_cancel_reason`.
+  - Registrar log de auditoria via `api.log({ action: 'UPDATE', entity: 'invoices', ... })`.
+* **Behavior (Exportação Mensal de XMLs em Lote):**
+  - Ao acionar "Exportar XMLs (.zip)", filtrar as notas emitidas/autorizadas do mês e ano selecionados.
+  - Para notas sem `xml_content` em cache local, realizar fallback de consulta remota da URL do XML ou status na API fiscal, baixar o arquivo XML via `fetch` e compactar no arquivo ZIP via biblioteca `JSZip`.
+* **Component & Behavior: Indicador de Validade do Certificado Digital:**
+  - Avaliar a data `expiration_date` da empresa/certificado.
+  - Exibir badge e banner de aviso visual caso o certificado esteja vencido ou a menos de 15 dias do vencimento.
 
-* **Páginas Afetadas:** `src/pages/Fiscal.tsx`, `src/pages/CertificateManager.tsx`
-* **Componentes Afetados:** `src/components/Fiscal/InutilizacaoModal.tsx`, `src/components/Fiscal/TaxRuleForm.tsx`
-* **Camadas de Serviço:** `src/lib/fiscal.ts`, `src/lib/api.ts`
-
-#### Comportamentos a Finalizar:
-1. **Sincronização de Cancelamento/Inutilização:**
-   - Ao receber confirmação de cancelamento da SEFAZ, executar atualização síncrona:
-     - Na coleção `invoices`: definir `status = 'Cancelada'`, gravar `protocol_cancelamento`, `cancel_reason` e `canceled_at`.
-     - Na coleção `sales`: atualizar a venda vinculada para `nfe_status = 'Cancelada'`.
-2. **Exportação de XMLs em Lote:**
-   - Na rotina de exportação ZIP em `Fiscal.tsx`, verificar a presença da propriedade `xml_content` em cada nota selecionada.
-   - Caso `xml_content` esteja ausente no registro local, realizar requisição de busca do XML à API antes do empacotamento.
-3. **Validação Prévia do Certificado Digital A1:**
-   - No envio de NFe/NFCe, verificar a presença e a data de validade (`valid_until`) do certificado A1 da empresa.
-   - Se ausente ou expirado, abortar o envio antes da chamada externa e disparar notificação com redirecionamento opcional para a página de certificados.
-4. **Mapeamento de Impostos nas Regras Fiscais:**
-   - Vincular os dados de impostos (ICMS, IPI, PIS, COFINS, CFOP e CSOSN/CST) configurados em `tax_rules` diretamente aos itens transmitidos na nota.
+### 1.2. Página: `src/pages/TaxSettings.tsx`
+* **Behavior (Auditoria de Regras Tributárias):**
+  - Registrar evento de auditoria (`api.log`) em todas as mutações (`CREATE`, `UPDATE`, `DELETE`) na coleção `tax_rules`.
 
 ---
 
-### 2.2. Módulo Financeiro e Conciliação Bancária
+## 2. Módulo Financeiro e Conciliação Bancária
 
-* **Páginas Afetadas:** `src/pages/AccountsReceivable.tsx`, `src/pages/AccountsPayable.tsx`, `src/pages/BankReconciliation.tsx`, `src/pages/Cashiers.tsx`
-* **Componentes Afetados:** `src/components/Financial/OFXImporter.tsx`
-* **Camadas de Serviço:** `src/lib/finance.ts`, `src/lib/api.ts`
+### 2.1. Páginas: `src/pages/AccountsReceivable.tsx` e `src/pages/AccountsPayable.tsx`
+* **Behavior (Estorno Atômico de Baixas):**
+  - No estorno de recebimento ou pagamento (`reverseAccountReceipt` / `reverseAccountPayment`), reverter atomicamente os saldos em `bankAccounts` ou `cashiers`.
+  - Gravar movimentação de estorno na coleção `movements` e restaurar o status do título para `"Pendente"`.
+* **Component & Behavior (Bloqueio de Exclusão de Títulos Baixados):**
+  - Desabilitar visual e funcionalmente o botão de exclusão (`Trash2`) em títulos com status `"Recebido"` ou `"Pago"`.
+  - Exibir tooltip e alerta orientando o operador a realizar o estorno financeiro antes da exclusão física do documento.
 
-#### Comportamentos a Finalizar:
-1. **Estorno Atômico de Títulos:**
-   - Ao estornar recebimento (`accounts_receivable`) ou pagamento (`accounts_payable`), executar via transação Firestore (`runTransaction`):
-     - Atualizar o status do título de volta para `pendente`, limpando data de pagamento e valor pago.
-     - Recompor o saldo da conta bancária (`bank_accounts`) debitando ou creditando o valor estornado.
-     - Se o pagamento tiver ocorrido via caixa físico (`cashiers`), deduzir ou reverter o total recebido na sessão do caixa.
-     - Registrar um lançamento de estorno no extrato de movimentações financeiras.
-2. **Bloqueio de Exclusão Direta:**
-   - Desabilitar ou interceptar o botão de exclusão caso o título possua status `pago` ou `recebido`, instruindo o operador a realizar o estorno da baixa previamente.
-3. **Identificador Unívoco em Importação OFX:**
-   - Persistir o campo `fitid` (Financial Transaction ID) no documento `bank_transactions` gerado na conciliação.
-   - Durante a leitura do arquivo `.ofx`, verificar se o `fitid` já existe no banco de dados para a conta bancária selecionada, prevenindo lançamentos duplicados.
+### 2.2. Componente: `src/components/Financial/OFXImporter.tsx`
+* **Behavior (Deduplicação de Extratos por FITID):**
+  - Na leitura dos blocos `<STMTTRN>` do arquivo OFX, extrair o campo `<FITID>`.
+  - Comparar com os identificadores `ofx_fitid` já existentes nas coleções `accountsPayable` e `accountsReceivable`.
+  - Desmarcar previamente da lista de importação transações que já foram importadas ou conciliadas anteriormente.
 
 ---
 
-### 2.3. Módulo de Estoque e Ficha Técnica (BOM)
+## 3. Módulo de Estoque, Ficha Técnica (BOM) e Transferências
 
-* **Páginas Afetadas:** `src/pages/Transfers.tsx`, `src/pages/InventoryAdjustments.tsx`, `src/pages/Sales.tsx`
-* **Componentes Afetados:** `src/components/BOMBuilder.tsx`
-* **Camadas de Serviço:** `src/lib/inventory.ts`, `src/lib/api.ts`
+### 3.1. Biblioteca & Helper: `src/lib/inventory.ts`
+* **Behavior (Dedução e Devolução Recursiva de Insumos BOM):**
+  - Na finalização de vendas (`processSale`), verificar a existência de `bom_items` no produto. Se houver composição, deduzir a quantidade proporcional do estoque de cada insumo e registrar movimentação `SALE_KIT_COMPONENT`.
+  - No cancelamento de vendas (`reverseSaleStock`), devolver ao estoque a quantidade exata de cada componente que compõe o produto.
+* **Behavior (Trava de Saldo Negativo):**
+  - Respeitar a flag `allow_negative_stock` da empresa, impedindo transações caso a quantidade disponível de produto ou insumo seja menor que a quantidade requisitada.
 
-#### Comportamentos a Finalizar:
-1. **Baixa e Estorno de Insumos da BOM:**
-   - Ao finalizar uma venda contendo produto com tipo `composto` (com `bom_items` cadastrados):
-     - Executar a dedução no estoque de cada insumo proporcionalmente à quantidade vendida do produto pai.
-     - Em caso de cancelamento da venda, recompor o saldo de estoque de cada insumo componente.
-2. **Atomicidade em Transferência entre Locais de Estoque:**
-   - Na tela de `Transfers.tsx`, executar o débito no local de origem e o crédito no local de destino sob a mesma transação no Firestore, gerando os registros de `inventory_movements` com tipo `TRANSFER_OUT` e `TRANSFER_IN`.
-3. **Enforcement da Trava de Estoque Negativo:**
-   - Consultar o parâmetro `allow_negative_stock` da empresa antes de qualquer saída de estoque (venda ou transferência) e impedir a confirmação caso o saldo final fique abaixo de zero.
+### 3.2. Página: `src/pages/Transfers.tsx`
+* **Behavior (Transferência Atômica Inter-Filiais):**
+  - Executar a transferência entre locais de estoque via `runTransaction`, debitando na filial de origem, creditando na filial de destino e criando registros `TRANSFER_OUT` e `TRANSFER_IN` em `inventory_movements`.
 
 ---
 
-### 2.4. Módulo de Vendas, PDV e Gateway de Pagamentos
+## 4. Módulo de Vendas, PDV e Contingência Offline
 
-* **Páginas Afetadas:** `src/pages/Sales.tsx`, `src/pages/SalesHistory.tsx`
-* **Componentes Afetados:** `src/components/Sales/PaymentGateway.tsx`
-* **Camadas de Serviço:** `src/serverApp.ts`, `src/lib/offlineStore.ts`, `src/lib/api.ts`
+### 4.1. Componente: `src/components/Sales/PaymentGateway.tsx`
+* **Behavior (Polling e Confirmação de PIX):**
+  - Realizar polling a cada 4 segundos no endpoint `/api/payments/status/:paymentId`.
+  - Ao receber status de aprovação (`CONFIRMED`, `APPROVED`, `PAID`), atualizar o estado visual para sucesso, fechar a modal e disparar o callback `onSuccess` para gravar a venda.
 
-#### Comportamentos a Finalizar:
-1. **Polling e Conclusão Automática do Pagamento PIX:**
-   - No modal `PaymentGateway.tsx`, ao gerar um QR Code PIX, iniciar polling periódico de consulta do status da cobrança (`/api/pix-status/:id` ou Firestore listener).
-   - Ao receber status `paid` / `completed`, fechar automaticamente o modal, registrar o pagamento como confirmado e acionar a conclusão da venda no PDV.
-2. **Cancelamento em Cascata no Histórico de Vendas:**
-   - Ao cancelar uma venda na tela `SalesHistory.tsx`:
-     - Devolver os produtos (e insumos de BOM) ao estoque.
-     - Cancelar as contas a receber geradas por essa venda.
-     - Cancelar ou estornar o registro de comissão do vendedor vinculado.
-     - Atualizar o status da venda para `cancelada`.
-3. **Purga da Fila de Vendas Offline:**
-   - No módulo `offlineStore.ts`, após o envio e confirmação de persistência no Firestore de uma venda gravada localmente em contingência, remover o item da fila local para prevenir reenvios.
+### 4.2. Página: `src/pages/SalesHistory.tsx`
+* **Behavior (Cancelamento Completo de Venda):**
+  - Ao cancelar uma venda:
+    1. Devolver os produtos e componentes BOM ao estoque (`inventory.reverseSaleStock`).
+    2. Cancelar as parcelas pendentes geradas em `accountsReceivable`.
+    3. Anular as comissões calculadas para o vendedor.
+    4. Solicitar o cancelamento da NF-e vinculada (se houver).
+    5. Registrar log de auditoria.
 
----
-
-### 2.5. Gestão de Usuários, Empresas e Planos
-
-* **Páginas Afetadas:** `src/pages/Employees.tsx`, `src/pages/Products.tsx`
-* **Componentes Afetados:** `src/components/ProductDetailsModal.tsx`, `src/components/UpgradePlanModal.tsx`
-
-#### Comportamentos a Finalizar:
-1. **Desvinculação Segura de Colaboradores:**
-   - Ao remover um colaborador em `Employees.tsx`, executar atomicamente a remoção do `company_id` do array `company_ids` no documento do usuário (`users/{userId}`) e a inativação ou exclusão do registro na coleção `employees`.
-2. **Restrição de Fotos de Produtos e Upgrade Modal:**
-   - Quando o parâmetro `disable_product_images` estiver ativo para a empresa, ocultar/bloquear os campos de upload de imagem e disparar o `UpgradePlanModal` com camada `z-[999999]`.
+### 4.3. Biblioteca: `src/lib/offlineStore.ts`
+* **Behavior (Sincronização e Purga da Fila):**
+  - Ao restaurar conexão à internet, processar a fila de vendas e compras offline gravando no Firestore.
+  - Purgar imediatamente do IndexedDB cada registro finalizado com sucesso para prevenir duplicação de dados.
 
 ---
 
-### 2.6. Atendimento, Suporte e Auditoria
+## 5. Módulo de Usuários, Multi-Empresa e Planos
 
-* **Páginas Afetadas:** `src/pages/Support.tsx`, `src/pages/AuditLogs.tsx`
+### 5.1. Página: `src/pages/Employees.tsx`
+* **Behavior (Desvinculação Segura de Filiais):**
+  - Ao desvincular um funcionário de uma empresa, atualizar o registro em `employees` e remover o `company_id` do array `company_ids` no documento `users/{userId}` em um lote atômico (`writeBatch`).
 
-#### Comportamentos a Finalizar:
-1. **Tratamento de Anexos nos Chamados de Suporte:**
-   - Permitir que imagens anexadas aos tickets sejam renderizadas em miniatura com suporte a clique para ampliação (lightbox) e download.
-2. **Consolidação de Logs de Auditoria:**
-   - Garantir que chamadas críticas (cancelamento de venda, estorno financeiro, alteração de parâmetros fiscais e desassociação de usuários) invoquem `api.log({ action, entity, details })`.
+### 5.2. Componente: `src/components/UpgradePlanModal.tsx`
+* **Behavior & Layout (Camada Visual Prioritária):**
+  - Garantir z-index máximo (`z-[999999]`) e bloqueio de scroll de fundo quando a modal for exibida por atingimento de limite contratual de usuários, filiais ou cadastros.
 
 ---
 
-## 3. Matriz de Componentes e Funções Técnicas
+## 6. Módulo de Suporte Técnico e Auditoria
 
-| Identificador | Página / Componente | Função / Hook Envolvido | Comportamento Esperado |
-| :--- | :--- | :--- | :--- |
-| **SPEC-01** | `Fiscal.tsx` / `InutilizacaoModal.tsx` | `cancelInvoiceMutation` / `api.syncSaleInvoice` | Sincronizar status `Cancelada` na NFe e na Venda |
-| **SPEC-02** | `AccountsReceivable.tsx` / `AccountsPayable.tsx` | `handleReversePayment` / `finance.ts` | Recomposição atômica de banco e caixa |
-| **SPEC-03** | `Transfers.tsx` / `BOMBuilder.tsx` | `transferMutation` / `inventory.ts` | Baixa de insumos de BOM e transferência atômica |
-| **SPEC-04** | `PaymentGateway.tsx` / `SalesHistory.tsx` | `pollPaymentStatus` / `handleCancelSale` | Polling automático PIX e cancelamento em cascata |
-| **SPEC-05** | `Employees.tsx` / `ProductDetailsModal.tsx` | `handleRemoveEmployee` / `UpgradePlanModal` | Desvinculação multiempresa e trava de imagens |
-| **SPEC-06** | `Support.tsx` / `AuditLogs.tsx` | `handleCreateTicket` / `api.log` | Anexos com lightbox e logs em operações críticas |
+### 6.1. Página: `src/pages/Support.tsx`
+* **Component & Behavior (Visualizador Lightbox de Anexos):**
+  - Abrir visualização ampliada (lightbox) ao clicar em capturas de tela ou imagens anexadas aos chamados de suporte, disponibilizando botão de download direto.
+
+### 6.2. Biblioteca: `src/lib/api.ts` e Página: `src/pages/AuditLogs.tsx`
+* **Behavior (Rastreabilidade Automática em Exclusões):**
+  - No método `api.delete(entity, id)`, registrar automaticamente evento em `audit_logs` com `action: 'DELETE'`, informando entidade, ID e metadados da operação.

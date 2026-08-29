@@ -29,6 +29,7 @@ import {
   Info,
   Edit,
   Upload,
+  Download,
   Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
@@ -110,6 +111,7 @@ export default function Support() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const selectedTicket = selectedTicketId ? tickets.find(t => t.id === selectedTicketId) : null;
   const [replyText, setReplyText] = useState("");
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Active Company Data
   const activeCompanyId = api.getCompanyId() || user?.company_id;
@@ -1062,18 +1064,17 @@ Preciso de auxílio técnico com a plataforma.`;
                           <p className="text-[11px] font-bold text-gray-500 flex items-center gap-1">
                             <ImageIcon size={12} className="text-blue-600" /> Captura de Tela / Imagem:
                           </p>
-                          <a 
-                            href={selectedTicket.attachment} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="block rounded-xl overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity max-w-sm"
+                          <button 
+                            type="button"
+                            onClick={() => setLightboxImage(selectedTicket.attachment)}
+                            className="block rounded-xl overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity max-w-sm cursor-zoom-in text-left group"
                           >
                             <img 
                               src={selectedTicket.attachment} 
                               alt="Anexo do Chamado" 
-                              className="max-h-48 w-auto object-contain rounded-lg bg-gray-50"
+                              className="max-h-48 w-auto object-contain rounded-lg bg-gray-50 group-hover:scale-105 transition-transform"
                             />
-                          </a>
+                          </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -1346,6 +1347,52 @@ Preciso de auxílio técnico com a plataforma.`;
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Attachment Image Lightbox */}
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div 
+            className="relative max-w-4xl max-h-[90vh] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between gap-4 text-white">
+              <span className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                <ImageIcon size={16} className="text-blue-400" />
+                Visualização do Anexo
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={lightboxImage}
+                  download="anexo-suporte.png"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
+                >
+                  <Download size={14} />
+                  <span>Baixar</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setLightboxImage(null)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 flex items-center justify-center bg-slate-950/50 overflow-auto">
+              <img 
+                src={lightboxImage} 
+                alt="Anexo Ampliado" 
+                className="max-w-full max-h-[75vh] object-contain rounded-xl"
+              />
+            </div>
           </div>
         </div>
       )}

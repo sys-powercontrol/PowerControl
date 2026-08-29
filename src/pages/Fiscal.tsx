@@ -121,21 +121,21 @@ export default function Fiscal() {
 
   const handleExportXmlZip = async () => {
     const emittedInvoices = invoices.filter((i) => {
-      const isEmitted = (i.status === "Emitida" || i.status === "Autorizada") && (i.xml_storage_url || i.xml_url || i.xml_content);
+      const isEmitted = (i.status === "Emitida" || i.status === "Autorizada");
       if (!isEmitted) return false;
-      const d = new Date(i.created_at || i.issue_date || Date.now());
+      const d = new Date(i.created_at || i.issue_date || i.emission_date || Date.now());
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const y = String(d.getFullYear());
       return m === selectedMonth && y === selectedYear;
     });
 
     if (emittedInvoices.length === 0) {
-      toast.warning(`Nenhuma nota fiscal emitida/autorizada com XML encontrada para ${selectedMonth}/${selectedYear}.`);
+      toast.warning(`Nenhuma nota fiscal emitida/autorizada encontrada para ${selectedMonth}/${selectedYear}.`);
       return;
     }
 
     setIsExportingXmlZip(true);
-    toast.info(`Compactando XMLs de ${emittedInvoices.length} nota(s) (${selectedMonth}/${selectedYear})...`);
+    toast.info(`Processando e compactando XMLs de ${emittedInvoices.length} nota(s) (${selectedMonth}/${selectedYear})...`);
 
     try {
       const zip = new JSZip();
@@ -147,15 +147,35 @@ export default function Fiscal() {
           let xmlData = "";
           if (invoice.xml_content) {
             xmlData = invoice.xml_content;
-          } else {
+          } else if (invoice.xml_storage_url || invoice.xml_url) {
             const url = invoice.xml_storage_url || invoice.xml_url;
             const res = await fetch(url);
             xmlData = await res.text();
+          } else if (company?.fiscal_token && invoice.reference) {
+            // Fallback: buscar status/XML diretamente no provedor fiscal
+            try {
+              const fiscalConfig = {
+                token: company.fiscal_token,
+                environment: company.fiscal_environment || "sandbox",
+                provider: company.fiscal_provider || "FocusNFe"
+              };
+              const statusRes = await fiscalApi.checkStatus(fiscalConfig as any, invoice.reference, invoice.type || "NFe");
+              if (statusRes.xml_url) {
+                const res = await fetch(statusRes.xml_url);
+                xmlData = await res.text();
+                // Atualizar cache da nota
+                api.put("invoices", invoice.id, { xml_url: statusRes.xml_url }).catch(() => {});
+              }
+            } catch (fallbackErr) {
+              console.warn(`Fallback de recuperação de XML falhou para nota #${invoice.number}:`, fallbackErr);
+            }
           }
 
-          const fileName = `NFe_${invoice.number || invoice.id}_${invoice.access_key || "chave"}.xml`;
-          folder?.file(fileName, xmlData);
-          addedCount++;
+          if (xmlData) {
+            const fileName = `NFe_${invoice.number || invoice.id}_${invoice.access_key || "chave"}.xml`;
+            folder?.file(fileName, xmlData);
+            addedCount++;
+          }
         } catch (fileErr) {
           console.warn(`Erro ao obter XML da nota #${invoice.number}:`, fileErr);
         }

@@ -585,6 +585,15 @@ export const api = {
       console.warn(`Firestore delete on ${entity}/${id} error:`, e?.message || e);
     }
 
+    if (entity !== "audit_logs") {
+      api.log({
+        action: 'DELETE',
+        entity,
+        entity_id: id,
+        description: `Exclusão de registro em ${entity} (ID: ${id})`
+      }).catch(() => {});
+    }
+
     // 1. Purge from all localStorage cache keys
     removeFromLocalCacheAcrossKeys(entity, id);
 

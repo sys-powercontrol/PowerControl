@@ -184,18 +184,19 @@ export function PaymentGateway({
       try {
         const res = await axios.get(`/api/payments/status/${paymentId}`);
         if (!isMounted) return;
-        if (res.data.status === "CONFIRMED") {
+        const normalizedStatus = String(res.data.status || "").toUpperCase();
+        if (normalizedStatus === "CONFIRMED" || normalizedStatus === "APPROVED" || normalizedStatus === "PAID" || normalizedStatus === "COMPLETED") {
           setStatus("CONFIRMED");
-          toast.success("Pagamento via Mercado Pago aprovado!");
-          setTimeout(onSuccess, 1500);
-        } else if (res.data.status === "EXPIRED") {
+          toast.success("Pagamento aprovado com sucesso!");
+          setTimeout(onSuccess, 1200);
+        } else if (normalizedStatus === "EXPIRED" || normalizedStatus === "CANCELLED" || normalizedStatus === "REJECTED") {
           setStatus("EXPIRED");
-          toast.error("O pagamento expirou. Tente novamente.");
+          toast.error("O pagamento expirou ou foi cancelado. Tente novamente.");
         }
       } catch {
-        // Ignorar erros de rede no polling
+        // Ignorar erros transitórios de rede no polling
       }
-    }, 5000);
+    }, 4000);
 
     return () => {
       isMounted = false;

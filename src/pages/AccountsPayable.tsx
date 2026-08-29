@@ -835,8 +835,13 @@ if (!canView) {
                 {(user?.role === 'admin' || user?.role === 'master') && (
                   <button
                     onClick={() => handleDelete(acc.id)}
-                    className="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all ml-1 font-bold"
-                    title="Excluir Conta"
+                    disabled={acc.status === "Pago"}
+                    className={`p-3 rounded-xl transition-all ml-1 font-bold ${
+                      acc.status === "Pago"
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
+                        : "bg-red-100 text-red-600 hover:bg-red-200"
+                    }`}
+                    title={acc.status === "Pago" ? "Contas pagas não podem ser excluídas diretamente. Realize o estorno primeiro." : "Excluir Conta"}
                   >
                     <Trash2 size={20} />
                   </button>

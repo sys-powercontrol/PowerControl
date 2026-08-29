@@ -44,9 +44,29 @@ export default function TaxSettings() {
   );
 
   const ruleMutation = useMutation({
-    mutationFn: (data: any) => editingRule 
-      ? api.put("tax_rules", editingRule.id, data)
-      : api.post("tax_rules", data),
+    mutationFn: async (data: any) => {
+      if (editingRule) {
+        const res = await api.put("tax_rules", editingRule.id, data);
+        await api.log({
+          action: 'UPDATE',
+          entity: 'tax_rules',
+          entity_id: editingRule.id,
+          description: `Atualizou regra tributária NCM: ${data.ncm || editingRule.ncm}`,
+          metadata: { ncm: data.ncm, description: data.description, icms_rate: data.icms_rate }
+        });
+        return res;
+      } else {
+        const res = await api.post("tax_rules", data);
+        await api.log({
+          action: 'CREATE',
+          entity: 'tax_rules',
+          entity_id: (res as any)?.id || "new",
+          description: `Cadastrou nova regra tributária NCM: ${data.ncm}`,
+          metadata: { ncm: data.ncm, description: data.description, icms_rate: data.icms_rate }
+        });
+        return res;
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tax_rules"] });
       toast.success(editingRule ? "Regra fiscal atualizada!" : "Regra fiscal cadastrada!");
@@ -56,7 +76,18 @@ export default function TaxSettings() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete("tax_rules", id),
+    mutationFn: async (id: string) => {
+      const targetRule = taxRules.find((r: any) => r.id === id);
+      const res = await api.delete("tax_rules", id);
+      await api.log({
+        action: 'DELETE',
+        entity: 'tax_rules',
+        entity_id: id,
+        description: `Excluiu regra tributária NCM: ${targetRule?.ncm || id}`,
+        metadata: { ncm: targetRule?.ncm, description: targetRule?.description }
+      });
+      return res;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tax_rules"] });
       toast.success("Regra fiscal removida!");

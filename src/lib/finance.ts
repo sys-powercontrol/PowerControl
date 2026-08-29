@@ -279,7 +279,7 @@ export async function reverseAccountReceipt(accountData: any) {
     transaction.set(movementRef, {
       company_id: accountData.company_id,
       type: "Saída",
-      description: `Estorno de Exclusão: ${accountData.description || 'Conta a Receber'}`,
+      description: `Estorno de Recebimento: ${accountData.description || 'Conta a Receber'}`,
       amount: amount,
       from_account_type: accountData.bank_account_id ? 'Banco' : 'Caixa',
       from_account_id: accountId,
@@ -288,6 +288,20 @@ export async function reverseAccountReceipt(accountData: any) {
       movement_date: new Date().toISOString(),
       created_at: serverTimestamp()
     });
+
+    // Update Daily Summary Rollup if exists for today
+    if (accountData.company_id) {
+      const todayDateStr = new Date().toISOString().split("T")[0];
+      const summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
+      const summaryDoc = await transaction.get(summaryRef);
+      if (summaryDoc.exists()) {
+        const prevSummary = summaryDoc.data();
+        transaction.set(summaryRef, {
+          receipts_total: Math.max(0, (prevSummary.receipts_total || 0) - amount),
+          updated_at: serverTimestamp()
+        }, { merge: true });
+      }
+    }
 
     return { success: true };
   });
@@ -331,6 +345,20 @@ export async function reverseSalePayment(saleData: any) {
       created_at: serverTimestamp()
     });
 
+    if (saleData.company_id) {
+      const todayDateStr = new Date().toISOString().split("T")[0];
+      const summaryRef = doc(db, "companies", saleData.company_id, "daily_summaries", todayDateStr);
+      const summaryDoc = await transaction.get(summaryRef);
+      if (summaryDoc.exists()) {
+        const prevSummary = summaryDoc.data();
+        transaction.set(summaryRef, {
+          sales_total: Math.max(0, (prevSummary.sales_total || 0) - amount),
+          receipts_total: Math.max(0, (prevSummary.receipts_total || 0) - amount),
+          updated_at: serverTimestamp()
+        }, { merge: true });
+      }
+    }
+
     return { success: true };
   });
 }
@@ -364,7 +392,7 @@ export async function reverseAccountPayment(accountData: any) {
     transaction.set(movementRef, {
       company_id: accountData.company_id,
       type: "Entrada",
-      description: `Estorno de Exclusão: ${accountData.description || 'Conta a Pagar'}`,
+      description: `Estorno de Pagamento: ${accountData.description || 'Conta a Pagar'}`,
       amount: amount,
       to_account_type: accountData.bank_account_id ? 'Banco' : 'Caixa',
       to_account_id: accountId,
@@ -373,6 +401,19 @@ export async function reverseAccountPayment(accountData: any) {
       movement_date: new Date().toISOString(),
       created_at: serverTimestamp()
     });
+
+    if (accountData.company_id) {
+      const todayDateStr = new Date().toISOString().split("T")[0];
+      const summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
+      const summaryDoc = await transaction.get(summaryRef);
+      if (summaryDoc.exists()) {
+        const prevSummary = summaryDoc.data();
+        transaction.set(summaryRef, {
+          expenses_total: Math.max(0, (prevSummary.expenses_total || 0) - amount),
+          updated_at: serverTimestamp()
+        }, { merge: true });
+      }
+    }
 
     return { success: true };
   });
