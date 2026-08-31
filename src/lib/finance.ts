@@ -260,6 +260,8 @@ export async function reverseAccountReceipt(accountData: any) {
 
     const collectionName = accountData.bank_account_id ? "bankAccounts" : "cashiers";
     const receiptAccountRef = doc(db, collectionName, accountId);
+
+    // 1. ALL READS FIRST
     const docSnap = await transaction.get(receiptAccountRef);
     if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema."); 
 
@@ -268,6 +270,15 @@ export async function reverseAccountReceipt(accountData: any) {
       throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
     }
 
+    let summaryDoc = null;
+    let summaryRef = null;
+    if (accountData.company_id) {
+      const todayDateStr = new Date().toISOString().split("T")[0];
+      summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
+      summaryDoc = await transaction.get(summaryRef);
+    }
+
+    // 2. ALL WRITES AFTER
     // Deduct balance
     const currentBalance = receiptAccountData.balance || 0;
     transaction.update(receiptAccountRef, {
@@ -290,17 +301,12 @@ export async function reverseAccountReceipt(accountData: any) {
     });
 
     // Update Daily Summary Rollup if exists for today
-    if (accountData.company_id) {
-      const todayDateStr = new Date().toISOString().split("T")[0];
-      const summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
-      const summaryDoc = await transaction.get(summaryRef);
-      if (summaryDoc.exists()) {
-        const prevSummary = summaryDoc.data();
-        transaction.set(summaryRef, {
-          receipts_total: Math.max(0, (prevSummary.receipts_total || 0) - amount),
-          updated_at: serverTimestamp()
-        }, { merge: true });
-      }
+    if (summaryRef && summaryDoc && summaryDoc.exists()) {
+      const prevSummary = summaryDoc.data();
+      transaction.set(summaryRef, {
+        receipts_total: Math.max(0, (prevSummary.receipts_total || 0) - amount),
+        updated_at: serverTimestamp()
+      }, { merge: true });
     }
 
     return { success: true };
@@ -317,6 +323,8 @@ export async function reverseSalePayment(saleData: any) {
 
     const collectionName = saleData.bank_account_id ? "bankAccounts" : "cashiers";
     const receiptAccountRef = doc(db, collectionName, accountId);
+
+    // 1. ALL READS FIRST
     const docSnap = await transaction.get(receiptAccountRef);
     if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema.");
 
@@ -325,6 +333,15 @@ export async function reverseSalePayment(saleData: any) {
       throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
     }
 
+    let summaryDoc = null;
+    let summaryRef = null;
+    if (saleData.company_id) {
+      const todayDateStr = new Date().toISOString().split("T")[0];
+      summaryRef = doc(db, "companies", saleData.company_id, "daily_summaries", todayDateStr);
+      summaryDoc = await transaction.get(summaryRef);
+    }
+
+    // 2. ALL WRITES AFTER
     // Deduct balance
     const currentBalance = receiptAccountData.balance || 0;
     transaction.update(receiptAccountRef, {
@@ -345,18 +362,13 @@ export async function reverseSalePayment(saleData: any) {
       created_at: serverTimestamp()
     });
 
-    if (saleData.company_id) {
-      const todayDateStr = new Date().toISOString().split("T")[0];
-      const summaryRef = doc(db, "companies", saleData.company_id, "daily_summaries", todayDateStr);
-      const summaryDoc = await transaction.get(summaryRef);
-      if (summaryDoc.exists()) {
-        const prevSummary = summaryDoc.data();
-        transaction.set(summaryRef, {
-          sales_total: Math.max(0, (prevSummary.sales_total || 0) - amount),
-          receipts_total: Math.max(0, (prevSummary.receipts_total || 0) - amount),
-          updated_at: serverTimestamp()
-        }, { merge: true });
-      }
+    if (summaryRef && summaryDoc && summaryDoc.exists()) {
+      const prevSummary = summaryDoc.data();
+      transaction.set(summaryRef, {
+        sales_total: Math.max(0, (prevSummary.sales_total || 0) - amount),
+        receipts_total: Math.max(0, (prevSummary.receipts_total || 0) - amount),
+        updated_at: serverTimestamp()
+      }, { merge: true });
     }
 
     return { success: true };
@@ -373,6 +385,8 @@ export async function reverseAccountPayment(accountData: any) {
 
     const collectionName = accountData.bank_account_id ? "bankAccounts" : "cashiers";
     const paymentAccountRef = doc(db, collectionName, accountId);
+
+    // 1. ALL READS FIRST
     const docSnap = await transaction.get(paymentAccountRef);
     if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema."); 
 
@@ -381,6 +395,15 @@ export async function reverseAccountPayment(accountData: any) {
       throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
     }
 
+    let summaryDoc = null;
+    let summaryRef = null;
+    if (accountData.company_id) {
+      const todayDateStr = new Date().toISOString().split("T")[0];
+      summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
+      summaryDoc = await transaction.get(summaryRef);
+    }
+
+    // 2. ALL WRITES AFTER
     // Add back balance
     const currentBalance = paymentAccountData.balance || 0;
     transaction.update(paymentAccountRef, {
@@ -402,17 +425,12 @@ export async function reverseAccountPayment(accountData: any) {
       created_at: serverTimestamp()
     });
 
-    if (accountData.company_id) {
-      const todayDateStr = new Date().toISOString().split("T")[0];
-      const summaryRef = doc(db, "companies", accountData.company_id, "daily_summaries", todayDateStr);
-      const summaryDoc = await transaction.get(summaryRef);
-      if (summaryDoc.exists()) {
-        const prevSummary = summaryDoc.data();
-        transaction.set(summaryRef, {
-          expenses_total: Math.max(0, (prevSummary.expenses_total || 0) - amount),
-          updated_at: serverTimestamp()
-        }, { merge: true });
-      }
+    if (summaryRef && summaryDoc && summaryDoc.exists()) {
+      const prevSummary = summaryDoc.data();
+      transaction.set(summaryRef, {
+        expenses_total: Math.max(0, (prevSummary.expenses_total || 0) - amount),
+        updated_at: serverTimestamp()
+      }, { merge: true });
     }
 
     return { success: true };
@@ -429,6 +447,8 @@ export async function reversePurchasePayment(purchaseData: any) {
 
     const collectionName = purchaseData.bank_account_id ? "bankAccounts" : "cashiers";
     const paymentAccountRef = doc(db, collectionName, accountId);
+
+    // 1. ALL READS FIRST
     const docSnap = await transaction.get(paymentAccountRef);
     if (!docSnap.exists()) throw new Error("Não é possível estornar: A conta bancária ou caixa atrelada a esta operação já não existe no sistema.");
 
@@ -437,6 +457,15 @@ export async function reversePurchasePayment(purchaseData: any) {
       throw new Error("Transação negada. O Caixa no qual este valor foi computado já está Fechado. A quantia deve ser tratada como Movimentação manual.");
     }
 
+    let summaryDoc = null;
+    let summaryRef = null;
+    if (purchaseData.company_id) {
+      const todayDateStr = new Date().toISOString().split("T")[0];
+      summaryRef = doc(db, "companies", purchaseData.company_id, "daily_summaries", todayDateStr);
+      summaryDoc = await transaction.get(summaryRef);
+    }
+
+    // 2. ALL WRITES AFTER
     // Add back balance
     const currentBalance = paymentAccountData.balance || 0;
     transaction.update(paymentAccountRef, {
@@ -456,6 +485,14 @@ export async function reversePurchasePayment(purchaseData: any) {
       movement_date: new Date().toISOString(),
       created_at: serverTimestamp()
     });
+
+    if (summaryRef && summaryDoc && summaryDoc.exists()) {
+      const prevSummary = summaryDoc.data();
+      transaction.set(summaryRef, {
+        expenses_total: Math.max(0, (prevSummary.expenses_total || 0) - amount),
+        updated_at: serverTimestamp()
+      }, { merge: true });
+    }
 
     return { success: true };
   });

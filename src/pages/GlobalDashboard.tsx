@@ -137,9 +137,9 @@ export default function GlobalDashboard() {
   const [activeTab, setActiveTab] = useState<"overview" | "financial" | "cashiers" | "companies" | "audit">("overview");
 
   // Multi-tenant dataset queries with optimized batch limits and date bounds
-  const { data: companies, dataUpdatedAt } = useQuery({ 
+  const { data: companies = [], dataUpdatedAt } = useQuery({ 
     queryKey: ["companies", "all"], 
-    queryFn: () => api.get("companies", { _all: true }),
+    queryFn: () => api.get("companies", { _all: true }).then(r => Array.isArray(r) ? r : []),
     ...CACHE_TIERS.STATIC
   });
   const { data: sales = [], isLoading: loadingSales, isFetching: isFetchingSales } = useQuery({ 
@@ -149,12 +149,12 @@ export default function GlobalDashboard() {
       params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) },
       orderByField: "sale_date",
       orderDir: "desc"
-    }).then(r => r.items),
+    }).then(r => r?.items || []),
     ...CACHE_TIERS.REPORTS
   });
   const { data: users = [] } = useQuery({ 
     queryKey: ["users", "all"], 
-    queryFn: () => api.get("users", { _all: true, _limit: 100 }),
+    queryFn: () => api.get("users", { _all: true, _limit: 100 }).then(r => Array.isArray(r) ? r : []),
     ...CACHE_TIERS.STATIC
   });
   const { data: payables = [] } = useQuery({
@@ -164,7 +164,7 @@ export default function GlobalDashboard() {
       params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) },
       orderByField: "due_date",
       orderDir: "desc"
-    }).then(r => r.items),
+    }).then(r => r?.items || []),
     ...CACHE_TIERS.REPORTS
   });
   const { data: receivables = [] } = useQuery({
@@ -174,7 +174,7 @@ export default function GlobalDashboard() {
       params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) },
       orderByField: "due_date",
       orderDir: "desc"
-    }).then(r => r.items),
+    }).then(r => r?.items || []),
     ...CACHE_TIERS.REPORTS
   });
   const { data: products = [] } = useQuery({
@@ -182,7 +182,7 @@ export default function GlobalDashboard() {
     queryFn: () => api.getPage("products", { 
       pageSize: 100, 
       params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) }
-    }).then(r => r.items),
+    }).then(r => r?.items || []),
     ...CACHE_TIERS.MASTER
   });
   const { data: cashiers = [] } = useQuery({
@@ -190,12 +190,12 @@ export default function GlobalDashboard() {
     queryFn: () => api.getPage("cashiers", { 
       pageSize: 50, 
       params: { _all: true, ...(selectedCompanyId !== "all" ? { company_id: selectedCompanyId } : {}) }
-    }).then(r => r.items),
+    }).then(r => r?.items || []),
     ...CACHE_TIERS.MASTER
   });
   const { data: auditLogs = [] } = useQuery({
     queryKey: ["audit_logs", "all"],
-    queryFn: () => api.get("audit_logs", { _all: true, _limit: 25 }),
+    queryFn: () => api.get("audit_logs", { _all: true, _limit: 25 }).then(r => Array.isArray(r) ? r : []),
     ...CACHE_TIERS.REPORTS
   });
 
@@ -206,11 +206,18 @@ export default function GlobalDashboard() {
 
   const metrics = useMemo(() => {
     const now = getNowBR();
+    const safeCompanies = Array.isArray(companies) ? companies : [];
+    const safeSales = Array.isArray(sales) ? sales : [];
+    const safeUsers = Array.isArray(users) ? users : [];
+    const safePayables = Array.isArray(payables) ? payables : [];
+    const safeReceivables = Array.isArray(receivables) ? receivables : [];
+    const safeCashiers = Array.isArray(cashiers) ? cashiers : [];
+    const safeProducts = Array.isArray(products) ? products : [];
     
     // Filter sales by selected company
-    let filteredSales = sales;
+    let filteredSales = safeSales;
     if (selectedCompanyId !== "all") {
-      filteredSales = sales.filter((s: any) => s.company_id === selectedCompanyId);
+      filteredSales = safeSales.filter((s: any) => s.company_id === selectedCompanyId);
     }
 
     // Filter by date range
@@ -237,21 +244,21 @@ export default function GlobalDashboard() {
       return d >= startDate && d <= endDate && s.status !== "Cancelada";
     });
 
-    const activeCompanies = companies.filter((c: any) => c.is_active).length;
+    const activeCompanies = safeCompanies.filter((c: any) => c.is_active).length;
     const periodRevenue = rangeSales.reduce((acc: number, s: any) => acc + (parseFloat(s.total) || 0), 0);
     const periodSalesCount = rangeSales.length;
     const averageTicket = periodSalesCount > 0 ? periodRevenue / periodSalesCount : 0;
 
-    const totalEcosystemRevenue = sales
+    const totalEcosystemRevenue = safeSales
       .filter((s: any) => s.status !== "Cancelada")
       .reduce((acc: number, s: any) => acc + (parseFloat(s.total) || 0), 0);
 
     // Financial obligations
-    let filteredPayables = payables;
-    let filteredReceivables = receivables;
+    let filteredPayables = safePayables;
+    let filteredReceivables = safeReceivables;
     if (selectedCompanyId !== "all") {
-      filteredPayables = payables.filter((p: any) => p.company_id === selectedCompanyId);
-      filteredReceivables = receivables.filter((r: any) => r.company_id === selectedCompanyId);
+      filteredPayables = safePayables.filter((p: any) => p.company_id === selectedCompanyId);
+      filteredReceivables = safeReceivables.filter((r: any) => r.company_id === selectedCompanyId);
     }
 
     const pendingPayables = filteredPayables
@@ -265,17 +272,17 @@ export default function GlobalDashboard() {
     const netProjected = pendingReceivables - pendingPayables;
 
     // Cashiers
-    let filteredCashiers = cashiers;
+    let filteredCashiers = safeCashiers;
     if (selectedCompanyId !== "all") {
-      filteredCashiers = cashiers.filter((c: any) => c.company_id === selectedCompanyId);
+      filteredCashiers = safeCashiers.filter((c: any) => c.company_id === selectedCompanyId);
     }
     const openCashiers = filteredCashiers.filter((c: any) => c.status === "Aberto");
     const openCashiersBalance = openCashiers.reduce((acc: number, c: any) => acc + (parseFloat(c.balance) || 0), 0);
 
     // Products & stock
-    let filteredProducts = products;
+    let filteredProducts = safeProducts;
     if (selectedCompanyId !== "all") {
-      filteredProducts = products.filter((p: any) => p.company_id === selectedCompanyId);
+      filteredProducts = safeProducts.filter((p: any) => p.company_id === selectedCompanyId);
     }
     const totalProductsCount = filteredProducts.length;
     const lowStockCount = filteredProducts.filter((p: any) => (p.stock || 0) <= (p.min_stock || 5)).length;
@@ -294,17 +301,17 @@ export default function GlobalDashboard() {
     // Company Ranking
     const companyStatsMap: Record<string, { name: string; revenue: number; salesCount: number; activeUsers: number; openCashiers: number }> = {};
     
-    companies.forEach((c: any) => {
+    safeCompanies.forEach((c: any) => {
       companyStatsMap[c.id] = {
         name: c.name || "Sem Nome",
         revenue: 0,
         salesCount: 0,
-        activeUsers: users.filter((u: any) => u.company_id === c.id && u.is_active).length,
-        openCashiers: cashiers.filter((ca: any) => ca.company_id === c.id && ca.status === "Aberto").length
+        activeUsers: safeUsers.filter((u: any) => u.company_id === c.id && u.is_active).length,
+        openCashiers: safeCashiers.filter((ca: any) => ca.company_id === c.id && ca.status === "Aberto").length
       };
     });
 
-    sales.forEach((s: any) => {
+    safeSales.forEach((s: any) => {
       if (s.company_id && companyStatsMap[s.company_id] && s.status !== "Cancelada") {
         companyStatsMap[s.company_id].revenue += parseFloat(s.total) || 0;
         companyStatsMap[s.company_id].salesCount += 1;
@@ -320,7 +327,7 @@ export default function GlobalDashboard() {
         averageTicket: stat.salesCount > 0 ? stat.revenue / stat.salesCount : 0,
         activeUsers: stat.activeUsers,
         openCashiers: stat.openCashiers,
-        isActive: companies.find((c: any) => c.id === id)?.is_active ?? true
+        isActive: safeCompanies.find((c: any) => c.id === id)?.is_active ?? true
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
@@ -343,7 +350,7 @@ export default function GlobalDashboard() {
 
     return {
       activeCompanies,
-      totalCompaniesCount: companies.length,
+      totalCompaniesCount: safeCompanies.length,
       periodRevenue,
       periodSalesCount,
       averageTicket,
@@ -358,7 +365,7 @@ export default function GlobalDashboard() {
       paymentMethodsData,
       ranking,
       dailyRevenueChart,
-      totalUsersCount: users.length
+      totalUsersCount: safeUsers.length
     };
   }, [companies, sales, users, payables, receivables, products, cashiers, dateFilter, selectedCompanyId]);
 

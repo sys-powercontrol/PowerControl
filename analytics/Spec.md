@@ -1,105 +1,57 @@
-# Especificação Técnica e Funcional - Finalizações do Sistema (Spec.md)
+# Especificação Técnica de Finalizações do Sistema (Spec)
 
-**Data e Hora de Geração:** 29 de Agosto de 2026 às 16:18:38 (Horário de Brasília - UTC-3)  
+**Data e Hora de Geração:** 29 de Agosto de 2026 às 20:45:49 (Horário de Brasília - UTC-3)  
 **Documento de Referência:** `analytics/report.md`  
-**Escopo:** Especificação exclusiva dos comportamentos, páginas e componentes que demandam finalização e amarração de integridade (SEM adição de novas funcionalidades).
+**Escopo:** Especificação estrita do que falta implementar e finalizar no sistema, sem inclusão de novas páginas ou recursos fora do escopo original.
 
 ---
 
-## 1. Módulo Fiscal e Tributário
+## 1. Módulo: Compras & Gestão de Estoque
 
-### 1.1. Página: `src/pages/Fiscal.tsx`
-* **Behavior (Cancelamento em Cascata da Nota Fiscal):**
-  - Ao receber a confirmação de cancelamento via SEFAZ (`fiscalApi.cancel`), atualizar o documento `invoices/{invoiceId}` com `status: "Cancelada"`, `cancel_reason`, `cancel_protocol` e `cancelled_at`.
-  - Atualizar o documento correspondente em `sales/{saleId}` com `nfe_status: "Cancelada"` e `nfe_cancel_reason`.
-  - Registrar log de auditoria via `api.log({ action: 'UPDATE', entity: 'invoices', ... })`.
-* **Behavior (Exportação Mensal de XMLs em Lote):**
-  - Ao acionar "Exportar XMLs (.zip)", filtrar as notas emitidas/autorizadas do mês e ano selecionados.
-  - Para notas sem `xml_content` em cache local, realizar fallback de consulta remota da URL do XML ou status na API fiscal, baixar o arquivo XML via `fetch` e compactar no arquivo ZIP via biblioteca `JSZip`.
-* **Component & Behavior: Indicador de Validade do Certificado Digital:**
-  - Avaliar a data `expiration_date` da empresa/certificado.
-  - Exibir badge e banner de aviso visual caso o certificado esteja vencido ou a menos de 15 dias do vencimento.
-
-### 1.2. Página: `src/pages/TaxSettings.tsx`
-* **Behavior (Auditoria de Regras Tributárias):**
-  - Registrar evento de auditoria (`api.log`) em todas as mutações (`CREATE`, `UPDATE`, `DELETE`) na coleção `tax_rules`.
+### 1.1 Página / Componente: `src/pages/PurchaseHistory.tsx` & `src/lib/inventory.ts`
+- **Comportamento Atual:** Cancelamento e exclusão de compras executam a reversão de pagamento mas não estornam o saldo dos itens que deram entrada no estoque.
+- **Comportamento Especificado:**
+  - **Função `inventory.reversePurchaseStock(purchase)`:**
+    - Para cada item presente no array `purchase.items`:
+      - Subtrair a quantidade comprada (`item.quantity`) do estoque do produto (`stock_quantity`).
+      - Registrar movimentação no histórico de estoque (`stock_movements`) com o tipo `"PURCHASE_CANCEL"`, apontando a compra de origem.
+  - **Função `cancelPurchaseMutation` e `deletePurchaseMutation`:**
+    - Executar atomicamente `reversePurchasePayment(purchase)`, `inventory.reversePurchaseStock(purchase)`, atualizar contas a pagar atreladas (`status: "Cancelado"`) e definir a compra com `status: "Cancelada"`.
+    - Registrar log de auditoria com usuário e data/hora.
 
 ---
 
-## 2. Módulo Financeiro e Conciliação Bancária
+## 2. Módulo: Caixa & Fechamento de Turno
 
-### 2.1. Páginas: `src/pages/AccountsReceivable.tsx` e `src/pages/AccountsPayable.tsx`
-* **Behavior (Estorno Atômico de Baixas):**
-  - No estorno de recebimento ou pagamento (`reverseAccountReceipt` / `reverseAccountPayment`), reverter atomicamente os saldos em `bankAccounts` ou `cashiers`.
-  - Gravar movimentação de estorno na coleção `movements` e restaurar o status do título para `"Pendente"`.
-* **Component & Behavior (Bloqueio de Exclusão de Títulos Baixados):**
-  - Desabilitar visual e funcionalmente o botão de exclusão (`Trash2`) em títulos com status `"Recebido"` ou `"Pago"`.
-  - Exibir tooltip e alerta orientando o operador a realizar o estorno financeiro antes da exclusão física do documento.
-
-### 2.2. Componente: `src/components/Financial/OFXImporter.tsx`
-* **Behavior (Deduplicação de Extratos por FITID):**
-  - Na leitura dos blocos `<STMTTRN>` do arquivo OFX, extrair o campo `<FITID>`.
-  - Comparar com os identificadores `ofx_fitid` já existentes nas coleções `accountsPayable` e `accountsReceivable`.
-  - Desmarcar previamente da lista de importação transações que já foram importadas ou conciliadas anteriormente.
+### 2.1 Página / Componente: `src/pages/Cashiers.tsx`
+- **Comportamento Atual:** Ao fechar o caixa com diferença (`counted !== expected`), o sistema persiste a observação no documento do caixa, mas não realiza o lançamento de ajuste na contabilidade diária nem possui visualizador detalhado de turnos passados.
+- **Comportamento Especificado:**
+  - **Ajuste Automático de Diferença de Caixa:**
+    - Se `counted < expected` (Quebra de Caixa): gerar movimentação (`movements`) de saída/despesa `"Ajuste de Quebra de Caixa"` vinculada ao caixa com o valor da falta.
+    - Se `counted > expected` (Sobra de Caixa): gerar movimentação (`movements`) de entrada/receita `"Ajuste de Sobra de Caixa"` vinculada ao caixa com o valor do excesso.
+  - **Modal de Histórico de Fechamentos:**
+    - Ao clicar no botão de histórico de um caixa, listar os ciclos fechados em ordem cronológica decrescente exibindo: operador de abertura, operador de fechamento, data/hora de abertura/fechamento, valor de abertura, total de vendas, total de sangrias/suprimentos, saldo esperado, saldo contado e diferença apurada.
 
 ---
 
-## 3. Módulo de Estoque, Ficha Técnica (BOM) e Transferências
+## 3. Módulo: Clientes & Cadastro PJ
 
-### 3.1. Biblioteca & Helper: `src/lib/inventory.ts`
-* **Behavior (Dedução e Devolução Recursiva de Insumos BOM):**
-  - Na finalização de vendas (`processSale`), verificar a existência de `bom_items` no produto. Se houver composição, deduzir a quantidade proporcional do estoque de cada insumo e registrar movimentação `SALE_KIT_COMPONENT`.
-  - No cancelamento de vendas (`reverseSaleStock`), devolver ao estoque a quantidade exata de cada componente que compõe o produto.
-* **Behavior (Trava de Saldo Negativo):**
-  - Respeitar a flag `allow_negative_stock` da empresa, impedindo transações caso a quantidade disponível de produto ou insumo seja menor que a quantidade requisitada.
-
-### 3.2. Página: `src/pages/Transfers.tsx`
-* **Behavior (Transferência Atômica Inter-Filiais):**
-  - Executar a transferência entre locais de estoque via `runTransaction`, debitando na filial de origem, creditando na filial de destino e criando registros `TRANSFER_OUT` e `TRANSFER_IN` em `inventory_movements`.
+### 3.1 Página / Componente: `src/pages/Clients.tsx`
+- **Comportamento Atual:** O cadastro de clientes possui busca por CEP, mas quando se trata de pessoa jurídica, os dados de Razão Social e Endereço precisam ser preenchidos manualmente.
+- **Comportamento Especificado:**
+  - **Botão de Consulta CNPJ:**
+    - Ao lado do campo de Documento (CPF/CNPJ), exibir botão de busca quando o documento tiver 14 dígitos.
+    - Ao acionar, chamar `externalApi.fetchCNPJ(cleanCNPJ)`.
+    - Autopreencher: Razão Social/Nome, E-mail, Telefone, CEP, Logradouro, Número, Bairro, Cidade e UF.
+    - Exibir feedback de carregamento com `Loader2` e toasts informativos de sucesso/erro.
 
 ---
 
-## 4. Módulo de Vendas, PDV e Contingência Offline
+## 4. Módulo: Fiscal & Visualização de DANFE
 
-### 4.1. Componente: `src/components/Sales/PaymentGateway.tsx`
-* **Behavior (Polling e Confirmação de PIX):**
-  - Realizar polling a cada 4 segundos no endpoint `/api/payments/status/:paymentId`.
-  - Ao receber status de aprovação (`CONFIRMED`, `APPROVED`, `PAID`), atualizar o estado visual para sucesso, fechar a modal e disparar o callback `onSuccess` para gravar a venda.
-
-### 4.2. Página: `src/pages/SalesHistory.tsx`
-* **Behavior (Cancelamento Completo de Venda):**
-  - Ao cancelar uma venda:
-    1. Devolver os produtos e componentes BOM ao estoque (`inventory.reverseSaleStock`).
-    2. Cancelar as parcelas pendentes geradas em `accountsReceivable`.
-    3. Anular as comissões calculadas para o vendedor.
-    4. Solicitar o cancelamento da NF-e vinculada (se houver).
-    5. Registrar log de auditoria.
-
-### 4.3. Biblioteca: `src/lib/offlineStore.ts`
-* **Behavior (Sincronização e Purga da Fila):**
-  - Ao restaurar conexão à internet, processar a fila de vendas e compras offline gravando no Firestore.
-  - Purgar imediatamente do IndexedDB cada registro finalizado com sucesso para prevenir duplicação de dados.
-
----
-
-## 5. Módulo de Usuários, Multi-Empresa e Planos
-
-### 5.1. Página: `src/pages/Employees.tsx`
-* **Behavior (Desvinculação Segura de Filiais):**
-  - Ao desvincular um funcionário de uma empresa, atualizar o registro em `employees` e remover o `company_id` do array `company_ids` no documento `users/{userId}` em um lote atômico (`writeBatch`).
-
-### 5.2. Componente: `src/components/UpgradePlanModal.tsx`
-* **Behavior & Layout (Camada Visual Prioritária):**
-  - Garantir z-index máximo (`z-[999999]`) e bloqueio de scroll de fundo quando a modal for exibida por atingimento de limite contratual de usuários, filiais ou cadastros.
-
----
-
-## 6. Módulo de Suporte Técnico e Auditoria
-
-### 6.1. Página: `src/pages/Support.tsx`
-* **Component & Behavior (Visualizador Lightbox de Anexos):**
-  - Abrir visualização ampliada (lightbox) ao clicar em capturas de tela ou imagens anexadas aos chamados de suporte, disponibilizando botão de download direto.
-
-### 6.2. Biblioteca: `src/lib/api.ts` e Página: `src/pages/AuditLogs.tsx`
-* **Behavior (Rastreabilidade Automática em Exclusões):**
-  - No método `api.delete(entity, id)`, registrar automaticamente evento em `audit_logs` com `action: 'DELETE'`, informando entidade, ID e metadados da operação.
+### 4.1 Página / Componente: `src/components/DanfeViewer.tsx`
+- **Comportamento Atual:** Modal de visualização exibe primariamente o layout em PDF A4 padrão.
+- **Comportamento Especificado:**
+  - **Suporte a NFC-e Térmica:**
+    - Adicionar propriedade opcional `model?: '55' | '65'` ou detectar NFC-e a partir dos dados da nota.
+    - Para NFC-e (modelo 65), disponibilizar alternância de layout ou botão específico para impressão de cupom térmico (58mm/80mm) formatado com QR-Code de consulta e dados resumidos da venda.

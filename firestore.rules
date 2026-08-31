@@ -75,10 +75,12 @@ service cloud.firestore {
     }
 
     function belongsToCompany(companyId) {
-      return isAuthenticated() && isActive() && companyId is string && companyId != '' && (
+      return isAuthenticated() && isActive() && (
         isMaster() || 
-        getUserCompanyId() == companyId || 
-        getUserCompanyIds().hasAny([companyId])
+        (companyId is string && companyId != '' && (
+          getUserCompanyId() == companyId || 
+          getUserCompanyIds().hasAny([companyId])
+        ))
       );
     }
 
@@ -178,8 +180,8 @@ service cloud.firestore {
     }
 
     match /purchases/{id} {
-      allow read: if belongsToCompany(resource.data.get('company_id', '')) && hasPermission('inventory.manage');
-      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('inventory.manage');
+      allow read: if isMaster() || (belongsToCompany(resource.data.get('company_id', '')) && hasPermission('inventory.manage'));
+      allow create, update: if isMaster() || (belongsToCompany(request.resource.data.get('company_id', '')) && hasPermission('inventory.manage'));
       allow delete: if isMaster() || (belongsToCompany(resource.data.get('company_id', '')) && (isAdmin() || hasPermission('inventory.manage')));
     }
 

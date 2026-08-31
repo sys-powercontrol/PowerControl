@@ -26,9 +26,11 @@ export default function Clients() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [isSearchingCEP, setIsSearchingCEP] = useState(false);
+  const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [zipCode, setZipCode] = useState("");
-  const [addressData, setAddressData] = useState<any>({});
+  const [cnpj, setCnpj] = useState("");
+  const [fetchedData, setFetchedData] = useState<any>({});
 
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -79,17 +81,52 @@ export default function Clients() {
     setIsSearchingCEP(true);
     try {
       const data = await externalApi.fetchCEP(cleanCEP);
-      setAddressData({
+      setFetchedData((prev: any) => ({
+        ...prev,
         address: data.logradouro,
         neighborhood: data.bairro,
         city: data.localidade,
         state: data.uf
-      });
+      }));
       toast.success("Endereço encontrado!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao buscar CEP");
     } finally {
       setIsSearchingCEP(false);
+    }
+  };
+
+  const searchCNPJ = async () => {
+    const cleanCNPJ = cnpj.replace(/\D/g, "");
+    if (cleanCNPJ.length !== 14) {
+      toast.error("CNPJ inválido. Digite 14 números.");
+      return;
+    }
+
+    setIsSearchingCNPJ(true);
+    try {
+      const data = await externalApi.fetchCNPJ(cleanCNPJ);
+      const cleanCepFromData = data.cep ? data.cep.replace(/\D/g, "") : "";
+      setFetchedData((prev: any) => ({
+        ...prev,
+        name: data.nome || data.fantasia || prev.name,
+        email: data.email || prev.email,
+        phone: data.telefone || prev.phone,
+        zip_code: cleanCepFromData || prev.zip_code,
+        address: data.logradouro || prev.address,
+        address_number: data.numero || prev.address_number,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.municipio || prev.city,
+        state: data.uf || prev.state
+      }));
+      if (cleanCepFromData) {
+        setZipCode(cleanCepFromData);
+      }
+      toast.success("Dados da empresa consultados na Receita Federal com sucesso!");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao buscar CNPJ");
+    } finally {
+      setIsSearchingCNPJ(false);
     }
   };
 
@@ -202,7 +239,9 @@ if (!canView) {
           <button 
             onClick={() => { 
               setEditingClient(null); 
-              setAddressData({});
+              setFetchedData({});
+              setCnpj("");
+              setZipCode("");
               setIsModalOpen(true); 
             }}
             className="col-span-2 sm:col-span-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold shadow-md shadow-blue-500/20 transition-all text-xs sm:text-sm cursor-pointer min-h-[48px] w-full h-full"
@@ -238,7 +277,9 @@ if (!canView) {
               <button 
                 onClick={() => { 
                   setEditingClient(c); 
-                  setAddressData({});
+                  setFetchedData(c);
+                  setCnpj(c.cpf || c.document || "");
+                  setZipCode(c.zip_code || "");
                   setIsModalOpen(true); 
                 }}
                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -293,11 +334,12 @@ if (!canView) {
             <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 overscroll-contain">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-bold text-gray-700">Nome Completo *</label>
+                  <label className="text-sm font-bold text-gray-700">Nome / Razão Social *</label>
                   <input 
                     name="name" 
                     required 
-                    defaultValue={editingClient?.name}
+                    defaultValue={fetchedData.name || editingClient?.name}
+                    key={`name-${fetchedData.name}`}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
@@ -306,7 +348,8 @@ if (!canView) {
                   <input 
                     name="email" 
                     type="email" 
-                    defaultValue={editingClient?.email}
+                    defaultValue={fetchedData.email || editingClient?.email}
+                    key={`email-${fetchedData.email}`}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
@@ -315,7 +358,8 @@ if (!canView) {
                   <InputMask 
                     name="phone" 
                     mask="(00) 00000-0000"
-                    defaultValue={editingClient?.phone}
+                    defaultValue={fetchedData.phone || editingClient?.phone}
+                    key={`phone-${fetchedData.phone}`}
                   />
                 </div>
                 <div className="space-y-2">
@@ -329,14 +373,28 @@ if (!canView) {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">CPF / CNPJ</label>
-                  <InputMask 
-                    name="cpf" 
-                    mask={[
-                      { mask: '000.000.000-00' },
-                      { mask: '00.000.000/0000-00' }
-                    ]}
-                    defaultValue={editingClient?.cpf}
-                  />
+                  <div className="flex gap-2">
+                    <InputMask 
+                      name="cpf" 
+                      mask={[
+                        { mask: '000.000.000-00' },
+                        { mask: '00.000.000/0000-00' }
+                      ]}
+                      defaultValue={editingClient?.cpf}
+                      value={cnpj || undefined}
+                      onChange={(val) => setCnpj(val)}
+                      key={`cnpj-${cnpj}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={searchCNPJ}
+                      disabled={isSearchingCNPJ || cnpj.replace(/\D/g, "").length !== 14}
+                      className="px-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50 flex items-center justify-center shrink-0"
+                      title="Consultar dados na Receita Federal via CNPJ"
+                    >
+                      {isSearchingCNPJ ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">CEP</label>
@@ -344,8 +402,10 @@ if (!canView) {
                     <InputMask 
                       name="zip_code" 
                       mask="00000-000"
-                      defaultValue={editingClient?.zip_code}
+                      defaultValue={fetchedData.zip_code || editingClient?.zip_code}
+                      value={zipCode || undefined}
                       onChange={handleCEPChange}
+                      key={`zip-${zipCode || fetchedData.zip_code}`}
                     />
                     <button
                       type="button"
@@ -362,8 +422,8 @@ if (!canView) {
                   <label className="text-sm font-bold text-gray-700">Endereço</label>
                   <input 
                     name="address" 
-                    defaultValue={addressData.address || editingClient?.address}
-                    key={addressData.address}
+                    defaultValue={fetchedData.address || editingClient?.address}
+                    key={`address-${fetchedData.address}`}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
@@ -371,7 +431,8 @@ if (!canView) {
                   <label className="text-sm font-bold text-gray-700">Número</label>
                   <input 
                     name="address_number" 
-                    defaultValue={editingClient?.address_number}
+                    defaultValue={fetchedData.address_number || editingClient?.address_number}
+                    key={`num-${fetchedData.address_number}`}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
@@ -379,8 +440,8 @@ if (!canView) {
                   <label className="text-sm font-bold text-gray-700">Bairro</label>
                   <input 
                     name="neighborhood" 
-                    defaultValue={addressData.neighborhood || editingClient?.neighborhood}
-                    key={addressData.neighborhood}
+                    defaultValue={fetchedData.neighborhood || editingClient?.neighborhood}
+                    key={`neigh-${fetchedData.neighborhood}`}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
@@ -396,8 +457,8 @@ if (!canView) {
                   <label className="text-sm font-bold text-gray-700">Cidade</label>
                   <input 
                     name="city" 
-                    defaultValue={addressData.city || editingClient?.city}
-                    key={addressData.city}
+                    defaultValue={fetchedData.city || editingClient?.city}
+                    key={`city-${fetchedData.city}`}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
@@ -405,8 +466,8 @@ if (!canView) {
                   <label className="text-sm font-bold text-gray-700">Estado</label>
                   <input 
                     name="state" 
-                    defaultValue={addressData.state || editingClient?.state}
-                    key={addressData.state}
+                    defaultValue={fetchedData.state || editingClient?.state}
+                    key={`state-${fetchedData.state}`}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>

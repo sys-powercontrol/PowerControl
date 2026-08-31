@@ -395,27 +395,34 @@ export default function AdminMaster() {
   const searchCNPJ = async () => {
     const cleanCNPJ = cnpj.replace(/\D/g, "");
     if (cleanCNPJ.length !== 14) {
-      toast.error("CNPJ inválido. Digite 14 números.");
+      toast.error("CNPJ inválido. Digite os 14 números.");
       return;
     }
 
     setIsSearchingCNPJ(true);
     try {
       const data = await externalApi.fetchCNPJ(cleanCNPJ);
+      const cleanCep = data.cep ? data.cep.replace(/\D/g, "") : "";
+      
       setFetchedData((prev: any) => ({
         ...prev,
-        name: data.nome,
-        email: data.email,
-        phone: data.telefone,
-        zip_code: data.cep.replace(/\D/g, ""),
-        address: data.logradouro,
-        address_number: data.numero,
-        neighborhood: data.bairro,
-        city: data.municipio,
-        state: data.uf,
-        cnae: data.atividade_principal?.[0]?.code
+        name: data.nome || data.fantasia || prev.name,
+        email: data.email || prev.email,
+        phone: data.telefone || prev.phone,
+        zip_code: cleanCep || prev.zip_code,
+        address: data.logradouro || prev.address,
+        address_number: data.numero || prev.address_number,
+        complemento: data.complemento || prev.complemento,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.municipio || prev.city,
+        state: data.uf || prev.state,
+        cnae: data.cnae || data.atividade_principal?.[0]?.code || prev.cnae
       }));
-      toast.success("Dados da empresa encontrados!");
+
+      if (cleanCep) {
+        setZipCode(cleanCep);
+      }
+      toast.success("Dados da empresa consultados e preenchidos!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao buscar CNPJ");
     } finally {

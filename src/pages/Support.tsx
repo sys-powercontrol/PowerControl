@@ -439,12 +439,12 @@ Preciso de auxílio técnico com a plataforma.`;
       <div className="bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="space-y-4 max-w-2xl text-center md:text-left">
+          <div className="space-y-4 max-w-4xl text-center md:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 rounded-full border border-blue-400/30 text-blue-200 text-xs font-bold">
               <LifeBuoy size={14} className="text-blue-400 animate-pulse" />
               <span>Central Unificada de Atendimento & Suporte</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight w-[800px] max-w-full">
               Como podemos ajudar sua empresa hoje?
             </h1>
             <p className="text-blue-100/80 text-sm sm:text-base leading-relaxed">
@@ -453,16 +453,6 @@ Preciso de auxílio técnico com a plataforma.`;
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <a
-              id="btn-support-header-whatsapp"
-              href={supportWhatsAppUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
-            >
-              <MessageSquare size={18} />
-              <span>WhatsApp Suporte</span>
-            </a>
             <Link
               to="/BaseConhecimento"
               className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"

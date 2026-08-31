@@ -53,6 +53,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import ScrollToTop from "./components/ScrollToTop";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -113,61 +114,63 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <ScrollToTop />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<Dashboard />} />
-              <Route path="PainelVendedor" element={<SellerDashboard />} />
-              <Route path="Produtos" element={<Products />} />
-              <Route path="Categorias" element={<Products defaultTab="Categorias" />} />
-              <Route path="Marcas" element={<Products defaultTab="Marcas" />} />
-              <Route path="Servicos" element={<Services />} />
-              <Route path="AjustesEstoque" element={<InventoryAdjustments />} />
-              <Route path="HistoricoEstoque" element={<InventoryHistory />} />
-              <Route path="RelatorioGiro" element={<InventoryTurnoverReport />} />
-              <Route path="RelatorioLucratividade" element={<ProfitabilityReport />} />
-              <Route path="Compras" element={<Purchases />} />
-              <Route path="HistoricoCompras" element={<PurchaseHistory />} />
-              <Route path="Vender" element={<Sales />} />
-              <Route path="HistoricoVendas" element={<SalesHistory />} />
-              <Route path="Comissoes" element={<CommissionPayouts />} />
-              <Route path="Certificado" element={<CertificateManager />} />
-              <Route path="Vendedores" element={<Sellers />} />
-              <Route path="Clientes" element={<Clients />} />
-              <Route path="Caixas" element={<Cashiers />} />
-              <Route path="ContasPagar" element={<AccountsPayable />} />
-              <Route path="ContasReceber" element={<AccountsReceivable />} />
-              <Route path="RelatorioDRE" element={<CashFlowReport />} />
-              <Route path="RelatorioFluxoCaixa" element={<Navigate to="/RelatorioDRE" replace />} />
-              <Route path="ContasBancarias" element={<BankAccounts />} />
-              <Route path="ConciliacaoBancaria" element={<BankReconciliation />} />
-              <Route path="Transferencias" element={<Transfers />} />
-              <Route path="Fornecedores" element={<Suppliers />} />
-              <Route path="Categorias" element={<Categories />} />
-              <Route path="Funcionarios" element={<Employees />} />
-              <Route path="Convites" element={<Invite />} />
-              <Route path="MeuPerfil" element={<Profile />} />
-              <Route path="Empresa" element={<Company />} />
-              <Route path="PainelAdminMaster" element={<AdminMaster />} />
-              <Route path="DashboardGlobal" element={<GlobalDashboard />} />
-              <Route path="Configuracoes" element={<Configurations />} />
-              <Route path="ConfiguracoesFiscais" element={<TaxSettings />} />
-              <Route path="Fiscal" element={<Fiscal />} />
-              <Route path="Suporte" element={<Support />} />
-              <Route path="BaseConhecimento" element={<KnowledgeBase />} />
-              <Route path="TermosDeUso" element={<TermsOfUse />} />
-              <Route path="PoliticaPrivacidade" element={<PrivacyPolicy />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-        <Toaster position="top-right" />
-      </QueryClientProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
+            <ScrollToTop />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route index element={<Dashboard />} />
+                <Route path="PainelVendedor" element={<SellerDashboard />} />
+                <Route path="Produtos" element={<Products />} />
+                <Route path="Categorias" element={<Products defaultTab="Categorias" />} />
+                <Route path="Marcas" element={<Products defaultTab="Marcas" />} />
+                <Route path="Servicos" element={<Services />} />
+                <Route path="AjustesEstoque" element={<InventoryAdjustments />} />
+                <Route path="HistoricoEstoque" element={<InventoryHistory />} />
+                <Route path="RelatorioGiro" element={<InventoryTurnoverReport />} />
+                <Route path="RelatorioLucratividade" element={<ProfitabilityReport />} />
+                <Route path="Compras" element={<Purchases />} />
+                <Route path="HistoricoCompras" element={<PurchaseHistory />} />
+                <Route path="Vender" element={<Sales />} />
+                <Route path="HistoricoVendas" element={<SalesHistory />} />
+                <Route path="Comissoes" element={<CommissionPayouts />} />
+                <Route path="Certificado" element={<CertificateManager />} />
+                <Route path="Vendedores" element={<Sellers />} />
+                <Route path="Clientes" element={<Clients />} />
+                <Route path="Caixas" element={<Cashiers />} />
+                <Route path="ContasPagar" element={<AccountsPayable />} />
+                <Route path="ContasReceber" element={<AccountsReceivable />} />
+                <Route path="RelatorioDRE" element={<CashFlowReport />} />
+                <Route path="RelatorioFluxoCaixa" element={<Navigate to="/RelatorioDRE" replace />} />
+                <Route path="ContasBancarias" element={<BankAccounts />} />
+                <Route path="ConciliacaoBancaria" element={<BankReconciliation />} />
+                <Route path="Transferencias" element={<Transfers />} />
+                <Route path="Fornecedores" element={<Suppliers />} />
+                <Route path="Categorias" element={<Categories />} />
+                <Route path="Funcionarios" element={<Employees />} />
+                <Route path="Convites" element={<Invite />} />
+                <Route path="MeuPerfil" element={<Profile />} />
+                <Route path="Empresa" element={<Company />} />
+                <Route path="PainelAdminMaster" element={<AdminMaster />} />
+                <Route path="DashboardGlobal" element={<GlobalDashboard />} />
+                <Route path="Configuracoes" element={<Configurations />} />
+                <Route path="ConfiguracoesFiscais" element={<TaxSettings />} />
+                <Route path="Fiscal" element={<Fiscal />} />
+                <Route path="Suporte" element={<Support />} />
+                <Route path="BaseConhecimento" element={<KnowledgeBase />} />
+                <Route path="TermosDeUso" element={<TermsOfUse />} />
+                <Route path="PoliticaPrivacidade" element={<PrivacyPolicy />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster position="top-right" />
+        </QueryClientProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

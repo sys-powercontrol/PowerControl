@@ -126,12 +126,19 @@ export default function Cashiers() {
     }
   };
 
+  const { data: cashierSessions = [], isLoading: isLoadingSessions } = useQuery({
+    queryKey: ["cashier_sessions", historyCashier?.id],
+    queryFn: () => api.get("cashier_sessions", { cashier_id: historyCashier?.id, _orderBy: "closed_at", _orderDir: "desc" }),
+    enabled: !!historyCashier?.id
+  });
+
   const closeCashierMutation = useMutation({
     mutationFn: async ({ cashier, counted, notes }: { cashier: any; counted: number; notes: string }) => {
       const now = new Date().toISOString();
-      const closedBy = user?.full_name || "Sistema";
+      const closedBy = user?.full_name || user?.email || "Sistema";
       const expected = Number(cashier.balance) || 0;
       const difference = Number((counted - expected).toFixed(2));
+      const companyId = cashier.company_id || currentCompanyId || user?.company_id;
 
       // 1. Fetch and link unclosed sales and movements
       try {
@@ -157,7 +164,76 @@ export default function Cashiers() {
         console.warn("Aviso ao vincular lançamentos ao fechamento do caixa:", err);
       }
 
-      // 2. Close cashier with audited expected vs counted amounts
+      // 2. Contábil: Criar lançamento de ajuste financeiro se houver discrepância
+      if (difference < 0) {
+        // Quebra de caixa (falta de dinheiro físico) -> Lançamento de Saída
+        try {
+          await api.post("movements", {
+            company_id: companyId,
+            type: "Saída",
+            description: `Ajuste de Quebra de Caixa - Caixa: ${cashier.name}`,
+            amount: Math.abs(difference),
+            from_account_type: "Caixa",
+            from_account_id: cashier.id,
+            from_account_name: cashier.name,
+            category: "Quebra de Caixa",
+            movement_date: now,
+            cashier_closed_at: now,
+            cashier_cycle_id: cashier.id,
+            observation: notes ? `Justificativa: ${notes}` : undefined
+          });
+        } catch (movErr) {
+          console.error("Erro ao registrar movimento de quebra de caixa:", movErr);
+        }
+      } else if (difference > 0) {
+        // Sobra de caixa (excesso de dinheiro físico) -> Lançamento de Entrada
+        try {
+          await api.post("movements", {
+            company_id: companyId,
+            type: "Entrada",
+            description: `Ajuste de Sobra de Caixa - Caixa: ${cashier.name}`,
+            amount: difference,
+            to_account_type: "Caixa",
+            to_account_id: cashier.id,
+            to_account_name: cashier.name,
+            category: "Sobra de Caixa",
+            movement_date: now,
+            cashier_closed_at: now,
+            cashier_cycle_id: cashier.id,
+            observation: notes ? `Justificativa: ${notes}` : undefined
+          });
+        } catch (movErr) {
+          console.error("Erro ao registrar movimento de sobra de caixa:", movErr);
+        }
+      }
+
+      // 3. Gravar registro permanente de sessão / ciclo de fechamento
+      try {
+        await api.post("cashier_sessions", {
+          company_id: companyId,
+          cashier_id: cashier.id,
+          cashier_name: cashier.name,
+          opened_at: cashier.opened_at || now,
+          opened_by: cashier.opened_by || "Sistema",
+          opened_by_id: cashier.opened_by_id || user?.id,
+          closed_at: now,
+          closed_by: closedBy,
+          closed_by_id: user?.id,
+          opening_balance: Number(cashier.opening_balance) || 0,
+          closing_balance: expected,
+          counted_balance: counted,
+          difference_balance: difference,
+          closing_notes: notes || "",
+          sales_count: closingSummary?.salesCount || 0,
+          sales_total: closingSummary?.salesTotal || 0,
+          movements_count: closingSummary?.movementsCount || 0,
+          created_at: now
+        });
+      } catch (sessionErr) {
+        console.error("Erro ao registrar sessão de caixa:", sessionErr);
+      }
+
+      // 4. Fechar caixa e atualizar saldo para o valor contado
       return api.put("cashiers", cashier.id, {
         status: "Fechado",
         closed_at: now,
@@ -165,11 +241,13 @@ export default function Cashiers() {
         closing_balance: expected,
         counted_balance: counted,
         difference_balance: difference,
-        closing_notes: notes || undefined
+        closing_notes: notes || undefined,
+        balance: counted
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
+      queryClient.invalidateQueries({ queryKey: ["cashier_sessions"] });
       queryClient.invalidateQueries({ queryKey: ["sales"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       toast.success("Caixa fechado e auditoria de turno concluída com sucesso!");
@@ -395,68 +473,124 @@ if (!canView) {
       {historyCashier && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setHistoryCashier(null)} />
-          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900">
                   <History className="text-blue-600" size={24} />
-                  Histórico do Caixa
+                  Histórico e Auditoria de Turnos
                 </h2>
-                <p className="text-sm text-gray-500 mt-1 font-medium">{historyCashier.name}</p>
+                <p className="text-sm text-gray-500 mt-1 font-medium">{historyCashier.name} — ID: {historyCashier.id?.substring(0, 8).toUpperCase()}</p>
               </div>
               <button onClick={() => setHistoryCashier(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
               </button>
             </div>
             
-            <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
-                
-                {/* Fechamento Block (Top, newest) */}
-                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 relative z-10 ${historyCashier.closed_at ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>
-                    <Lock size={16} />
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Status do Turno Atual */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Ciclo Atual</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${historyCashier.status === "Aberto" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
+                    {historyCashier.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-400 block font-medium">Abertura:</span>
+                    <span className="font-bold text-slate-800">{historyCashier.opened_at ? formatBR(historyCashier.opened_at, "dd/MM/yy HH:mm") : "---"}</span>
+                    <span className="text-[11px] text-slate-500 block truncate">Por: {historyCashier.opened_by || "Sistema"}</span>
                   </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-gray-100 bg-white shadow-sm">
-                    <div className="flex items-center justify-between space-x-2 mb-1">
-                      <div className="font-bold text-gray-900">Fechamento</div>
-                      <time className="text-xs font-bold text-gray-500 uppercase">{historyCashier.closed_at ? formatBR(historyCashier.closed_at, "dd/MM/yyyy HH:mm") : "---"}</time>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {historyCashier.closed_at ? (
-                        <>Fechado por <span className="font-bold text-gray-900">{historyCashier.closed_by || "Sistema"}</span></>
-                      ) : (
-                        <span className="text-green-600 font-medium">Caixa em andamento...</span>
-                      )}
-                    </div>
+                  <div>
+                    <span className="text-slate-400 block font-medium">Saldo Inicial:</span>
+                    <span className="font-bold text-blue-700">{formatCurrency(historyCashier.opening_balance || 0)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block font-medium">Saldo em Caixa:</span>
+                    <span className="font-bold text-slate-900 text-sm">{formatCurrency(historyCashier.balance || 0)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block font-medium">Último Fechamento:</span>
+                    <span className="font-bold text-slate-800">{historyCashier.closed_at ? formatBR(historyCashier.closed_at, "dd/MM/yy HH:mm") : "Em andamento"}</span>
+                    {historyCashier.closed_by && <span className="text-[11px] text-slate-500 block truncate">Por: {historyCashier.closed_by}</span>}
                   </div>
                 </div>
+              </div>
 
-                {/* Abertura Block (Bottom, oldest) */}
-                <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 relative z-10 ${historyCashier.opened_at ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-                    <Unlock size={16} />
+              {/* Histórico de Fechamentos Anteriores */}
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center justify-between">
+                  <span>Fechamentos Anteriores Gravados</span>
+                  <span className="text-xs font-normal text-gray-500">{cashierSessions.length} turno(s) registrado(s)</span>
+                </h3>
+
+                {isLoadingSessions ? (
+                  <div className="py-8 text-center text-sm text-gray-400 font-medium">Carregando histórico de turnos...</div>
+                ) : cashierSessions.length === 0 ? (
+                  <div className="py-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    <p className="text-sm text-gray-500 font-medium">Nenhum turno anterior registrado na base consolidada.</p>
+                    <p className="text-xs text-gray-400 mt-1">Os fechamentos realizados a partir de agora aparecerão listados aqui com auditoria completa.</p>
                   </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-gray-100 bg-white shadow-sm">
-                    <div className="flex items-center justify-between space-x-2 mb-1">
-                      <div className="font-bold text-gray-900">Abertura</div>
-                      <time className="text-xs font-bold text-gray-500 uppercase">{historyCashier.opened_at ? formatBR(historyCashier.opened_at, "dd/MM/yyyy HH:mm") : "---"}</time>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {historyCashier.opened_at ? (
-                        <>Aberto por <span className="font-bold text-gray-900">{historyCashier.opened_by || "Sistema"}</span></>
-                      ) : (
-                        <span>Sem registro de abertura</span>
-                      )}
-                    </div>
-                    {historyCashier.opening_balance !== undefined && (
-                      <div className="text-[13px] font-bold text-blue-600 mt-2 bg-blue-50 p-2 rounded-lg inline-block">
-                        Saldo Inicial: {formatCurrency(Number(historyCashier.opening_balance))}
-                      </div>
-                    )}
+                ) : (
+                  <div className="space-y-3">
+                    {cashierSessions.map((session: any) => {
+                      const diff = Number(session.difference_balance) || 0;
+                      const isExact = diff === 0;
+                      const isSurplus = diff > 0;
+
+                      return (
+                        <div key={session.id} className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 hover:border-blue-100 transition-colors space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                <Lock size={16} />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-gray-900">
+                                  Fechamento: {session.closed_at ? formatBR(session.closed_at, "dd/MM/yyyy HH:mm") : "---"}
+                                </p>
+                                <p className="text-[11px] text-gray-500">
+                                  Aberto em {session.opened_at ? formatBR(session.opened_at, "dd/MM/yyyy HH:mm") : "---"} por <span className="font-semibold text-gray-700">{session.opened_by || "Sistema"}</span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2.5 py-1 rounded-xl text-xs font-bold ${isExact ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : isSurplus ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                                {isExact ? "Conferência Exata" : isSurplus ? `Sobra: +${formatCurrency(diff)}` : `Quebra: ${formatCurrency(diff)}`}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-gray-50/70 p-3 rounded-xl">
+                            <div>
+                              <span className="text-gray-400 block font-medium">Saldo Inicial:</span>
+                              <span className="font-bold text-gray-800">{formatCurrency(session.opening_balance || 0)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 block font-medium">Saldo Esperado:</span>
+                              <span className="font-bold text-gray-800">{formatCurrency(session.closing_balance || 0)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 block font-medium">Saldo Contado:</span>
+                              <span className="font-bold text-gray-900">{formatCurrency(session.counted_balance || 0)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 block font-medium">Fechado por:</span>
+                              <span className="font-bold text-gray-800 truncate block">{session.closed_by || "Sistema"}</span>
+                            </div>
+                          </div>
+
+                          {session.closing_notes && (
+                            <div className="text-xs bg-amber-50/60 border border-amber-100 text-amber-900 p-2.5 rounded-xl">
+                              <span className="font-bold">Observação da Auditoria:</span> {session.closing_notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-                
+                )}
               </div>
             </div>
           </div>

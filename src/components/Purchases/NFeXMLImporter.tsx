@@ -1,8 +1,9 @@
 import React, { useState, useRef } from "react";
-import { Upload, FileCode, CheckCircle, X, Search, Warehouse, Receipt } from "lucide-react";
+import { Upload, FileCode, CheckCircle, X, Search, Warehouse, Receipt, Loader2 } from "lucide-react";
 import { formatCurrency } from "../../lib/currencyUtils";
 import { toast } from "sonner";
 import { api } from "../../lib/api";
+import { readXmlFileAsText, parseNFeXml } from "../../lib/utils/nfeXml";
 
 interface NFeItemParsed {
   code: string;
@@ -55,7 +56,7 @@ export function NFeXMLImporter({
   const [isParsing, setIsParsing] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -65,132 +66,97 @@ export function NFeXMLImporter({
     }
 
     setIsParsing(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const xmlText = event.target?.result as string;
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+    try {
+      const xmlText = await readXmlFileAsText(file);
+      const parsedData = parseNFeXml(xmlText);
 
-        const parseError = xmlDoc.querySelector("parsererror");
-        if (parseError) {
-          throw new Error("Erro ao ler arquivo XML: formato inválido.");
-        }
+      // 1. Supplier Matching
+      let supplierData: any = null;
+      if (parsedData.supplier) {
+        const rawCnpj = parsedData.supplier.cnpj.replace(/\D/g, "");
+        const rawName = parsedData.supplier.name.toLowerCase().trim();
 
-        // Supplier Info
-        const emitNode = xmlDoc.querySelector("emit");
-        let supplierData: any = null;
-        if (emitNode) {
-          const cnpj = emitNode.querySelector("CNPJ")?.textContent || emitNode.querySelector("CPF")?.textContent || "";
-          const name = emitNode.querySelector("xNome")?.textContent || "";
-          const tradeName = emitNode.querySelector("xFant")?.textContent || "";
-          const phone = emitNode.querySelector("fone")?.textContent || "";
-          const state = emitNode.querySelector("UF")?.textContent || "";
-          const city = emitNode.querySelector("xMun")?.textContent || "";
-
-          // Try to match existing supplier by CNPJ or name
-          const matchedSupplier = suppliers.find(s => 
-            (cnpj && s.cnpj?.replace(/\D/g, "") === cnpj.replace(/\D/g, "")) ||
-            (name && s.name?.toLowerCase() === name.toLowerCase())
-          );
-
-          if (matchedSupplier) {
-            supplierData = matchedSupplier;
-          } else {
-            supplierData = {
-              name: tradeName || name,
-              cnpj,
-              phone,
-              address_state: state,
-              address_city: city,
-              isNew: true
-            };
-          }
-        }
-
-        // Invoice Info
-        const ideNode = xmlDoc.querySelector("ide");
-        const invNum = ideNode?.querySelector("nNF")?.textContent || "";
-        const invSeries = ideNode?.querySelector("serie")?.textContent || "1";
-        const invDate = ideNode?.querySelector("dhEmi")?.textContent || new Date().toISOString();
-        setInvoiceInfo({ number: invNum, series: invSeries, date: invDate });
-
-        // Duplicates / Cobrança (<cobr><dup>)
-        const dupNodes = xmlDoc.querySelectorAll("cobr dup");
-        const parsedDups: NFeDuplicateParsed[] = [];
-        dupNodes.forEach((dup, idx) => {
-          const nDup = dup.querySelector("nDup")?.textContent || `${idx + 1}`;
-          const dVenc = dup.querySelector("dVenc")?.textContent || "";
-          const vDup = parseFloat(dup.querySelector("vDup")?.textContent || "0");
-          if (!isNaN(vDup) && vDup > 0) {
-            parsedDups.push({
-              number: nDup,
-              dueDate: dVenc,
-              amount: vDup
-            });
-          }
-        });
-        setDuplicates(parsedDups);
-
-        // Items
-        const detNodes = xmlDoc.querySelectorAll("det");
-        const parsedList: NFeItemParsed[] = [];
-
-        detNodes.forEach((det) => {
-          const prod = det.querySelector("prod");
-          if (!prod) return;
-
-          const cProd = prod.querySelector("cProd")?.textContent || "";
-          const cEAN = prod.querySelector("cEAN")?.textContent || "";
-          const xProd = prod.querySelector("xProd")?.textContent || "";
-          const ncm = prod.querySelector("NCM")?.textContent || "";
-          const cfop = prod.querySelector("CFOP")?.textContent || "";
-          const uCom = prod.querySelector("uCom")?.textContent || "UN";
-          const qCom = parseFloat(prod.querySelector("qCom")?.textContent || "1");
-          const vUnCom = parseFloat(prod.querySelector("vUnCom")?.textContent || "0");
-          const vProd = parseFloat(prod.querySelector("vProd")?.textContent || "0");
-
-          // Auto-match product by barcode or name
-          const cleanEan = cEAN && cEAN !== "SEM GTIN" ? cEAN.trim() : "";
-          const matchedProd = products.find(p => 
-            (cleanEan && p.barcode === cleanEan) ||
-            (p.name?.toLowerCase().trim() === xProd.toLowerCase().trim())
-          );
-
-          const matchedLoc = matchedProd ? (
-            matchedProd.storage_location || 
-            matchedProd.storage_code || 
-            [matchedProd.storage_room, matchedProd.storage_rack, matchedProd.storage_shelf].filter(Boolean).join("-") || 
-            ""
-          ) : "";
-
-          parsedList.push({
-            code: cProd,
-            ean: cleanEan,
-            name: xProd,
-            ncm,
-            cfop,
-            unit: uCom,
-            quantity: isNaN(qCom) || qCom <= 0 ? 1 : qCom,
-            unitCost: isNaN(vUnCom) ? 0 : vUnCom,
-            totalCost: isNaN(vProd) ? 0 : vProd,
-            linkedProductId: matchedProd?.id,
-            linkedProductName: matchedProd?.name,
-            storageLocation: matchedLoc
-          });
+        // Match existing supplier
+        const matched = suppliers.find(s => {
+          const sCnpj = (s.cnpj || "").replace(/\D/g, "");
+          const sName = (s.name || "").toLowerCase().trim();
+          return (rawCnpj && sCnpj && sCnpj === rawCnpj) || (rawName && sName && sName === rawName);
         });
 
-        setParsedSupplier(supplierData);
-        setItems(parsedList);
-        toast.success(`XML importado: ${parsedList.length} itens extraídos${parsedDups.length > 0 ? ` e ${parsedDups.length} duplicatas` : ""}.`);
-      } catch (err: any) {
-        console.error("Erro ao analisar XML:", err);
-        toast.error(err.message || "Erro ao processar o XML da NF-e.");
-      } finally {
-        setIsParsing(false);
+        if (matched) {
+          supplierData = matched;
+        } else {
+          supplierData = {
+            ...parsedData.supplier,
+            isNew: true
+          };
+        }
       }
-    };
-    reader.readAsText(file);
+
+      // 2. Invoice Info
+      setInvoiceInfo({
+        number: parsedData.invoice.number || "",
+        series: parsedData.invoice.series || "1",
+        date: parsedData.invoice.date || new Date().toISOString()
+      });
+
+      // 3. Duplicates
+      setDuplicates(parsedData.duplicates || []);
+
+      // 4. Match Items with Existing Products Catalog
+      const parsedItemsList: NFeItemParsed[] = parsedData.items.map(it => {
+        const cleanEan = it.ean && it.ean !== "SEM GTIN" ? it.ean.trim() : "";
+        const cleanCode = (it.code || "").trim().toLowerCase();
+        const cleanName = (it.name || "").trim().toLowerCase();
+
+        const matchedProd = products.find(p => {
+          const pBarcode = (p.barcode || "").trim();
+          const pCode = (p.code || p.sku || "").trim().toLowerCase();
+          const pName = (p.name || "").trim().toLowerCase();
+
+          return (
+            (cleanEan && pBarcode === cleanEan) ||
+            (cleanCode && pCode && pCode === cleanCode) ||
+            (cleanName && pName === cleanName)
+          );
+        });
+
+        const matchedLoc = matchedProd ? (
+          matchedProd.storage_location || 
+          matchedProd.storage_code || 
+          [matchedProd.storage_room, matchedProd.storage_rack, matchedProd.storage_shelf].filter(Boolean).join("-") || 
+          ""
+        ) : "";
+
+        return {
+          code: it.code,
+          ean: cleanEan,
+          name: it.name,
+          ncm: it.ncm,
+          cfop: it.cfop,
+          unit: it.unit,
+          quantity: it.quantity,
+          unitCost: it.unitCost,
+          totalCost: it.totalCost,
+          linkedProductId: matchedProd?.id,
+          linkedProductName: matchedProd?.name,
+          storageLocation: matchedLoc
+        };
+      });
+
+      setParsedSupplier(supplierData);
+      setItems(parsedItemsList);
+      toast.success(`XML importado com sucesso: ${parsedItemsList.length} itens extraídos${parsedData.duplicates.length > 0 ? ` e ${parsedData.duplicates.length} duplicatas` : ""}.`);
+    } catch (err: any) {
+      console.error("Erro ao analisar XML:", err);
+      toast.error(err.message || "Erro ao processar o XML da NF-e.");
+    } finally {
+      setIsParsing(false);
+      // Reset input value so the same file can be re-selected if needed
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleLinkProduct = (index: number, productId: string) => {
@@ -349,22 +315,48 @@ export function NFeXMLImporter({
         {/* Upload Zone */}
         {items.length === 0 ? (
           <div
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-orange-300 bg-orange-50/50 hover:bg-orange-50 rounded-2xl p-12 text-center cursor-pointer transition-colors"
+            onClick={() => !isParsing && fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isParsing) return;
+              const droppedFiles = e.dataTransfer.files;
+              if (droppedFiles && droppedFiles.length > 0) {
+                const syntheticEvent = {
+                  target: { files: droppedFiles }
+                } as unknown as React.ChangeEvent<HTMLInputElement>;
+                handleFileUpload(syntheticEvent);
+              }
+            }}
+            className={`border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${
+              isParsing
+                ? "border-orange-400 bg-orange-50/80 cursor-wait"
+                : "border-orange-300 bg-orange-50/50 hover:bg-orange-50 cursor-pointer"
+            }`}
           >
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xml"
+              accept=".xml,text/xml,application/xml"
               onChange={handleFileUpload}
               className="hidden"
             />
-            <Upload size={48} className="mx-auto text-orange-500 mb-4" />
+            {isParsing ? (
+              <Loader2 size={48} className="mx-auto text-orange-600 mb-4 animate-spin" />
+            ) : (
+              <Upload size={48} className="mx-auto text-orange-500 mb-4" />
+            )}
             <h3 className="text-base font-bold text-gray-800 mb-1">
-              {isParsing ? "Lendo XML da NF-e..." : "Clique ou arraste o arquivo XML da NF-e"}
+              {isParsing ? "Processando e validando XML da NF-e..." : "Clique ou arraste o arquivo XML da NF-e"}
             </h3>
             <p className="text-xs text-gray-500 max-w-md mx-auto">
-              O sistema extrairá o fornecedor (CNPJ/Razão Social), os produtos com NCM, código EAN, quantidades, custos e parcelas de cobrança.
+              {isParsing
+                ? "Identificando fornecedor, produtos, unidades, alíquotas, tributações e duplicatas de cobrança..."
+                : "O sistema extrairá o fornecedor (CNPJ/Razão Social), os produtos com NCM, código EAN, quantidades, custos e parcelas de cobrança."}
             </p>
           </div>
         ) : (

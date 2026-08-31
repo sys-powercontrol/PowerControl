@@ -1,5 +1,5 @@
-import React from 'react';
-import { FileText, Table as TableIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileText, Table as TableIcon, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -31,30 +31,44 @@ export default function ExportButton({
   children,
   summaryBlocks
 }: ExportButtonProps) {
+  const [isExporting, setIsExporting] = useState(false);
   
   const handleExport = () => {
+    if (isExporting) return;
     if (!data || data.length === 0) {
       toast.error("Não há dados para exportar.");
       return;
     }
 
-    // Prepare data based on headers mapping
-    const exportData = data.map(item => {
-      if (!headers) return item;
-      const newItem: any = {};
-      Object.entries(headers).forEach(([key, label]) => {
-        newItem[label] = item[key];
-      });
-      return newItem;
-    });
+    setIsExporting(true);
 
-    if (format === 'xlsx') {
-      exportToExcel(exportData);
-    } else if (format === 'csv') {
-      exportToCSV(exportData);
-    } else {
-      exportToPDF(exportData);
-    }
+    // Permitir que o navegador renderize o spinner antes de processar cálculos pesados
+    setTimeout(() => {
+      try {
+        // Prepare data based on headers mapping
+        const exportData = data.map(item => {
+          if (!headers) return item;
+          const newItem: any = {};
+          Object.entries(headers).forEach(([key, label]) => {
+            newItem[label] = item[key];
+          });
+          return newItem;
+        });
+
+        if (format === 'xlsx') {
+          exportToExcel(exportData);
+        } else if (format === 'csv') {
+          exportToCSV(exportData);
+        } else {
+          exportToPDF(exportData);
+        }
+      } catch (err) {
+        console.error("Erro no processamento de exportação:", err);
+        toast.error("Erro ao processar exportação.");
+      } finally {
+        setIsExporting(false);
+      }
+    }, 150);
   };
 
   const exportToCSV = (preparedData: any[]) => {
@@ -226,12 +240,23 @@ export default function ExportButton({
 
   return (
     <button
+      type="button"
       onClick={handleExport}
-      className={className || `flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${bgColor}`}
+      disabled={isExporting}
+      className={`${className || `flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${bgColor}`} ${
+        isExporting ? 'opacity-75 cursor-wait pointer-events-none' : ''
+      }`}
     >
-      {children ? children : (
+      {isExporting ? (
         <>
-          <Icon size={18} />
+          <Loader2 size={18} className="animate-spin text-current shrink-0" />
+          <span>Processando...</span>
+        </>
+      ) : children ? (
+        children
+      ) : (
+        <>
+          <Icon size={18} className="shrink-0" />
           <span>{label}</span>
         </>
       )}

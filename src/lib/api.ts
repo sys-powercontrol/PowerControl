@@ -420,7 +420,7 @@ export const api = {
             throw new Error("Pendente de company_id");
           }
           conditions.push(where("company_id", "==", companyId));
-        } else if (isSystemAdminStatus && (currentCompanyId || await api.waitForCompany(500)) && !(paramsOrId && paramsOrId._all) && !isCompanyEntity) {
+        } else if (isSystemAdminStatus && !paramsOrId?.company_id && (currentCompanyId || await api.waitForCompany(500)) && !(paramsOrId && (paramsOrId._all || paramsOrId.all)) && !isCompanyEntity) {
           conditions.push(where("company_id", "==", currentCompanyId));
         }
 

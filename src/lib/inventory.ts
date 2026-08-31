@@ -848,6 +848,86 @@ export const inventory = {
     });
   },
 
+  async reversePurchaseStock(purchase: any, userContext?: User) {
+    const user = userContext || (await api.get<User>("me")) as User;
+    if (!user) throw new Error("Usuário não autenticado");
+
+    const items = purchase?.items || [];
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    return runTransaction(db, async (transaction) => {
+      const productDocs = new Map<string, any>();
+
+      // 1. READ ALL PRODUCT DOCS FIRST
+      for (const item of items) {
+        const prodId = item.id || item.product_id;
+        if (!prodId) continue;
+
+        if (!productDocs.has(prodId)) {
+          const productRef = doc(db, "products", prodId);
+          const productDoc = await transaction.get(productRef);
+          if (productDoc.exists()) {
+            productDocs.set(prodId, productDoc);
+          }
+        }
+      }
+
+      // 2. READ COMPANY FOR allow_negative_stock
+      const companyId = purchase.company_id || user.company_id;
+      let allowNegativeStock = true;
+      if (companyId) {
+        const companyRef = doc(db, "companies", companyId);
+        const companyDoc = await transaction.get(companyRef);
+        allowNegativeStock = companyDoc.data()?.allow_negative_stock === "true" || companyDoc.data()?.allow_negative_stock === true;
+      }
+
+      // 3. PERFORM ALL WRITES (DEDUCT STOCK)
+      const stockUpdates = new Map<string, number>();
+
+      for (const item of items) {
+        const prodId = item.id || item.product_id;
+        if (!prodId) continue;
+
+        const productDoc = productDocs.get(prodId);
+        if (!productDoc) continue;
+
+        const productData = productDoc.data();
+        const itemQty = Number(item.quantity) || 1;
+
+        const previous_stock = stockUpdates.has(prodId)
+          ? stockUpdates.get(prodId)!
+          : (productData.stock_quantity || 0);
+
+        if (!allowNegativeStock && previous_stock < itemQty) {
+          throw new Error(`Estoque insuficiente para estornar a compra do produto "${item.name || item.product_name || productData.name}". Saldo disponível: ${previous_stock}, saída: ${itemQty}`);
+        }
+
+        const current_stock = previous_stock - itemQty;
+        stockUpdates.set(prodId, current_stock);
+
+        const productRef = doc(db, "products", prodId);
+        transaction.update(productRef, { stock_quantity: current_stock });
+
+        const movementRef = doc(collection(db, "inventory_movements"));
+        transaction.set(movementRef, {
+          product_id: prodId,
+          product_name: item.name || item.product_name || productData.name || "Produto",
+          company_id: companyId,
+          type: 'OUT',
+          reason: 'PURCHASE_CANCEL',
+          quantity: itemQty,
+          previous_stock,
+          current_stock,
+          reference_id: purchase.id,
+          reconciliation_id: purchase.id,
+          user_id: user.id,
+          user_name: user.full_name || user.email || "Sistema",
+          timestamp: serverTimestamp()
+        });
+      }
+    });
+  },
+
   async recordSale(saleData: Partial<Sale> & Record<string, unknown>, items: SaleItem[], userContext?: User) {
     return this.processSale(saleData, items, userContext);
   }

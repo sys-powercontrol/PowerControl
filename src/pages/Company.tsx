@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { storage } from "../lib/firebase";
@@ -32,11 +32,7 @@ export default function Company() {
     enabled: !!companyId,
   });
 
-  useEffect(() => {
-    if (company?.logo_url) {
-      setTimeout(() => setLogoPreview(company.logo_url), 0);
-    }
-  }, [company]);
+  const displayLogo = logoPreview || company?.logo_url || null;
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => api.put("companies", companyId, data),
@@ -63,7 +59,8 @@ export default function Company() {
   };
 
   const searchCEP = async () => {
-    const cleanCEP = zipCode.replace(/\D/g, "");
+    const rawZip = zipCode || company?.zip_code || "";
+    const cleanCEP = rawZip.replace(/\D/g, "");
     if (cleanCEP.length !== 8) {
       toast.error("CEP inválido. Digite 8 números.");
       return;
@@ -74,10 +71,10 @@ export default function Company() {
       const data = await externalApi.fetchCEP(cleanCEP);
       setFetchedData((prev: any) => ({
         ...prev,
-        address: data.logradouro,
-        neighborhood: data.bairro,
-        city: data.localidade,
-        state: data.uf
+        address: data.logradouro || prev.address,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.localidade || prev.city,
+        state: data.uf || prev.state
       }));
       toast.success("Endereço encontrado!");
     } catch (err: unknown) {
@@ -88,29 +85,38 @@ export default function Company() {
   };
 
   const searchCNPJ = async () => {
-    const cleanCNPJ = cnpj.replace(/\D/g, "");
+    const rawCnpj = cnpj || company?.cnpj || "";
+    const cleanCNPJ = rawCnpj.replace(/\D/g, "");
     if (cleanCNPJ.length !== 14) {
-      toast.error("CNPJ inválido. Digite 14 números.");
+      toast.error("CNPJ inválido. Digite os 14 números.");
       return;
     }
 
     setIsSearchingCNPJ(true);
     try {
       const data = await externalApi.fetchCNPJ(cleanCNPJ);
+      const cleanCep = data.cep ? data.cep.replace(/\D/g, "") : "";
+      
       setFetchedData((prev: any) => ({
         ...prev,
-        name: data.nome,
-        email: data.email,
-        phone: data.telefone,
-        zip_code: data.cep.replace(/\D/g, ""),
-        address: data.logradouro,
-        address_number: data.numero,
-        neighborhood: data.bairro,
-        city: data.municipio,
-        state: data.uf,
-        cnae: data.atividade_principal?.[0]?.code
+        name: data.fantasia || data.nome || prev.name,
+        razao_social: data.nome || prev.razao_social,
+        email: data.email || prev.email,
+        phone: data.telefone || prev.phone,
+        zip_code: cleanCep || prev.zip_code,
+        address: data.logradouro || prev.address,
+        address_number: data.numero || prev.address_number,
+        complemento: data.complemento || prev.complemento,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.municipio || prev.city,
+        state: data.uf || prev.state,
+        cnae: data.cnae || data.atividade_principal?.[0]?.code || prev.cnae
       }));
-      toast.success("Dados da empresa encontrados!");
+
+      if (cleanCep) {
+        setZipCode(cleanCep);
+      }
+      toast.success("Dados da empresa consultados e preenchidos!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao buscar CNPJ");
     } finally {
@@ -173,8 +179,8 @@ if (!canManage) {
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="relative group">
               <div className="w-32 h-32 bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-50 flex items-center justify-center">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                {displayLogo ? (
+                  <img src={displayLogo} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
                   <Building2 size={48} className="text-gray-300" />
                 )}
@@ -203,6 +209,17 @@ if (!canManage) {
                   defaultValue={fetchedData.name || company.name}
                   key={fetchedData.name}
                   required
+                  placeholder="Nome fantasia ou marca"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">Razão Social</label>
+                <input 
+                  name="razao_social"
+                  defaultValue={fetchedData.razao_social || company.razao_social || ""}
+                  key={fetchedData.razao_social}
+                  placeholder="Razão Social completa"
                   className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -213,14 +230,15 @@ if (!canManage) {
                     name="cnpj"
                     mask="00.000.000/0000-00"
                     defaultValue={company.cnpj}
+                    value={cnpj || undefined}
                     onChange={(val) => setCnpj(val)}
                   />
                   <button
                     type="button"
                     onClick={searchCNPJ}
-                    disabled={isSearchingCNPJ}
-                    className="px-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50"
-                    title="Consultar CNPJ"
+                    disabled={isSearchingCNPJ || (cnpj || company.cnpj || "").replace(/\D/g, "").length !== 14}
+                    className="px-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50 flex items-center justify-center shrink-0 cursor-pointer"
+                    title="Consultar dados na Receita Federal via CNPJ"
                   >
                     {isSearchingCNPJ ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
                   </button>

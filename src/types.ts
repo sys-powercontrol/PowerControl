@@ -37,6 +37,7 @@ export interface User {
 export interface Company {
   id: string;
   name: string;
+  razao_social?: string;
   cnpj?: string;
   email?: string;
   phone?: string;

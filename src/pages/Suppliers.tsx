@@ -98,28 +98,36 @@ export default function Suppliers() {
   };
 
   const searchCNPJ = async () => {
-    const cleanCNPJ = cnpj.replace(/\D/g, "");
+    const rawCnpj = cnpj || editingSupplier?.document || "";
+    const cleanCNPJ = rawCnpj.replace(/\D/g, "");
     if (cleanCNPJ.length !== 14) {
-      toast.error("CNPJ inválido. Digite 14 números.");
+      toast.error("CNPJ inválido. Digite os 14 números.");
       return;
     }
 
     setIsSearchingCNPJ(true);
     try {
       const data = await externalApi.fetchCNPJ(cleanCNPJ);
+      const cleanCep = data.cep ? data.cep.replace(/\D/g, "") : "";
+      
       setFetchedData((prev: any) => ({
         ...prev,
-        name: data.nome,
-        email: data.email,
-        phone: data.telefone,
-        zip_code: data.cep.replace(/\D/g, ""),
-        address: data.logradouro,
-        address_number: data.numero,
-        neighborhood: data.bairro,
-        city: data.municipio,
-        state: data.uf
+        name: data.nome || data.fantasia || prev.name,
+        email: data.email || prev.email,
+        phone: data.telefone || prev.phone,
+        zip_code: cleanCep || prev.zip_code,
+        address: data.logradouro || prev.address,
+        address_number: data.numero || prev.address_number,
+        complemento: data.complemento || prev.complemento,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.municipio || prev.city,
+        state: data.uf || prev.state
       }));
-      toast.success("Dados da empresa encontrados!");
+
+      if (cleanCep) {
+        setZipCode(cleanCep);
+      }
+      toast.success("Dados da empresa consultados e preenchidos!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao buscar CNPJ");
     } finally {
@@ -240,6 +248,8 @@ if (!canView) {
             onClick={() => {
               setEditingSupplier(null);
               setFetchedData({});
+              setCnpj("");
+              setZipCode("");
               setIsModalOpen(true);
             }}
             className="col-span-2 sm:col-span-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl px-3 py-2.5 flex items-center justify-center gap-2 font-bold shadow-md shadow-blue-500/20 transition-all text-xs sm:text-sm cursor-pointer min-h-[48px] w-full h-full"
@@ -308,7 +318,9 @@ if (!canView) {
                       <button 
                         onClick={() => {
                           setEditingSupplier(supplier);
-                          setFetchedData({});
+                          setFetchedData(supplier);
+                          setCnpj(supplier.document || "");
+                          setZipCode(supplier.zip_code || "");
                           setIsModalOpen(true);
                         }}
                         title="Editar Fornecedor"
@@ -374,14 +386,16 @@ if (!canView) {
                         { mask: '00.000.000/0000-00' }
                       ]}
                       defaultValue={editingSupplier?.document}
+                      value={cnpj || undefined}
                       onChange={(val) => setCnpj(val)}
+                      key={`cnpj-${cnpj}`}
                     />
                     <button
                       type="button"
                       onClick={searchCNPJ}
-                      disabled={isSearchingCNPJ}
-                      className="px-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50"
-                      title="Consultar CNPJ"
+                      disabled={isSearchingCNPJ || (cnpj || editingSupplier?.document || "").replace(/\D/g, "").length !== 14}
+                      className="px-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50 flex items-center justify-center shrink-0 cursor-pointer"
+                      title="Consultar dados na Receita Federal via CNPJ"
                     >
                       {isSearchingCNPJ ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
                     </button>

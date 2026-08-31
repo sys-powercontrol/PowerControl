@@ -875,6 +875,8 @@ if (!canManage) {
         onClose={() => setIsDanfeOpen(false)} 
         pdfUrl={selectedInvoice?.pdf_url} 
         invoiceNumber={selectedInvoice?.number} 
+        model={selectedInvoice?.model || (selectedInvoice?.type === 'NFC-e' ? '65' : '55')}
+        invoiceData={selectedInvoice}
       />
 
       {/* Modal Enviar E-mail Fiscal */}

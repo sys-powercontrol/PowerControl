@@ -17,7 +17,9 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FileText,
-  Warehouse
+  Warehouse,
+  Building2,
+  ChevronDown
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -29,10 +31,11 @@ export default function PurchaseHistory() {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>("all");
 
-  const canView = hasPermission('inventory.manage');
-
-  
+  const isMaster = user?.role === 'master';
+  const isAdminOrMaster = user?.role === 'admin' || isMaster;
+  const canView = hasPermission('inventory.manage') || isAdminOrMaster;
 
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -41,6 +44,22 @@ export default function PurchaseHistory() {
 
   const currentCompanyId = api.getCompanyId() || user?.company_id;
 
+  const { data: companies = [] } = useQuery({ 
+    queryKey: ["companies", "all"], 
+    queryFn: () => api.get("companies", { _all: true }).then(r => Array.isArray(r) ? r : []),
+    enabled: isMaster
+  });
+
+  const companiesMap = useMemo(() => {
+    const map = new Map<string, any>();
+    if (Array.isArray(companies)) {
+      companies.forEach((c: any) => {
+        if (c.id) map.set(c.id, c);
+      });
+    }
+    return map;
+  }, [companies]);
+
   const { data: company } = useQuery({ 
     queryKey: ["company", currentCompanyId], 
     queryFn: () => api.get(`companies/${currentCompanyId}`),
@@ -48,14 +67,32 @@ export default function PurchaseHistory() {
   });
 
   const { data: purchasesData = [], isLoading } = useQuery({ 
-    queryKey: ["purchases", currentCompanyId], 
-    queryFn: () => api.get("purchases", { _orderBy: "purchase_date", _orderDir: "desc" }),
+    queryKey: ["purchases", isMaster ? selectedCompanyFilter : currentCompanyId], 
+    queryFn: () => {
+      if (isMaster) {
+        if (selectedCompanyFilter === "all") {
+          return api.get("purchases", { _all: true, _orderBy: "purchase_date", _orderDir: "desc" });
+        } else {
+          return api.get("purchases", { company_id: selectedCompanyFilter, _orderBy: "purchase_date", _orderDir: "desc" });
+        }
+      }
+      return api.get("purchases", { _orderBy: "purchase_date", _orderDir: "desc" });
+    },
     enabled: !!user
   });
 
   const { data: productsData = [] } = useQuery({
-    queryKey: ["products", currentCompanyId],
-    queryFn: () => api.get("products", currentCompanyId ? { company_id: currentCompanyId } : {}),
+    queryKey: ["products", isMaster ? selectedCompanyFilter : currentCompanyId],
+    queryFn: () => {
+      if (isMaster) {
+        if (selectedCompanyFilter === "all") {
+          return api.get("products", { _all: true });
+        } else {
+          return api.get("products", { company_id: selectedCompanyFilter });
+        }
+      }
+      return api.get("products", currentCompanyId ? { company_id: currentCompanyId } : {});
+    },
     enabled: !!user
   });
 
@@ -80,20 +117,32 @@ export default function PurchaseHistory() {
   };
 
   const filteredPurchases = useMemo(() => {
-    return purchasesData.filter((p: any) => 
-      p.purchase_number?.includes(searchTerm) ||
-      p.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [purchasesData, searchTerm]);
+    return purchasesData.filter((p: any) => {
+      const matchesSearch = 
+        p.purchase_number?.includes(searchTerm) ||
+        p.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (isMaster && companiesMap.get(p.company_id)?.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesSearch;
+    });
+  }, [purchasesData, searchTerm, isMaster, companiesMap]);
 
   const purchaseExportHeaders = {
     purchase_number: "Nº Compra",
+    ...(isMaster ? { company_name: "Empresa" } : {}),
     supplier_name: "Fornecedor",
     total: "Total",
     payment_method: "Pagamento",
     status: "Status",
     purchase_date: "Data"
   };
+
+  const exportData = useMemo(() => {
+    if (!isMaster) return filteredPurchases;
+    return filteredPurchases.map((p: any) => ({
+      ...p,
+      company_name: companiesMap.get(p.company_id)?.name || p.company_name || "N/A"
+    }));
+  }, [filteredPurchases, isMaster, companiesMap]);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [purchaseToDelete, setPurchaseToDelete] = useState<string | null>(null);
@@ -104,12 +153,54 @@ export default function PurchaseHistory() {
 
   const cancelPurchaseMutation = useMutation({
     mutationFn: async (id: string) => {
-      const dbPurchase = purchasesData.find((p: any) => p.id === id);
+      let dbPurchase = purchasesData.find((p: any) => p.id === id);
+      if (!dbPurchase) {
+        dbPurchase = await api.get(`purchases/${id}`);
+      }
       if (dbPurchase && dbPurchase.status !== "Cancelada") {
          const { reversePurchasePayment } = await import("../lib/finance");
-         await reversePurchasePayment(dbPurchase);
-         // Note: idealmente revertemos o stock, mas vamos focar na reversão do financeiro como solicitado
+         const { inventory } = await import("../lib/inventory");
+         
+         // 1. Revert financial payment/entries
+         try {
+           await reversePurchasePayment(dbPurchase);
+         } catch (err: any) {
+           console.warn("Aviso ao estornar pagamento:", err?.message || err);
+         }
+         
+         // 2. Revert inventory stock
+         try {
+           await inventory.reversePurchaseStock(dbPurchase, user);
+         } catch (err: any) {
+           console.warn("Aviso ao estornar estoque:", err?.message || err);
+         }
+         
+         // 3. Update associated accounts payable
+         try {
+           const { collection, query, where, getDocs, updateDoc, doc } = await import("firebase/firestore");
+           const { db } = await import("../lib/firebase");
+           const payablesQuery = query(collection(db, "accountsPayable"), where("purchase_id", "==", id));
+           const payablesSnap = await getDocs(payablesQuery);
+           for (const payableDoc of payablesSnap.docs) {
+             await updateDoc(doc(db, "accountsPayable", payableDoc.id), { status: "Cancelado" });
+           }
+         } catch (payablesErr) {
+           console.error("Erro ao cancelar contas a pagar vinculadas:", payablesErr);
+         }
+
+         // 4. Mark purchase as Cancelada
          await api.put("purchases", id, { status: "Cancelada" });
+
+         // 5. Audit log
+         if (api.log) {
+           await api.log({
+             action: "UPDATE",
+             description: `Cancelamento da compra #${id.substring(0, 8).toUpperCase()}`,
+             entity: "purchases",
+             entity_id: id,
+             company_id: dbPurchase.company_id
+           }, user);
+         }
       }
     },
     onSuccess: () => {
@@ -119,20 +210,69 @@ export default function PurchaseHistory() {
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
-      toast.success("Compra cancelada com sucesso!");
+      toast.success("Compra cancelada e estoque estornado com sucesso!");
       setIsDetailsModalOpen(false);
       setIsCancelModalOpen(false);
       setPurchaseToCancel(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao cancelar compra.");
     }
   });
 
   const deletePurchaseMutation = useMutation({
     mutationFn: async (id: string) => {
-      const dbPurchase = purchasesData.find((p: any) => p.id === id);
+      let dbPurchase = purchasesData.find((p: any) => p.id === id);
+      if (!dbPurchase) {
+        try {
+          dbPurchase = await api.get(`purchases/${id}`);
+        } catch {
+          // ignore
+        }
+      }
       if (dbPurchase && dbPurchase.status !== "Cancelada") {
          const { reversePurchasePayment } = await import("../lib/finance");
-         await reversePurchasePayment(dbPurchase);
+         const { inventory } = await import("../lib/inventory");
+         try {
+           await reversePurchasePayment(dbPurchase);
+         } catch (err: any) {
+           console.warn("Aviso ao estornar pagamento na exclusão:", err?.message || err);
+         }
+         try {
+           await inventory.reversePurchaseStock(dbPurchase, user);
+         } catch (err: any) {
+           console.warn("Aviso ao estornar estoque na exclusão:", err?.message || err);
+         }
       }
+
+      // Cancel or clean up associated accounts payable
+      try {
+        const { collection, query, where, getDocs, updateDoc, doc } = await import("firebase/firestore");
+        const { db } = await import("../lib/firebase");
+        const payablesQuery = query(collection(db, "accountsPayable"), where("purchase_id", "==", id));
+        const payablesSnap = await getDocs(payablesQuery);
+        for (const payableDoc of payablesSnap.docs) {
+          await updateDoc(doc(db, "accountsPayable", payableDoc.id), { status: "Cancelado" });
+        }
+      } catch (payablesErr) {
+        console.error("Erro ao cancelar contas a pagar na exclusão da compra:", payablesErr);
+      }
+
+      // Audit log before deleting
+      if (api.log && dbPurchase) {
+        try {
+          await api.log({
+            action: "DELETE",
+            description: `Exclusão da compra #${id.substring(0, 8).toUpperCase()}`,
+            entity: "purchases",
+            entity_id: id,
+            company_id: dbPurchase.company_id
+          }, user);
+        } catch {
+          // ignore log failure
+        }
+      }
+
       return api.delete("purchases", id);
     },
     onSuccess: () => {
@@ -146,6 +286,9 @@ export default function PurchaseHistory() {
       setIsDetailsModalOpen(false);
       setIsDeleteModalOpen(false);
       setPurchaseToDelete(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao excluir compra.");
     }
   });
 
@@ -156,6 +299,9 @@ export default function PurchaseHistory() {
       toast.success("Compra atualizada com sucesso!");
       setIsEditModalOpen(false);
       setPurchaseToEdit(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao atualizar compra.");
     }
   });
 
@@ -172,14 +318,14 @@ export default function PurchaseHistory() {
   const handleEditClick = (purchase: any) => {
     setPurchaseToEdit(purchase);
     setEditForm({
-      supplier_name: purchase.supplier_name,
-      status: purchase.status,
-      payment_status: purchase.payment_status
+      supplier_name: purchase.supplier_name || "",
+      status: purchase.status || "Concluída",
+      payment_status: purchase.payment_status || "Pendente"
     });
     setIsEditModalOpen(true);
   };
 
-if (!canView) {
+  if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
         <div className="p-4 bg-red-50 text-red-600 rounded-full">
@@ -205,7 +351,7 @@ if (!canView) {
         </div>
         <div className="grid grid-cols-2 gap-3 w-full md:w-auto items-stretch">
           <ExportButton 
-            data={filteredPurchases} 
+            data={exportData} 
             filename="historico-compras" 
             format="xlsx" 
             headers={purchaseExportHeaders} 
@@ -224,7 +370,7 @@ if (!canView) {
           </ExportButton>
 
           <ExportButton 
-            data={filteredPurchases} 
+            data={exportData} 
             filename="historico-compras" 
             format="pdf" 
             title="Histórico de Compras"
@@ -246,15 +392,38 @@ if (!canView) {
       </div>
 
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input 
-            type="text" 
-            placeholder="Buscar por número ou fornecedor..." 
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input 
+              type="text" 
+              placeholder={isMaster ? "Buscar por número, fornecedor ou empresa..." : "Buscar por número ou fornecedor..."} 
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {isMaster && (
+            <div className="flex items-center gap-2 min-w-[240px]">
+              <div className="relative w-full">
+                <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <select
+                  value={selectedCompanyFilter}
+                  onChange={(e) => setSelectedCompanyFilter(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="all">Todas as Empresas ({companies.length})</option>
+                  {companies.map((comp: any) => (
+                    <option key={comp.id} value={comp.id}>
+                      {comp.name || comp.trade_name || comp.fantasy_name || comp.razao_social || "Empresa sem nome"}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -262,6 +431,7 @@ if (!canView) {
             <thead>
               <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-50">
                 <th className="pb-4 font-medium">Número</th>
+                {isMaster && <th className="pb-4 font-medium">Empresa</th>}
                 <th className="pb-4 font-medium">Fornecedor</th>
                 <th className="pb-4 font-medium">Total</th>
                 <th className="pb-4 font-medium">Status</th>
@@ -272,79 +442,94 @@ if (!canView) {
             <tbody className="divide-y divide-gray-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-gray-500">Carregando histórico...</td>
+                  <td colSpan={isMaster ? 7 : 6} className="py-8 text-center text-gray-500">Carregando histórico...</td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-gray-500">Nenhuma compra encontrada.</td>
+                  <td colSpan={isMaster ? 7 : 6} className="py-8 text-center text-gray-500">Nenhuma compra encontrada.</td>
                 </tr>
-              ) : filteredPurchases.map((p: any) => (
-                <tr key={p.id} className="text-sm group hover:bg-gray-50 transition-colors">
-                  <td className="py-4 font-medium text-gray-900">#{p.purchase_number || "001"}</td>
-                  <td className="py-4 text-gray-600">{p.supplier_name}</td>
-                  <td className="py-4 font-bold text-orange-600">{formatCurrency(p.total || 0)}</td>
-                  <td className="py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                      p.status === "Cancelada" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                    }`}>
-                      {p.status || "Concluída"}
-                    </span>
-                  </td>
-                  <td className="py-4 text-gray-500 flex items-center gap-2">
-                    <Calendar size={14} />
-                    {formatBR(p.purchase_date)}
-                  </td>
-                  <td className="py-4 text-right flex justify-end gap-2">
-                    <button 
-                      onClick={() => {
-                         if (company) {
-                           printPurchaseReceipt(p, company);
-                         } else {
-                           toast.error("Dados da empresa não encontrados.");
-                         }
-                      }}
-                      className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Imprimir Comprovante"
-                    >
-                      <Printer size={18} />
-                    </button>
-                    <button 
-                      onClick={() => { setSelectedPurchase(p); setIsDetailsModalOpen(true); }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Ver Detalhes"
-                    >
-                      <Eye size={18} />
-                    </button>
-                    {(user?.role === 'admin' || user?.role === 'master') && (
-                      <button 
-                        onClick={() => handleEditClick(p)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Editar Compra"
-                      >
-                        <Pencil size={18} />
-                      </button>
+              ) : filteredPurchases.map((p: any) => {
+                const targetCompany = companiesMap.get(p.company_id) || company;
+                const companyName = targetCompany?.name || p.company_name || "N/A";
+
+                return (
+                  <tr key={p.id} className="text-sm group hover:bg-gray-50 transition-colors">
+                    <td className="py-4 font-medium text-gray-900">#{p.purchase_number || "001"}</td>
+                    {isMaster && (
+                      <td className="py-4">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                          <Building2 size={12} className="text-slate-500" />
+                          {companyName}
+                        </span>
+                      </td>
                     )}
-                    {p.status !== "Cancelada" && (user?.role === 'admin' || user?.role === 'master') && (
-                      <button 
-                        onClick={() => handleCancelClick(p.id)}
-                        className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                        title="Cancelar Compra"
-                      >
-                        <XCircle size={18} />
-                      </button>
-                    )}
-                    {(user?.role === 'admin' || user?.role === 'master') && (
-                      <button 
-                        onClick={() => handleDeleteClick(p.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Excluir Compra"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    <td className="py-4 text-gray-600">{p.supplier_name || "Sem fornecedor"}</td>
+                    <td className="py-4 font-bold text-orange-600">{formatCurrency(p.total || 0)}</td>
+                    <td className="py-4">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                        p.status === "Cancelada" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                      }`}>
+                        {p.status || "Concluída"}
+                      </span>
+                    </td>
+                    <td className="py-4 text-gray-500 flex items-center gap-2">
+                      <Calendar size={14} />
+                      {formatBR(p.purchase_date)}
+                    </td>
+                    <td className="py-4 text-right">
+                      <div className="flex justify-end gap-1 sm:gap-2">
+                        <button 
+                          onClick={() => {
+                             if (targetCompany) {
+                               printPurchaseReceipt(p, targetCompany);
+                             } else {
+                               toast.error("Dados da empresa não encontrados.");
+                             }
+                          }}
+                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                          title="Imprimir Comprovante"
+                        >
+                          <Printer size={18} />
+                        </button>
+                        <button 
+                          onClick={() => { setSelectedPurchase(p); setIsDetailsModalOpen(true); }}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Ver Detalhes"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        {isAdminOrMaster && (
+                          <button 
+                            onClick={() => handleEditClick(p)}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Editar Compra"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                        )}
+                        {p.status !== "Cancelada" && isAdminOrMaster && (
+                          <button 
+                            onClick={() => handleCancelClick(p.id)}
+                            className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                            title="Cancelar Compra"
+                          >
+                            <XCircle size={18} />
+                          </button>
+                        )}
+                        {isAdminOrMaster && (
+                          <button 
+                            onClick={() => handleDeleteClick(p.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Excluir Compra"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -362,7 +547,14 @@ if (!canView) {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">Detalhes da Compra</h2>
-                  <p className="text-sm text-gray-500">#{selectedPurchase.purchase_number}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-500">#{selectedPurchase.purchase_number}</p>
+                    {isMaster && (
+                      <span className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                        {companiesMap.get(selectedPurchase.company_id)?.name || "Empresa"}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <button onClick={() => setIsDetailsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
@@ -372,18 +564,18 @@ if (!canView) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <p className="text-xs font-bold text-gray-400 uppercase mb-1">Fornecedor</p>
-                  <p className="font-bold text-gray-900">{selectedPurchase.supplier_name}</p>
+                  <p className="font-bold text-gray-900">{selectedPurchase.supplier_name || "N/A"}</p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <p className="text-xs font-bold text-gray-400 uppercase mb-1">Data da Compra</p>
                   <p className="font-bold text-gray-900 flex items-center gap-2">
                     <Calendar size={16} className="text-gray-400" />
-                    {new Date(selectedPurchase.purchase_date).toLocaleString()}
+                    {selectedPurchase.purchase_date ? new Date(selectedPurchase.purchase_date).toLocaleString() : "-"}
                   </p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <p className="text-xs font-bold text-gray-400 uppercase mb-1">Status do Pagamento</p>
-                  <p className="font-bold text-gray-900">{selectedPurchase.payment_status}</p>
+                  <p className="font-bold text-gray-900">{selectedPurchase.payment_status || "-"}</p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <p className="text-xs font-bold text-gray-400 uppercase mb-1">Status da Compra</p>
@@ -462,12 +654,12 @@ if (!canView) {
                 Fechar
               </button>
               <button 
-                onClick={() => printPurchaseReceipt(selectedPurchase, company)}
+                onClick={() => printPurchaseReceipt(selectedPurchase, companiesMap.get(selectedPurchase.company_id) || company)}
                 className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors flex items-center gap-2"
               >
                 <Printer size={18} /> Imprimir
               </button>
-              {(user?.role === 'admin' || user?.role === 'master') && (
+              {isAdminOrMaster && (
                 <button 
                   onClick={() => { setIsDetailsModalOpen(false); handleEditClick(selectedPurchase); }}
                   className="px-6 py-2 bg-white text-blue-600 border border-blue-200 rounded-xl font-bold hover:bg-blue-50 transition-colors flex items-center gap-2"
@@ -475,7 +667,7 @@ if (!canView) {
                   <Pencil size={18} /> Editar
                 </button>
               )}
-              {selectedPurchase.status !== "Cancelada" && (user?.role === 'admin' || user?.role === 'master') && (
+              {selectedPurchase.status !== "Cancelada" && isAdminOrMaster && (
                 <button 
                   onClick={() => { setIsDetailsModalOpen(false); handleCancelClick(selectedPurchase.id); }}
                   className="px-6 py-2 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-100 transition-colors"
@@ -483,7 +675,7 @@ if (!canView) {
                   <XCircle size={18} /> Cancelar Compra
                 </button>
               )}
-              {(user?.role === 'admin' || user?.role === 'master') && (
+              {isAdminOrMaster && (
                 <button 
                   onClick={() => { setIsDetailsModalOpen(false); handleDeleteClick(selectedPurchase.id); }}
                   className="px-6 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
@@ -561,7 +753,7 @@ if (!canView) {
         onClose={() => setIsCancelModalOpen(false)}
         onConfirm={() => purchaseToCancel && cancelPurchaseMutation.mutate(purchaseToCancel)}
         title="Cancelar Compra"
-        message="Tem certeza que deseja cancelar esta compra? Esta ação irá estornar o caixa financeiro desta movimentação se houver. (Atenção: Estoque não é revertido no cancelamento direto, faça manual se necessário)."
+        message="Tem certeza que deseja cancelar esta compra? O estoque dos itens comprados e o lançamento financeiro/caixa serão estornados automaticamente."
         confirmText="Sim, Cancelar"
         isLoading={cancelPurchaseMutation.isPending}
       />
@@ -571,10 +763,11 @@ if (!canView) {
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={() => purchaseToDelete && deletePurchaseMutation.mutate(purchaseToDelete)}
         title="Excluir Compra"
-        message="Tem certeza que deseja EXCLUIR DEFINITIVAMENTE esta compra do histórico? O valor pago financeiro associado será estornado. Esta ação não poderá ser desfeita."
+        message="Tem certeza que deseja EXCLUIR DEFINITIVAMENTE esta compra do histórico? O estoque e o lançamento financeiro/caixa serão estornados automaticamente caso a compra não esteja cancelada."
         confirmText="Sim, Excluir"
         isLoading={deletePurchaseMutation.isPending}
       />
     </div>
   );
 }
+

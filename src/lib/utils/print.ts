@@ -322,12 +322,13 @@ export const printPurchaseReceipt = (purchase: any, company: any) => {
     return;
   }
 
-  const itemsHtml = purchase.items.map((item: any) => `
+  const items = Array.isArray(purchase?.items) ? purchase.items : [];
+  const itemsHtml = items.map((item: any) => `
     <tr>
-      <td style="padding: 4px 0;">${escapeHtml(item.name)}</td>
-      <td style="text-align: center; padding: 4px 0;">${escapeHtml(item.quantity)}</td>
-      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.cost)}</td>
-      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.cost * item.quantity)}</td>
+      <td style="padding: 4px 0;">${escapeHtml(item.name || 'Item')}</td>
+      <td style="text-align: center; padding: 4px 0;">${escapeHtml(item.quantity || 1)}</td>
+      <td style="text-align: right; padding: 4px 0;">${formatCurrency(item.cost || 0)}</td>
+      <td style="text-align: right; padding: 4px 0;">${formatCurrency((item.cost || 0) * (item.quantity || 1))}</td>
     </tr>
   `).join('');
 
