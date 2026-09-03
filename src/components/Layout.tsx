@@ -116,7 +116,7 @@ const MENU_ITEMS: {
       { name: "Conciliação Bancária", path: "/ConciliacaoBancaria", icon: ArrowRightLeft, permission: 'finance.manage' },
       { name: "Transferências", path: "/Transferencias", icon: ArrowRightLeft, permission: 'finance.manage' },
       { name: "Fornecedores", path: "/Fornecedores", icon: Users, permission: 'finance.view' },
-      { name: "Centro de Custos", path: "/Categorias", icon: Tag, permission: 'finance.manage' },
+      { name: "Centro de Custos", path: "/CentroDeCustos", icon: Tag, permission: 'finance.manage' },
     ]
   },
   { 
@@ -132,6 +132,7 @@ const MENU_ITEMS: {
   { name: "Minha Empresa", path: "/Empresa", icon: Building2, requiresCompany: true, permission: 'settings.manage' },
   { name: "Funcionários", path: "/Funcionarios", icon: Users, requiresCompany: true, permission: 'employees.manage' },
   { name: "Configurações", path: "/Configuracoes", icon: Zap, requiresCompany: true, permission: 'settings.manage' },
+  { name: "Auditoria", path: "/Auditoria", icon: History, requiresCompany: true, permission: 'audit.view' },
   { name: "Suporte", path: "/Suporte", icon: HelpCircle },
 ];
 

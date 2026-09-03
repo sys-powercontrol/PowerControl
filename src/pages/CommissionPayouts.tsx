@@ -13,7 +13,9 @@ import {
   DollarSign,
   ChevronRight,
   FileSpreadsheet,
-  FileText
+  FileText,
+  CheckCheck,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
@@ -28,10 +30,7 @@ export default function CommissionPayouts() {
   const canView = hasPermission('reports.view');
   const canManage = hasPermission('finance.manage');
 
-  
-
-  
-
+  const [isConfirmBatchModalOpen, setIsConfirmBatchModalOpen] = useState(false);
   const [selectedSellerId, setSelectedSellerId] = useState<string>("all");
   const [startDate, setStartDate] = useState(formatBR(startOfMonth(getNowBR()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(formatBR(endOfMonth(getNowBR()), 'yyyy-MM-dd'));
@@ -65,6 +64,12 @@ export default function CommissionPayouts() {
   const totalPending = useMemo(() => {
     return filteredSales.reduce((acc: number, sale: any) => acc + (sale.commission_amount || 0), 0);
   }, [filteredSales]);
+
+  const selectedSellerName = useMemo(() => {
+    if (selectedSellerId === "all") return "Múltiplos Vendedores (Todos filtrados)";
+    const found = sellers.find((s: any) => s.id === selectedSellerId);
+    return found?.name || "Vendedor Selecionado";
+  }, [selectedSellerId, sellers]);
 
   const payoutMutation = useMutation({
     mutationFn: async (sale: any) => {
@@ -150,6 +155,7 @@ export default function CommissionPayouts() {
       }
     },
     onSuccess: () => {
+      setIsConfirmBatchModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["sales"] });
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -201,20 +207,20 @@ if (!canManage) {
           <p className="text-gray-500">Gerencie e pague as comissões pendentes dos seus vendedores.</p>
         </div>
         <div className="flex flex-wrap gap-3 w-full sm:w-auto items-stretch">
-          {filteredSales.length > 0 && (
-            <button
-              onClick={() => {
-                if (window.confirm(`Deseja realizar o pagamento em lote de ${filteredSales.length} comissão(ões) no valor total de ${formatCurrency(totalPending)}?`)) {
-                  batchPayoutMutation.mutate(filteredSales);
-                }
-              }}
-              disabled={batchPayoutMutation.isPending}
-              className="bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 font-bold text-xs sm:text-sm transition-all shadow-md shadow-green-100 disabled:opacity-50 min-h-[48px]"
-            >
-              <CheckCircle2 size={18} />
-              {batchPayoutMutation.isPending ? "Processando..." : `Pagar Todas (${filteredSales.length})`}
-            </button>
-          )}
+          <button
+            id="btn-batch-payout-trigger"
+            onClick={() => setIsConfirmBatchModalOpen(true)}
+            disabled={filteredSales.length === 0 || batchPayoutMutation.isPending}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 font-bold text-xs sm:text-sm transition-all shadow-md shadow-emerald-100 disabled:opacity-50 min-h-[48px] cursor-pointer"
+            title="Pagar Todas as Comissões Filtradas"
+          >
+            {batchPayoutMutation.isPending ? (
+              <Loader2 className="animate-spin" size={18} />
+            ) : (
+              <CheckCheck size={18} />
+            )}
+            <span>Pagar Todas as Comissões Filtradas ({filteredSales.length})</span>
+          </button>
 
           <ExportButton 
             data={filteredSales} 
@@ -427,6 +433,71 @@ if (!canManage) {
           <p>Ao marcar uma comissão como paga, o sistema atualizará o status da venda e gerará automaticamente um lançamento de saída no seu Contas a Pagar com status "Pago".</p>
         </div>
       </div>
+
+      {/* Modal de Confirmação de Pagamento em Lote */}
+      {isConfirmBatchModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-emerald-100 text-emerald-700 rounded-2xl shrink-0">
+                <DollarSign size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Confirmar Pagamento em Lote</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Confirme a liquidação e registro das comissões selecionadas no Contas a Pagar:
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-sm border border-gray-100">
+              <div className="flex justify-between items-center py-1 border-b border-gray-200/60">
+                <span className="text-gray-500">Vendedor(es):</span>
+                <span className="font-semibold text-gray-900 truncate max-w-[220px]">{selectedSellerName}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-gray-200/60">
+                <span className="text-gray-500">Vendas no Lote:</span>
+                <span className="font-bold text-gray-900">{filteredSales.length} venda(s)</span>
+              </div>
+              <div className="flex justify-between items-center py-1 text-base">
+                <span className="text-gray-700 font-medium">Montante Total a Pagar:</span>
+                <span className="font-extrabold text-emerald-600 text-lg">{formatCurrency(totalPending)}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmBatchModalOpen(false)}
+                disabled={batchPayoutMutation.isPending}
+                className="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  batchPayoutMutation.mutate(filteredSales);
+                }}
+                disabled={batchPayoutMutation.isPending || filteredSales.length === 0}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-200 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {batchPayoutMutation.isPending ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Processando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCheck size={18} />
+                    <span>Confirmar Pagamento em Lote</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

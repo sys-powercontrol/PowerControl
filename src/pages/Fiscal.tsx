@@ -505,11 +505,23 @@ export default function Fiscal() {
 
     setIsSendingEmail(true);
     try {
-      await api.post("fiscal/send-email", {
-        invoice_id: emailInvoice.id,
-        recipient_email: recipientEmail
+      const response = await fetch("/api/fiscal/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoice_id: emailInvoice.id,
+          recipient_email: recipientEmail,
+          company_id: currentCompanyId
+        })
       });
-      toast.success(`Nota Fiscal #${emailInvoice.number} enviada por e-mail com sucesso!`);
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao enviar e-mail fiscal.");
+      }
+
+      toast.success(data.message || `Nota Fiscal #${emailInvoice.number} enviada por e-mail com sucesso!`);
       setIsEmailModalOpen(false);
       setEmailInvoice(null);
       setRecipientEmail("");

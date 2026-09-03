@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import ReactMarkdown from 'react-markdown';
@@ -13,8 +14,16 @@ import {
   ChevronRight,
   PlayCircle,
   ArrowLeft,
-  Info
+  Info,
+  ShoppingCart,
+  Users,
+  BookOpen,
+  ExternalLink,
+  Sparkles,
+  Check,
+  ArrowUpRight
 } from "lucide-react";
+import { KNOWLEDGE_CATEGORIES, KNOWLEDGE_ARTICLES } from "../constants/knowledgeBase";
 
 const ICON_MAP: Record<string, any> = {
   PlayCircle: PlayCircle,
@@ -24,11 +33,35 @@ const ICON_MAP: Record<string, any> = {
   Settings: Settings,
   Book: Book,
   FileText: FileText,
-  Info: Info
+  Info: Info,
+  ShoppingCart: ShoppingCart,
+  Users: Users,
+  BookOpen: BookOpen,
 };
 
-// Mock data used as fallback if nothing is found in DB
-const fallbackCategories = [
+const fallbackCategories = KNOWLEDGE_CATEGORIES.filter((c) => c.id !== "all").map((cat) => ({
+  id: cat.id,
+  title: cat.name,
+  icon_name: cat.iconName,
+  badgeColor: cat.badgeColor,
+  color: "text-blue-600",
+  bg: "bg-blue-50",
+  articles: KNOWLEDGE_ARTICLES.filter((a) => a.category === cat.id).map((a) => ({
+    id: a.id,
+    title: a.title,
+    summary: a.summary,
+    content: a.content,
+    steps: a.steps,
+    tips: a.tips,
+    linkTo: a.linkTo,
+    linkText: a.linkText,
+    readTime: a.readTime,
+    tags: a.tags,
+  })),
+}));
+
+/*
+const _legacyFallbackCategories = [
   {
     id: "getting-started",
     title: "Primeiros Passos",
@@ -268,6 +301,7 @@ Basta ter os tokens e ambiente válidos criados em referida plataforma integrado
     ]
   }
 ];
+*/
 
 export default function KnowledgeBase() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -285,7 +319,9 @@ export default function KnowledgeBase() {
   const filteredCategories = activeCategories.map((category: any) => ({
     ...category,
     articles: (category.articles || []).filter((article: any) => 
-      article.title.toLowerCase().includes(searchTerm.toLowerCase())
+      article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (article.summary && article.summary.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (article.tags && article.tags.some((t: string) => t.toLowerCase().includes(searchTerm.toLowerCase())))
     )
   })).filter((category: any) => category.articles.length > 0);
 
@@ -294,7 +330,7 @@ export default function KnowledgeBase() {
       <div className="max-w-4xl mx-auto space-y-8">
         <button 
           onClick={() => setSelectedArticle(null)}
-          className="flex items-center gap-2 text-gray-500 hover:text-blue-600 transition-colors font-medium"
+          className="flex items-center gap-2 text-gray-500 hover:text-blue-600 transition-colors font-medium cursor-pointer"
         >
           <ArrowLeft size={16} /> Voltar para Base de Conhecimento
         </button>
@@ -302,16 +338,93 @@ export default function KnowledgeBase() {
         <div className="bg-white p-8 md:p-12 rounded-3xl border border-gray-100 shadow-sm space-y-8 relative overflow-hidden">
            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
            <div className="space-y-4">
+             <div className="flex items-center gap-2">
+               <span className="text-xs font-bold uppercase tracking-wider text-blue-600">Manual PowerControl</span>
+               {selectedArticle.readTime && (
+                 <>
+                   <span className="text-gray-300">•</span>
+                   <span className="text-xs text-gray-500">{selectedArticle.readTime} de leitura</span>
+                 </>
+               )}
+             </div>
              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight block">{selectedArticle.title}</h1>
+             {selectedArticle.summary && (
+               <p className="text-sm text-gray-600 leading-relaxed font-medium bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                 {selectedArticle.summary}
+               </p>
+             )}
            </div>
+
+           {/* Direct Action Link if available */}
+           {selectedArticle.linkTo && (
+             <div className="p-4 bg-blue-50/80 rounded-2xl border border-blue-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+               <div className="flex items-center gap-3">
+                 <div className="p-2.5 bg-blue-600 text-white rounded-xl">
+                   <ExternalLink size={18} />
+                 </div>
+                 <div>
+                   <p className="text-xs font-extrabold text-blue-900">Quer executar este procedimento agora?</p>
+                   <p className="text-[11px] text-blue-700">Acesse a tela do sistema diretamente sem perder seu contexto.</p>
+                 </div>
+               </div>
+               <Link
+                 to={selectedArticle.linkTo}
+                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-xs flex items-center gap-1.5 shrink-0"
+               >
+                 <span>{selectedArticle.linkText || "Acessar Módulo"}</span>
+                 <ArrowUpRight size={14} />
+               </Link>
+             </div>
+           )}
+
+           {/* Steps List */}
+           {selectedArticle.steps && selectedArticle.steps.length > 0 && (
+             <div className="space-y-3">
+               <h4 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                 <Check size={16} className="text-emerald-600" />
+                 <span>Passo a Passo Operacional</span>
+               </h4>
+               <div className="space-y-2">
+                 {selectedArticle.steps.map((step: string, idx: number) => (
+                   <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs sm:text-sm text-gray-800">
+                     <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                       {idx + 1}
+                     </span>
+                     <span>{step}</span>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
+
+           {/* Tips */}
+           {selectedArticle.tips && (
+             <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 flex items-start gap-3">
+               <Sparkles size={18} className="text-amber-600 shrink-0 mt-0.5" />
+               <div>
+                 <h5 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Dica do Especialista</h5>
+                 <p className="text-xs sm:text-sm text-amber-950 mt-0.5 leading-relaxed">{selectedArticle.tips}</p>
+               </div>
+             </div>
+           )}
            
-           <div className="prose prose-blue max-w-none text-gray-600 prose-headings:text-gray-900 prose-a:text-blue-600">
+           <div className="prose prose-blue max-w-none text-gray-600 prose-headings:text-gray-900 prose-a:text-blue-600 border-t border-gray-100 pt-6">
              {selectedArticle.content ? (
                <ReactMarkdown>{selectedArticle.content}</ReactMarkdown>
              ) : (
                <p className="italic text-gray-400">Conteúdo não disponível para este tutorial.</p>
              )}
            </div>
+
+           {selectedArticle.tags && selectedArticle.tags.length > 0 && (
+             <div className="flex flex-wrap gap-1.5 pt-4 border-t border-gray-100">
+               {selectedArticle.tags.map((tag: string) => (
+                 <span key={tag} className="text-xs font-bold px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-md">
+                   #{tag}
+                 </span>
+               ))}
+             </div>
+           )}
         </div>
       </div>
     );

@@ -310,6 +310,11 @@ export default function Configurations() {
       data.notify_commission = notifyCommission;
     }
 
+    if (activeTab === "payments") {
+      data.credit_card_rate = data.credit_card_rate !== "" && data.credit_card_rate !== undefined ? Number(data.credit_card_rate) : null;
+      data.debit_card_rate = data.debit_card_rate !== "" && data.debit_card_rate !== undefined ? Number(data.debit_card_rate) : null;
+    }
+
     if (activeTab === "fiscal") {
       try {
         setIsSaving(true);
@@ -617,7 +622,7 @@ if (!canManage) {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
@@ -631,6 +636,51 @@ if (!canManage) {
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500 uppercase">Chave PIX (CPF/CNPJ/E-mail/Telefone)</label>
                         <input name="pix_key" defaultValue={company.pix_key} placeholder="Sua chave PIX" className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-gray-200/60">
+                        <CreditCard size={18} className="text-blue-600" />
+                        <h3 className="font-bold text-gray-900 text-sm">Taxas de Operadoras de Cartão</h3>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Defina as taxas cobradas pelas maquininhas/adquirentes nas vendas a prazo ou à vista para apropriação de despesas financeiras.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-gray-700 uppercase">Taxa Cartão de Crédito (%)</label>
+                          <div className="relative">
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              min="0"
+                              max="100"
+                              name="credit_card_rate" 
+                              defaultValue={company.credit_card_rate ?? ""} 
+                              placeholder="ex: 2.99" 
+                              className="w-full px-4 py-2 pr-8 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white" 
+                            />
+                            <span className="absolute right-3 top-2 text-xs font-bold text-gray-400 pointer-events-none">%</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-gray-700 uppercase">Taxa Cartão de Débito (%)</label>
+                          <div className="relative">
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              min="0"
+                              max="100"
+                              name="debit_card_rate" 
+                              defaultValue={company.debit_card_rate ?? ""} 
+                              placeholder="ex: 1.49" 
+                              className="w-full px-4 py-2 pr-8 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white" 
+                            />
+                            <span className="absolute right-3 top-2 text-xs font-bold text-gray-400 pointer-events-none">%</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

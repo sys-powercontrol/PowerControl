@@ -2,7 +2,6 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv, Plugin} from 'vite';
-import { VitePWA } from 'vite-plugin-pwa';
 
 function removeDirectivesPlugin(): Plugin {
   return {
@@ -27,59 +26,15 @@ export default defineConfig(({mode}) => {
       removeDirectivesPlugin(),
       react(), 
       tailwindcss(),
-      VitePWA({
-        strategies: 'injectManifest',
-        srcDir: 'src',
-        filename: 'sw.ts',
-        registerType: 'autoUpdate',
-        injectManifest: {
-          maximumFileSizeToCacheInBytes: 6000000, // 6MB
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-          buildPlugins: {
-            vite: [removeDirectivesPlugin()],
-          },
-        },
-        devOptions: {
-          enabled: false,
-        },
-        manifest: {
-          name: 'PowerControl ERP',
-          short_name: 'PowerControl',
-          description: 'Sistema de Gestão Empresarial e PDV Inteligente',
-          theme_color: '#2563eb',
-          background_color: '#ffffff',
-          display: 'standalone',
-          orientation: 'portrait',
-          icons: [
-            {
-              src: 'icon.svg',
-              sizes: '192x192',
-              type: 'image/svg+xml',
-              purpose: 'any'
-            },
-            {
-              src: 'icon.svg',
-              sizes: '512x512',
-              type: 'image/svg+xml',
-              purpose: 'any'
-            },
-            {
-              src: 'icon.svg',
-              sizes: '512x512',
-              type: 'image/svg+xml',
-              purpose: 'maskable'
-            }
-          ]
-        }
-      })
     ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(process.cwd(), '.'),
       },
+      dedupe: ['react', 'react-dom', 'react-router-dom'],
     },
     build: {
       chunkSizeWarningLimit: 2000,

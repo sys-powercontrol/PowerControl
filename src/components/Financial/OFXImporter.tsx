@@ -146,6 +146,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string>("");
   const [transactions, setTransactions] = useState<OFXTransaction[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
@@ -303,7 +304,12 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       const toImport = transactions.filter(t => selectedIds.includes(t.id));
       const { processAccountPayment, processAccountReceipt } = await import("../../lib/finance");
       
+      let reconciledCount = 0;
+      let createdCount = 0;
+      let totalAmountImported = 0;
+
       for (const t of toImport) {
+        totalAmountImported += Math.abs(t.amount || 0);
         const isExpense = t.type === "DEBIT";
         const endpoint = isExpense ? "accountsPayable" : "accountsReceivable";
         
@@ -320,6 +326,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
         }
 
         if (match) {
+          reconciledCount++;
           // Process payment/receipt to update bank account balance and register movement
           try {
             if (isExpense) {
@@ -341,6 +348,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
             ofx_fitid: t.fitid || t.id
           });
         } else {
+          createdCount++;
           // Check for rule to pre-fill metadata
           const matchingRule = rules.find((r: any) => {
             if (r.target_type !== (isExpense ? 'PAYABLE' : 'RECEIVABLE')) return false;
@@ -382,8 +390,31 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
           }
         }
       }
+
+      // Record in bank_imports collection for audit and history tracking
+      try {
+        await api.post("bank_imports", {
+          company_id: currentCompanyId,
+          bank_account_id: bankAccountId,
+          bank_account_name: bankAccountName || "Conta Bancária",
+          filename: fileName || "extrato.ofx",
+          total_transactions: transactions.length,
+          imported_count: toImport.length,
+          reconciled_count: reconciledCount,
+          created_count: createdCount,
+          ignored_count: transactions.length - toImport.length,
+          total_amount: totalAmountImported,
+          imported_at: new Date().toISOString(),
+          imported_by_id: user?.id || null,
+          imported_by_name: user?.full_name || user?.email || "Usuário",
+          created_at: new Date().toISOString()
+        });
+      } catch (logErr) {
+        console.warn("Erro ao registrar histórico de importação OFX:", logErr);
+      }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bank_imports"] });
       queryClient.invalidateQueries({ queryKey: ["accountsPayable"] });
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
@@ -402,6 +433,7 @@ export function OFXImporter({ onClose, bankAccountId, bankAccountName }: OFXImpo
       return;
     }
 
+    setFileName(file.name);
     setIsParsing(true);
     try {
       const text = await file.text();

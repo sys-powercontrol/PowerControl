@@ -286,6 +286,11 @@ service cloud.firestore {
       allow read, create, update, delete: if belongsToCompany(resource.data.get('company_id', '')) || belongsToCompany(request.resource.data.get('company_id', ''));
     }
 
+    match /bank_imports/{id} {
+      allow read, delete: if belongsToCompany(resource.data.get('company_id', '')) && (hasPermission('finance.view') || hasPermission('finance.manage'));
+      allow create, update: if belongsToCompany(request.resource.data.get('company_id', '')) && (hasPermission('finance.manage') || hasPermission('finance.view'));
+    }
+
     match /api_configurations/{id} {
       allow read: if isAuthenticated() && isMaster();
       allow write: if isAuthenticated() && isMaster();

@@ -48,6 +48,7 @@ import InventoryTurnoverReport from "./pages/InventoryTurnoverReport";
 import ProfitabilityReport from "./pages/ProfitabilityReport";
 import CashFlowReport from "./pages/CashFlowReport";
 import Employees from "./pages/Employees";
+import AuditLogs from "./pages/AuditLogs";
 import { AuthProvider, useAuth } from "./lib/auth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -150,7 +151,7 @@ export default function App() {
                 <Route path="ConciliacaoBancaria" element={<BankReconciliation />} />
                 <Route path="Transferencias" element={<Transfers />} />
                 <Route path="Fornecedores" element={<Suppliers />} />
-                <Route path="Categorias" element={<Categories />} />
+                <Route path="CentroDeCustos" element={<Categories />} />
                 <Route path="Funcionarios" element={<Employees />} />
                 <Route path="Convites" element={<Invite />} />
                 <Route path="MeuPerfil" element={<Profile />} />
@@ -160,6 +161,7 @@ export default function App() {
                 <Route path="Configuracoes" element={<Configurations />} />
                 <Route path="ConfiguracoesFiscais" element={<TaxSettings />} />
                 <Route path="Fiscal" element={<Fiscal />} />
+                <Route path="Auditoria" element={<AuditLogs />} />
                 <Route path="Suporte" element={<Support />} />
                 <Route path="BaseConhecimento" element={<KnowledgeBase />} />
                 <Route path="TermosDeUso" element={<TermsOfUse />} />

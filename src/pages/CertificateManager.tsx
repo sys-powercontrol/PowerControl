@@ -123,7 +123,17 @@ export default function CertificateManager() {
 
         await api.post("certificates", certData);
 
-        // 5. Log action
+        // 5. Synchronize validity and status on active company document
+        if (currentCompanyId) {
+          await api.put("companies", currentCompanyId, {
+            fiscal_certificate_expiration: certData.expiration_date,
+            certificate_expiration: certData.expiration_date,
+            has_certificate: true,
+            updated_at: new Date().toISOString()
+          });
+        }
+
+        // 6. Log action
         await api.log({
           action: 'CREATE',
           entity: 'certificates',
@@ -138,6 +148,10 @@ export default function CertificateManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["certificates"] });
+      if (currentCompanyId) {
+        queryClient.invalidateQueries({ queryKey: ["company", currentCompanyId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
       toast.success("Certificado enviado e configurado com sucesso!");
       setFile(null);
       setPassword("");
@@ -151,6 +165,27 @@ export default function CertificateManager() {
     mutationFn: async (cert: any) => {
       await api.delete("certificates", cert.id);
       
+      // If deleted certificate was active, check if there is any other active certificate
+      if (currentCompanyId && cert.active) {
+        const remainingActive = certificates.filter((c: any) => c.id !== cert.id && c.active);
+        if (remainingActive.length === 0) {
+          await api.put("companies", currentCompanyId, {
+            has_certificate: false,
+            fiscal_certificate_expiration: null,
+            certificate_expiration: null,
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          const nextCert = remainingActive[0];
+          await api.put("companies", currentCompanyId, {
+            has_certificate: true,
+            fiscal_certificate_expiration: nextCert.expiration_date,
+            certificate_expiration: nextCert.expiration_date,
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
+
       // Log action
       await api.log({
         action: 'DELETE',
@@ -166,6 +201,10 @@ export default function CertificateManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["certificates"] });
+      if (currentCompanyId) {
+        queryClient.invalidateQueries({ queryKey: ["company", currentCompanyId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
       toast.success("Certificado removido.");
     }
   });

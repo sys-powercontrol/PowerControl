@@ -52,6 +52,10 @@ export default function SalesHistory() {
   const [showReceipt, setShowReceipt] = useState<boolean>(!!location.state?.showReceipt);
   const [nfceUrl, setNfceUrl] = useState<string | null>(null);
   const [nfceErrorMsg, setNfceErrorMsg] = useState<string | null>(null);
+  const [fiscalWarningModal, setFiscalWarningModal] = useState<{
+    isOpen: boolean;
+    failedInvoices: Array<{ invoice: any; reason: string }>;
+  }>({ isOpen: false, failedInvoices: [] });
 
   useEffect(() => {
     if (location.state?.lastSale && location.state?.showReceipt) {
@@ -390,10 +394,14 @@ export default function SalesHistory() {
         }
 
         // Cancel linked fiscal invoices if any
+        const failedCancellations: Array<{ invoice: any; reason: string }> = [];
         try {
           const invoices = await api.get("invoices") as any[];
           const linkedInvoices = invoices.filter((inv: any) => (inv.sale_id === id || inv.reference?.includes(id)) && inv.status !== "Cancelada");
           for (const inv of linkedInvoices) {
+            let cancelSuccess = true;
+            let failureReason = "";
+
             if (company?.fiscal_token && inv.reference) {
               try {
                 const fiscalConfig = {
@@ -401,16 +409,39 @@ export default function SalesHistory() {
                   environment: company.fiscal_environment || "sandbox",
                   provider: company.fiscal_provider || "FocusNFe"
                 };
-                await fiscalApi.cancel(fiscalConfig as any, inv.reference, "Cancelamento de venda pelo operador");
-              } catch (fErr) {
+                const cancelRes = await fiscalApi.cancel(fiscalConfig as any, inv.reference, "Cancelamento de venda pelo operador");
+                if (cancelRes && cancelRes.status !== "sucesso" && cancelRes.status !== "cancelado") {
+                  cancelSuccess = false;
+                  failureReason = cancelRes.message || "Rejeição ou prazo regulamentar expirado na SEFAZ";
+                }
+              } catch (fErr: any) {
                 console.warn("Erro ao cancelar nota na SEFAZ/provedor fiscal:", fErr);
+                cancelSuccess = false;
+                failureReason = fErr?.message || "Rejeição ou prazo regulamentar de cancelamento expirado na SEFAZ";
               }
+            } else if (inv.status === "Emitida" && (inv.access_key || inv.number || inv.protocol || inv.reference)) {
+              // A nota fiscal já foi homologada na SEFAZ, porém não há credenciais ativas para cancelamento automático
+              cancelSuccess = false;
+              failureReason = "Nota homologada na SEFAZ sem integração fiscal ativa para cancelamento automático. Deve ser cancelada via SEFAZ ou estornada com Nota de Devolução.";
             }
-            await api.put("invoices", inv.id, { 
-              status: "Cancelada", 
-              cancel_reason: "Cancelamento da venda pelo operador",
-              cancelled_at: new Date().toISOString()
-            });
+
+            if (!cancelSuccess) {
+              // SEFAZ rejeitou/falhou: NÃO marcar como Cancelada para evitar inconsistência fiscal perante a Receita
+              failedCancellations.push({ invoice: inv, reason: failureReason });
+              await api.put("invoices", inv.id, { 
+                status: "Emitida", // Garantir manutenção do status Emitida
+                fiscal_cancel_attempted: true, 
+                fiscal_cancel_error: failureReason,
+                last_cancel_attempt_at: new Date().toISOString()
+              });
+            } else {
+              // Cancelamento fiscal bem-sucedido ou nota não homologada previamente na SEFAZ
+              await api.put("invoices", inv.id, { 
+                status: "Cancelada", 
+                cancel_reason: "Cancelamento da venda pelo operador",
+                cancelled_at: new Date().toISOString()
+              });
+            }
           }
         } catch (invErr) {
           console.warn("Erro ao processar cancelamento de notas fiscais vinculadas:", invErr);
@@ -421,6 +452,10 @@ export default function SalesHistory() {
 
         // Cancel or refund commission
         const commissionUpdates: Record<string, any> = { status: "Cancelada" };
+        if (failedCancellations.length > 0) {
+          commissionUpdates.fiscal_cancel_warning = true;
+          commissionUpdates.fiscal_cancel_notes = failedCancellations.map(f => `NF #${f.invoice.number || f.invoice.reference || f.invoice.id.slice(0, 8)}: ${f.reason}`).join("; ");
+        }
         if (dbSale.commission_amount > 0) {
           if (dbSale.commission_status === "paid") {
             commissionUpdates.commission_status = "refunded_reversal";
@@ -453,25 +488,39 @@ export default function SalesHistory() {
           action: 'UPDATE',
           entity: 'sales',
           entity_id: id,
-          description: `Cancelou venda #${id.substr(0, 8).toUpperCase()}${dbSale.commission_amount > 0 ? ' e estornou comissão' : ''}`,
+          description: `Cancelou venda #${id.substr(0, 8).toUpperCase()}${dbSale.commission_amount > 0 ? ' e estornou comissão' : ''}${failedCancellations.length > 0 ? ' (com alerta fiscal de nota não cancelada na SEFAZ)' : ''}`,
           metadata: { 
             total: dbSale.total, 
             client_name: dbSale.client_name, 
             commission_amount: dbSale.commission_amount,
-            commission_status: commissionUpdates.commission_status
+            commission_status: commissionUpdates.commission_status,
+            failed_fiscal_cancellations: failedCancellations.length
           }
         });
+
+        return { id, failedCancellations };
       }
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inventory_movements"] });
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       queryClient.invalidateQueries({ queryKey: ["cashiers"] });
       queryClient.invalidateQueries({ queryKey: ["bankAccounts"] });
       queryClient.invalidateQueries({ queryKey: ["accountsReceivable"] });
-      toast.success("Venda cancelada com sucesso!");
+
+      if (result?.failedCancellations && result.failedCancellations.length > 0) {
+        setFiscalWarningModal({
+          isOpen: true,
+          failedInvoices: result.failedCancellations
+        });
+        const invLabels = result.failedCancellations.map((f: any) => `nº ${f.invoice.number || f.invoice.reference || f.invoice.id.slice(0, 8)}`).join(", ");
+        toast.warning(`A SEFAZ rejeitou o cancelamento da nota ${invLabels} (prazo legal expirado). A nota permanece emitida. Para estornar a operação, emita uma Nota Fiscal de Devolução.`);
+      } else {
+        toast.success("Venda cancelada com sucesso!");
+      }
       setIsDetailsModalOpen(false);
       setIsCancelModalOpen(false);
       setSaleToCancel(null);
@@ -488,6 +537,11 @@ export default function SalesHistory() {
     mutationFn: async (id: string) => {
       const dbSale = sales.find((s: any) => s.id === id);
       if (dbSale) {
+        // Prevent deleting a sale with an emitted invoice
+        if (dbSale.nfe_status === "Emitida") {
+          throw new Error("Não é possível excluir uma venda com Nota Fiscal homologada na SEFAZ. Cancele a venda ou emita uma Nota Fiscal de Devolução.");
+        }
+
         if (dbSale.status !== "Cancelada") {
           const { reverseSalePayment } = await import("../lib/finance");
           await reverseSalePayment(dbSale);
@@ -1080,7 +1134,16 @@ if (!canView) {
         onClose={() => setIsCancelModalOpen(false)}
         onConfirm={() => saleToCancel && cancelSaleMutation.mutate(saleToCancel)}
         title="Cancelar Venda"
-        message="Tem certeza que deseja cancelar esta venda? Esta ação irá estornar o pagamento que a venda gerou no caixa. Esta ação não pode ser desfeita."
+        message={
+          (() => {
+            const currentSale = sales.find((s: any) => s.id === saleToCancel);
+            const hasFiscal = currentSale?.nfe_status === "Emitida" || currentSale?.has_nfe;
+            if (hasFiscal) {
+              return "Atenção: Esta venda possui Nota Fiscal emitida perante a SEFAZ. O cancelamento estornará o pagamento e o estoque, e tentará o cancelamento automático na SEFAZ (prazo de 24h para NF-e / 30min para NFC-e). Caso o prazo tenha expirado, a nota permanecerá emitida e será necessária a emissão de uma Nota Fiscal de Devolução. Deseja prosseguir com o cancelamento?";
+            }
+            return "Tem certeza que deseja cancelar esta venda? Esta ação irá estornar o pagamento que a venda gerou no caixa e devolver os produtos ao estoque. Esta ação não pode ser desfeita.";
+          })()
+        }
         confirmText="Sim, Cancelar"
         isLoading={cancelSaleMutation.isPending}
       />
@@ -1187,6 +1250,59 @@ if (!canView) {
                 className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors cursor-pointer"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta Fiscal - Falha no Cancelamento SEFAZ */}
+      {fiscalWarningModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-amber-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-2xl shrink-0">
+                <AlertTriangle size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Atenção: Ação Fiscal Requerida</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  A venda foi cancelada no sistema (estoque e financeiro estornados), porém a(s) nota(s) fiscal(is) abaixo <strong>não pôde(ram) ser cancelada(s) na SEFAZ</strong> (ex: prazo legal de 24h expirado):
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 space-y-2.5 max-h-48 overflow-y-auto">
+              {fiscalWarningModal.failedInvoices.map((item, idx) => (
+                <div key={idx} className="text-xs space-y-1 bg-white p-2.5 rounded-xl border border-amber-200">
+                  <div className="flex justify-between font-bold text-gray-800">
+                    <span>NF nº {item.invoice.number || item.invoice.reference || item.invoice.id.slice(0, 8)} {item.invoice.type ? `(${item.invoice.type})` : ''}</span>
+                    <span className="text-amber-700 font-semibold">Status: {item.invoice.status || 'Emitida'}</span>
+                  </div>
+                  {item.reason && (
+                    <p className="text-amber-900 break-words">
+                      <strong>Motivo SEFAZ:</strong> {item.reason}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 text-xs text-blue-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-blue-800">
+                <FileText size={14} /> Orientação Contábil / Fiscal
+              </p>
+              <p>
+                Perante a SEFAZ, a nota fiscal continua válida. Para anular os efeitos tributários, emita uma <strong>Nota Fiscal de Devolução/Estorno</strong> no módulo Fiscal.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setFiscalWarningModal({ isOpen: false, failedInvoices: [] })}
+                className="w-full sm:w-auto px-6 py-2.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors cursor-pointer"
+              >
+                Compreendido
               </button>
             </div>
           </div>

@@ -477,7 +477,7 @@ export default function Dashboard() {
             to="/Vender"
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-blue-100 transition-all"
           >
-            <ShoppingCart size={16} /> Abrir PDV / Vender
+            <ShoppingCart size={16} /> Vender
           </Link>
         </div>
       </div>

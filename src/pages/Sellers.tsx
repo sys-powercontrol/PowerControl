@@ -40,7 +40,7 @@ export default function Sellers() {
 
   const { data: sellers = [], isLoading } = useQuery({ 
     queryKey: ["sellers", currentCompanyId], 
-    queryFn: () => api.get("sellers"),
+    queryFn: () => api.get("sellers", { company_id: currentCompanyId }),
     enabled: !!currentCompanyId
   });
 
@@ -89,9 +89,10 @@ export default function Sellers() {
     const monthlyGoal = parseFloat(data.monthly_goal as string) || 0;
     const isActive = data.active === "on";
 
+    const activeCompanyId = currentCompanyId || user?.company_id;
     sellerMutation.mutate({ 
       ...data, 
-      company_id: user?.company_id, 
+      company_id: activeCompanyId, 
       commission_rate: commission, 
       monthly_goal: monthlyGoal,
       active: isActive 

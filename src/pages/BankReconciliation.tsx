@@ -3,14 +3,19 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { formatCurrency } from "../lib/currencyUtils";
+import { formatBR } from "../lib/dateUtils";
 import { 
   FileText, 
   Building2, 
-  ArrowRightLeft,
-  Shield,
-  CheckCircle2,
-  Upload,
-  Plus
+  ArrowRightLeft, 
+  Shield, 
+  CheckCircle2, 
+  Upload, 
+  Plus,
+  FileCode,
+  Clock,
+  History,
+  User as UserIcon
 } from "lucide-react";
 import { OFXImporter } from "../components/Financial/OFXImporter";
 
@@ -29,6 +34,18 @@ export default function BankReconciliation() {
   });
 
   const selectedAccount = accounts.find((a: any) => a.id === selectedAccountId);
+
+  const { data: bankImports = [], isLoading: isLoadingImports } = useQuery({ 
+    queryKey: ["bank_imports", currentCompanyId, selectedAccountId], 
+    queryFn: async () => {
+      if (!selectedAccountId) return [];
+      const allImports = await api.get("bank_imports") as any[];
+      return allImports
+        .filter((imp: any) => imp.bank_account_id === selectedAccountId)
+        .sort((a: any, b: any) => new Date(b.imported_at || b.created_at).getTime() - new Date(a.imported_at || a.created_at).getTime());
+    },
+    enabled: !!user && canManage && !!selectedAccountId
+  });
 
   
 
@@ -156,10 +173,76 @@ if (!canManage) {
               </div>
 
               <div className="pt-8 border-t border-gray-100">
-                <h4 className="font-bold text-gray-900 mb-4">Últimas Importações</h4>
-                <div className="text-center py-12 text-gray-400 italic text-sm">
-                  Nenhum histórico de importação disponível para esta conta.
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                    <History size={18} className="text-blue-600" />
+                    Últimas Importações OFX
+                  </h4>
+                  {bankImports.length > 0 && (
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full">
+                      {bankImports.length} {bankImports.length === 1 ? "lote importado" : "lotes importados"}
+                    </span>
+                  )}
                 </div>
+
+                {isLoadingImports ? (
+                  <div className="text-center py-12 text-gray-400 text-sm">
+                    Carregando histórico de importações...
+                  </div>
+                ) : bankImports.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400 italic text-sm">
+                    Nenhum histórico de importação disponível para esta conta.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-gray-100">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50/80 text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                          <th className="px-4 py-3">Arquivo</th>
+                          <th className="px-4 py-3">Data e Hora</th>
+                          <th className="px-4 py-3">Transações</th>
+                          <th className="px-4 py-3 text-right">Valor Total</th>
+                          <th className="px-4 py-3">Responsável</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 text-sm">
+                        {bankImports.map((imp: any) => (
+                          <tr key={imp.id} className="hover:bg-gray-50/60 transition-colors">
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                                  <FileCode size={16} />
+                                </div>
+                                <span className="font-semibold text-gray-900 truncate max-w-[180px]" title={imp.filename}>
+                                  {imp.filename || "extrato.ofx"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-xs text-gray-600 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                <Clock size={14} className="text-gray-400 shrink-0" />
+                                <span>{imp.imported_at ? formatBR(imp.imported_at, "dd/MM/yyyy HH:mm") : "-"}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-xs">
+                              <span className="font-bold text-gray-900">{imp.imported_count ?? imp.reconciled_count ?? 0}</span>
+                              <span className="text-gray-500"> de {imp.total_transactions ?? 0}</span>
+                            </td>
+                            <td className="px-4 py-3.5 text-right font-bold text-xs text-gray-900 whitespace-nowrap">
+                              {formatCurrency(imp.total_amount || 0)}
+                            </td>
+                            <td className="px-4 py-3.5 text-xs text-gray-600">
+                              <div className="flex items-center gap-1.5 truncate max-w-[140px]" title={imp.imported_by_name}>
+                                <UserIcon size={14} className="text-gray-400 shrink-0" />
+                                <span className="truncate">{imp.imported_by_name || "Usuário"}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}

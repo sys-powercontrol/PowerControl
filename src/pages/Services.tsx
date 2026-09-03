@@ -81,7 +81,8 @@ export default function Services() {
     const pis_rate = parseFloat(data.pis_rate as string) || 0;
     const cofins_rate = parseFloat(data.cofins_rate as string) || 0;
 
-    serviceMutation.mutate({ ...data, company_id: user?.company_id, price, cost, iss_rate, pis_rate, cofins_rate });
+    const activeCompanyId = currentCompanyId || user?.company_id;
+    serviceMutation.mutate({ ...data, company_id: activeCompanyId, price, cost, iss_rate, pis_rate, cofins_rate });
   };
 
   const handleDelete = (id: string) => {

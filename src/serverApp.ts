@@ -199,7 +199,11 @@ app.post(["/api/fiscal/send-email", "/fiscal/send-email"], async (req, res) => {
     const invoiceData = doc.data();
     console.log(`[Fiscal Email] Disparando e-mail para ${recipient_email} relativo à NF #${invoiceData?.number}`);
 
-    return res.json({ status: "ok", message: `Nota Fiscal #${invoiceData?.number || ""} enviada para ${recipient_email} com sucesso!` });
+    return res.json({ 
+      status: "ok", 
+      success: true, 
+      message: `Nota Fiscal #${invoiceData?.number || ""} enviada para ${recipient_email} com sucesso!` 
+    });
   } catch (error: any) {
     console.error("Erro ao enviar e-mail fiscal:", error);
     return res.status(500).json({ error: "Erro interno ao processar o envio de e-mail." });

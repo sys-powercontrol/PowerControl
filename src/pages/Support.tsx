@@ -30,8 +30,27 @@ import {
   Edit,
   Upload,
   Download,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ShoppingCart,
+  Shield,
+  DollarSign,
+  Package,
+  Users,
+  FileText,
+  Settings,
+  ArrowUpRight,
+  ExternalLink,
+  Check,
+  Copy,
+  Sparkles,
+  HelpCircle,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { 
+  KNOWLEDGE_CATEGORIES, 
+  KNOWLEDGE_ARTICLES, 
+  KnowledgeArticle, 
+} from "../constants/knowledgeBase";
 import { toast } from "sonner";
 import { formatBR } from "../lib/dateUtils";
 import { FooterConfig, DEFAULT_FOOTER_CONFIG } from "../types/footer";
@@ -255,11 +274,82 @@ Preciso de auxílio técnico com a plataforma.`;
     }
   });
 
+  // Navigation tabs: "knowledge" (Base de Conhecimento) vs "tickets" (Atendimento / Chamados)
+  const [activeSupportTab, setActiveSupportTab] = useState<"knowledge" | "tickets">("knowledge");
+  const [selectedArticleModal, setSelectedArticleModal] = useState<KnowledgeArticle | null>(null);
+  const [copiedArticleId, setCopiedArticleId] = useState<string | null>(null);
+  const [expandedArticleId, setExpandedArticleId] = useState<string | null>("pdv-venda-rapida");
+
+  // Knowledge Base Interactive States
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+  const [selectedKnowledgeCategory, setSelectedKnowledgeCategory] = useState<string>("all");
+  const [selectedKnowledgeTag, setSelectedKnowledgeTag] = useState<string | null>(null);
+
   // Filters & Search for FAQs & Tickets
   const [faqSearch, setFaqSearch] = useState("");
   const [activeFaqCategory, setActiveFaqCategory] = useState<string>("all");
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>("ALL");
   const [ticketSearch, setTicketSearch] = useState<string>("");
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: KNOWLEDGE_ARTICLES.length };
+    KNOWLEDGE_ARTICLES.forEach((art) => {
+      counts[art.category] = (counts[art.category] || 0) + 1;
+    });
+    return counts;
+  }, []);
+
+  const filteredKnowledgeArticles = useMemo(() => {
+    return KNOWLEDGE_ARTICLES.filter((art) => {
+      const matchesCat = selectedKnowledgeCategory === "all" || art.category === selectedKnowledgeCategory;
+      if (!matchesCat) return false;
+
+      if (selectedKnowledgeTag && !art.tags.includes(selectedKnowledgeTag)) {
+        return false;
+      }
+
+      if (!knowledgeSearch.trim()) return true;
+
+      const q = knowledgeSearch.toLowerCase();
+      return (
+        art.title.toLowerCase().includes(q) ||
+        art.summary.toLowerCase().includes(q) ||
+        art.content.toLowerCase().includes(q) ||
+        art.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    });
+  }, [knowledgeSearch, selectedKnowledgeCategory, selectedKnowledgeTag]);
+
+  const handleCopyArticle = (article: KnowledgeArticle) => {
+    const stepsText = article.steps ? article.steps.map((s, i) => `${i + 1}. ${s}`).join("\n") : "";
+    const text = `${article.title}\n\n${article.summary}\n\n${stepsText ? `Passos:\n${stepsText}\n\n` : ""}${article.tips ? `Dica: ${article.tips}\n\n` : ""}`;
+    navigator.clipboard.writeText(text);
+    setCopiedArticleId(article.id);
+    toast.success("Guia copiado para a área de transferência!");
+    setTimeout(() => setCopiedArticleId(null), 3000);
+  };
+
+  const renderCategoryIcon = (iconName: string, className = "w-4 h-4") => {
+    switch (iconName) {
+      case "ShoppingCart":
+        return <ShoppingCart className={className} />;
+      case "Shield":
+        return <Shield className={className} />;
+      case "DollarSign":
+        return <DollarSign className={className} />;
+      case "Package":
+        return <Package className={className} />;
+      case "Users":
+        return <Users className={className} />;
+      case "FileText":
+        return <FileText className={className} />;
+      case "Settings":
+        return <Settings className={className} />;
+      case "BookOpen":
+      default:
+        return <BookOpen className={className} />;
+    }
+  };
 
   // Form State
   const [subject, setSubject] = useState("");
@@ -294,17 +384,20 @@ Preciso de auxílio técnico com a plataforma.`;
         updated_at: new Date().toISOString()
       });
     },
-    onSuccess: async (_, variables) => {
+    onSuccess: async (createdTicket, variables) => {
       const activeCompanyId = api.getCompanyId() || user?.company_id;
       toast.success("Chamado registrado com sucesso! Nossa equipe técnica retornará em breve.");
       
-      // Send notification webhook
+      // Send notification webhook and register internal ERP notification
       await notificationApi.sendSupportWebhook({
         ...variables,
+        id: (createdTicket as any)?.id,
         user_name: user?.full_name,
         user_email: user?.email,
         company_id: activeCompanyId,
       });
+
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
 
       // Reset form
       setSubject("");
@@ -453,14 +546,97 @@ Preciso de auxílio técnico com a plataforma.`;
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <Link
-              to="/BaseConhecimento"
-              className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+            <button
+              id="hero-btn-knowledge"
+              type="button"
+              onClick={() => setActiveSupportTab("knowledge")}
+              className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                activeSupportTab === "knowledge"
+                  ? "bg-white text-blue-900 shadow-lg"
+                  : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              }`}
             >
               <BookOpen size={18} />
-              <span>Base de Conhecimento</span>
-            </Link>
+              <span>Base de Conhecimento ({KNOWLEDGE_ARTICLES.length})</span>
+            </button>
+
+            <button
+              id="hero-btn-tickets"
+              type="button"
+              onClick={() => setActiveSupportTab("tickets")}
+              className={`px-5 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                activeSupportTab === "tickets"
+                  ? "bg-white text-blue-900 shadow-lg"
+                  : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              }`}
+            >
+              <LifeBuoy size={18} />
+              <span>Abrir Chamado</span>
+            </button>
           </div>
+        </div>
+      </div>
+
+      {/* Mode Tabs Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-2.5 rounded-3xl border border-gray-200/90 shadow-xs">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            id="tab-btn-knowledge"
+            type="button"
+            onClick={() => setActiveSupportTab("knowledge")}
+            className={`flex-1 sm:flex-initial px-5 py-3 rounded-2xl font-extrabold text-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+              activeSupportTab === "knowledge"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <BookOpen size={18} />
+            <span>Base de Conhecimento & Manuais</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                activeSupportTab === "knowledge" ? "bg-white/20 text-white" : "bg-blue-100 text-blue-800"
+              }`}
+            >
+              {KNOWLEDGE_ARTICLES.length}
+            </span>
+          </button>
+
+          <button
+            id="tab-btn-tickets"
+            type="button"
+            onClick={() => setActiveSupportTab("tickets")}
+            className={`flex-1 sm:flex-initial px-5 py-3 rounded-2xl font-extrabold text-sm transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+              activeSupportTab === "tickets"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <LifeBuoy size={18} />
+            <span>Atendimento & Chamados</span>
+            {tickets.length > 0 && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                  activeSupportTab === "tickets" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                {tickets.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-gray-500 pr-2">
+          <span className="hidden md:inline font-medium">Precisa de suporte urgente?</span>
+          <a
+            id="btn-whatsapp-direct-top"
+            href={supportWhatsAppUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-xl border border-emerald-200 transition-colors"
+          >
+            <MessageSquare size={14} className="text-emerald-600" />
+            <span>WhatsApp Especialista</span>
+          </a>
         </div>
       </div>
 
@@ -500,8 +676,326 @@ Preciso de auxílio técnico com a plataforma.`;
         </div>
       </div>
 
-      {/* Main Grid: Form + Tickets vs Help Cards & FAQ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* KNOWLEDGE BASE AREA */}
+      {activeSupportTab === "knowledge" && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Knowledge Search & Quick Tags Bar */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200/80 shadow-sm space-y-6">
+            <div className="max-w-3xl mx-auto text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-100">
+                <BookOpen size={14} className="text-blue-600" />
+                <span>Base de Conhecimento Oficial PowerControl</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                O que você precisa aprender ou resolver no sistema?
+              </h2>
+              <p className="text-sm text-gray-500 max-w-xl mx-auto">
+                Pesquise por procedimentos operacionais, soluções fiscais, conciliação bancária, PDV e regras de negócio.
+              </p>
+
+              {/* Big Search Input */}
+              <div className="relative max-w-2xl mx-auto pt-2">
+                <Search size={20} className="absolute left-4 top-4.5 text-gray-400" />
+                <input
+                  id="input-search-knowledge-base"
+                  type="text"
+                  value={knowledgeSearch}
+                  onChange={(e) => setKnowledgeSearch(e.target.value)}
+                  placeholder="Ex: Como emitir NFC-e, conciliação OFX, sangria de caixa, leitor de código de barras..."
+                  className="w-full pl-12 pr-10 py-3.5 bg-gray-50 hover:bg-gray-100/80 focus:bg-white border-2 border-gray-200 focus:border-blue-500 rounded-2xl text-sm font-medium text-gray-900 placeholder:text-gray-400 outline-none transition-all shadow-inner"
+                />
+                {knowledgeSearch && (
+                  <button
+                    onClick={() => setKnowledgeSearch("")}
+                    className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Tag Recommendations */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-2">
+                <span className="text-xs font-bold text-gray-400 mr-1 flex items-center gap-1">
+                  <Sparkles size={13} className="text-amber-500" /> Tópicos Populares:
+                </span>
+                {["PDV", "PIX", "Certificado A1", "Conciliação", "OFX", "Importação XML", "Comissões", "Atalhos", "Rejeições"].map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => {
+                      if (selectedKnowledgeTag === tag) {
+                        setSelectedKnowledgeTag(null);
+                      } else {
+                        setSelectedKnowledgeTag(tag);
+                        setKnowledgeSearch("");
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                      selectedKnowledgeTag === tag
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+                {selectedKnowledgeTag && (
+                  <button
+                    onClick={() => setSelectedKnowledgeTag(null)}
+                    className="text-xs text-red-600 font-bold hover:underline ml-1 cursor-pointer"
+                  >
+                    Limpar filtro
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category Pills Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-4 border-t border-gray-100">
+              {KNOWLEDGE_CATEGORIES.map((cat) => {
+                const isSelected = selectedKnowledgeCategory === cat.id;
+                const count = categoryCounts[cat.id] || 0;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setSelectedKnowledgeCategory(cat.id);
+                      setSelectedKnowledgeTag(null);
+                    }}
+                    className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                      isSelected
+                        ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20 ring-2 ring-blue-400/30"
+                        : "bg-gray-50/80 hover:bg-white text-gray-700 border-gray-200/80 hover:border-blue-200 hover:shadow-xs"
+                    }`}
+                  >
+                    <div
+                      className={`p-2 rounded-xl ${
+                        isSelected ? "bg-white/20 text-white" : "bg-white text-blue-600 border border-gray-100 shadow-2xs"
+                      }`}
+                    >
+                      {renderCategoryIcon(cat.iconName, "w-4 h-4")}
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="block text-xs font-extrabold line-clamp-1">{cat.name}</span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                          isSelected ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-600"
+                        }`}
+                      >
+                        {count} {count === 1 ? "artigo" : "artigos"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Articles Grid & Counter Header */}
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                  <span>Manuais e Procedimentos Operacionais</span>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-extrabold rounded-full">
+                    {filteredKnowledgeArticles.length} {filteredKnowledgeArticles.length === 1 ? "artigo" : "artigos"}
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {selectedKnowledgeCategory === "all"
+                    ? "Exibindo todos os guias e manuais do sistema"
+                    : `Filtrado por: ${KNOWLEDGE_CATEGORIES.find((c) => c.id === selectedKnowledgeCategory)?.name}`}
+                  {selectedKnowledgeTag ? ` • Tag: #${selectedKnowledgeTag}` : ""}
+                </p>
+              </div>
+
+              {/* View Toggle / Link to Knowledge Base Dedicated Page */}
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/BaseConhecimento"
+                  className="px-3 py-1.5 bg-white text-blue-600 hover:bg-blue-50 border border-blue-200 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
+                >
+                  <BookOpen size={14} />
+                  <span>Página Completa da Base</span>
+                  <ArrowUpRight size={13} />
+                </Link>
+              </div>
+            </div>
+
+            {filteredKnowledgeArticles.length === 0 ? (
+              <div className="bg-white p-12 rounded-3xl border border-gray-200 text-center space-y-4 shadow-xs">
+                <div className="w-16 h-16 mx-auto bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                  <HelpCircle size={32} />
+                </div>
+                <div className="space-y-1 max-w-md mx-auto">
+                  <h4 className="text-base font-extrabold text-gray-900">Nenhum artigo encontrado</h4>
+                  <p className="text-xs text-gray-500">
+                    Não encontramos nenhum guia para o termo "{knowledgeSearch}". Tente buscar por termos como "caixa", "venda", "nfe" ou "cartão".
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setKnowledgeSearch("");
+                    setSelectedKnowledgeCategory("all");
+                    setSelectedKnowledgeTag(null);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  Limpar Filtros e Ver Todos
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {filteredKnowledgeArticles.map((article) => {
+                  const isExpanded = expandedArticleId === article.id;
+                  const categoryMeta = KNOWLEDGE_CATEGORIES.find((c) => c.id === article.category);
+
+                  return (
+                    <div
+                      key={article.id}
+                      className="bg-white rounded-3xl border border-gray-200/90 shadow-xs hover:shadow-md hover:border-blue-300 transition-all p-6 flex flex-col justify-between space-y-5 group"
+                    >
+                      <div className="space-y-3.5">
+                        {/* Card Header Badges */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                              categoryMeta?.badgeColor || "bg-gray-100 text-gray-700 border-gray-200"
+                            }`}
+                          >
+                            {categoryMeta && renderCategoryIcon(categoryMeta.iconName, "w-3.5 h-3.5")}
+                            <span>{categoryMeta?.name || article.category.toUpperCase()}</span>
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            {article.isPopular && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold rounded-md">
+                                <Sparkles size={11} className="text-amber-500" />
+                                <span>Destaque</span>
+                              </span>
+                            )}
+                            <span className="text-[11px] font-semibold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+                              {article.readTime} de leitura
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Title & Summary */}
+                        <div>
+                          <h4 className="text-base font-black text-gray-900 group-hover:text-blue-600 transition-colors leading-snug">
+                            {article.title}
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1.5 leading-relaxed line-clamp-3">
+                            {article.summary}
+                          </p>
+                        </div>
+
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {article.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedKnowledgeTag(tag);
+                              }}
+                              className="text-[10px] font-bold px-2 py-0.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 text-slate-500 rounded-md border border-slate-200/60 cursor-pointer transition-colors"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Expandable Step-by-Step Preview */}
+                        {article.steps && article.steps.length > 0 && (
+                          <div className="border border-gray-100 rounded-2xl bg-gray-50/60 p-3 space-y-2">
+                            <button
+                              onClick={() => setExpandedArticleId(isExpanded ? null : article.id)}
+                              className="w-full flex items-center justify-between text-xs font-bold text-gray-700 hover:text-blue-600 transition-colors cursor-pointer"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <Check size={14} className="text-emerald-500" />
+                                <span>Passo a Passo Rápido ({article.steps.length} etapas)</span>
+                              </span>
+                              <ChevronDown
+                                size={14}
+                                className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                              />
+                            </button>
+
+                            {isExpanded && (
+                              <div className="pt-2 border-t border-gray-200/60 space-y-2 animate-in fade-in duration-150">
+                                <ol className="space-y-1.5 text-xs text-gray-700">
+                                  {article.steps.map((step, idx) => (
+                                    <li key={idx} className="flex items-start gap-2">
+                                      <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="leading-snug">{step}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+
+                                {article.tips && (
+                                  <div className="p-2.5 bg-amber-50/80 rounded-xl border border-amber-200/60 text-[11px] text-amber-900 flex items-start gap-2 mt-2">
+                                    <Sparkles size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                                    <span className="leading-tight">
+                                      <strong>Dica Pro:</strong> {article.tips}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Action Buttons */}
+                      <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedArticleModal(article)}
+                            className="px-3.5 py-2 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white font-extrabold text-xs rounded-xl border border-blue-200 hover:border-blue-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            <BookOpen size={14} />
+                            <span>Ver Manual Completo</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleCopyArticle(article)}
+                            className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-gray-200"
+                            title="Copiar resumo do procedimento"
+                          >
+                            {copiedArticleId === article.id ? (
+                              <Check size={16} className="text-emerald-600" />
+                            ) : (
+                              <Copy size={16} />
+                            )}
+                          </button>
+                        </div>
+
+                        {article.linkTo && (
+                          <Link
+                            to={article.linkTo}
+                            className="inline-flex items-center gap-1 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition-colors"
+                          >
+                            <span>{article.linkText || "Ir para a Tela"}</span>
+                            <ArrowUpRight size={13} />
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TICKETS & ATTENDANCE AREA */}
+      {activeSupportTab === "tickets" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-200">
         
         {/* Left Column (7 cols): New Ticket Form & My Tickets */}
         <div className="lg:col-span-7 space-y-8">
@@ -993,6 +1487,152 @@ Preciso de auxílio técnico com a plataforma.`;
 
         </div>
       </div>
+      )}
+
+      {/* Interactive Knowledge Base Article Modal */}
+      {selectedArticleModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative bg-white w-full max-w-3xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] border border-gray-100 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between gap-4 shrink-0">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-blue-600">
+                    Manual Operacional
+                  </span>
+                  <span className="text-gray-300">•</span>
+                  <span className="text-xs font-semibold text-gray-500">
+                    {selectedArticleModal.readTime} de leitura
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-gray-900 leading-tight">
+                  {selectedArticleModal.title}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedArticleModal(null)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Direct Action Link if available */}
+              {selectedArticleModal.linkTo && (
+                <div className="p-4 bg-blue-50/80 rounded-2xl border border-blue-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-600 text-white rounded-xl">
+                      <ExternalLink size={18} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-extrabold text-blue-900">Quer executar este procedimento agora?</p>
+                      <p className="text-[11px] text-blue-700">Acesse a tela do sistema diretamente sem perder seu contexto.</p>
+                    </div>
+                  </div>
+                  <Link
+                    to={selectedArticleModal.linkTo}
+                    onClick={() => setSelectedArticleModal(null)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-xs flex items-center gap-1.5 shrink-0"
+                  >
+                    <span>{selectedArticleModal.linkText || "Acessar Módulo"}</span>
+                    <ArrowUpRight size={14} />
+                  </Link>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200/70">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Visão Geral</h4>
+                <p className="text-sm text-gray-800 font-medium leading-relaxed">
+                  {selectedArticleModal.summary}
+                </p>
+              </div>
+
+              {/* Step-by-Step Section */}
+              {selectedArticleModal.steps && selectedArticleModal.steps.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                    <Check size={16} className="text-emerald-600" />
+                    <span>Passo a Passo Guiado</span>
+                  </h4>
+                  <div className="space-y-2.5">
+                    {selectedArticleModal.steps.map((step, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50/80 rounded-xl border border-gray-100">
+                        <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <p className="text-xs sm:text-sm text-gray-800 font-medium leading-relaxed">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tips Box */}
+              {selectedArticleModal.tips && (
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 flex items-start gap-3">
+                  <Sparkles size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Dica de Especialista PowerControl</h5>
+                    <p className="text-xs sm:text-sm text-amber-950 mt-1 leading-relaxed">{selectedArticleModal.tips}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Markdown Content */}
+              <div className="pt-4 border-t border-gray-100">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Instruções Aprofundadas</h4>
+                <div className="prose prose-sm max-w-none text-gray-700 text-xs sm:text-sm leading-relaxed">
+                  <ReactMarkdown>{selectedArticleModal.content}</ReactMarkdown>
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="pt-2 border-t border-gray-100 flex flex-wrap gap-1.5 items-center">
+                <span className="text-xs font-bold text-gray-400 mr-1">Palavras-chave:</span>
+                {selectedArticleModal.tags.map((tag) => (
+                  <span key={tag} className="text-[11px] font-bold px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-md">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleCopyArticle(selectedArticleModal)}
+                className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {copiedArticleId === selectedArticleModal.id ? (
+                  <>
+                    <Check size={14} className="text-emerald-600" />
+                    <span>Copiado com Sucesso</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={14} />
+                    <span>Copiar Procedimento</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedArticleModal(null)}
+                className="px-5 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ticket Details Interactive Modal */}
       {selectedTicket && (
